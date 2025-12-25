@@ -3,9 +3,9 @@ name = "haze-library"
 version = "0.1.0"
 edition = "2021"
 description = "Rust backend for Haze quantitative trading indicators library"
-license = "MIT"
-homepage = "https://github.com/haze-library/haze-library"
-repository = "https://github.com/haze-library/haze-library"
+license = "CC-BY-NC-4.0"
+homepage = "https://github.com/kwannz/haze"
+repository = "https://github.com/kwannz/haze"
 
 [lib]
 name = "haze_library"

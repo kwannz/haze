@@ -31,6 +31,11 @@
 
 ### 📦 Installation
 
+#### From PyPI (Recommended)
+```bash
+pip install haze-library
+```
+
 #### From Source
 ```bash
 git clone https://github.com/kwannz/haze.git
@@ -41,7 +46,7 @@ maturin develop --release
 
 #### Prerequisites
 - Python 3.9+
-- Rust 1.75+ (for building from source)
+- Rust 1.75+ (required only for building from source)
 
 ### 🚀 Quick Start
 
@@ -218,6 +223,11 @@ For commercial licensing inquiries, please contact: team@haze-library.com
 - **🐍 Pythonic API**：与 pandas、numpy 等 Python 库无缝集成
 
 ### 📦 安装
+
+#### 从 PyPI 安装（推荐）
+```bash
+pip install haze-library
+```
 
 #### 从源码安装
 ```bash
