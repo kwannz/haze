@@ -221,6 +221,11 @@ pub fn dx(
     close: &[f64],
     period: usize,
 ) -> Vec<f64> {
+    // 边界检查：空数组
+    if high.is_empty() || low.is_empty() || close.is_empty() {
+        return vec![];
+    }
+
     // 复用 adx 函数的逻辑，但只返回 DX 部分
     let n = high.len();
     if n != low.len() || n != close.len() {
@@ -306,6 +311,11 @@ pub fn plus_di(
     close: &[f64],
     period: usize,
 ) -> Vec<f64> {
+    // 边界检查：空数组
+    if high.is_empty() || low.is_empty() || close.is_empty() {
+        return vec![];
+    }
+
     let (_adx, plus_di, _minus_di) = adx(high, low, close, period);
     plus_di
 }
@@ -328,6 +338,11 @@ pub fn minus_di(
     close: &[f64],
     period: usize,
 ) -> Vec<f64> {
+    // 边界检查：空数组
+    if high.is_empty() || low.is_empty() || close.is_empty() {
+        return vec![];
+    }
+
     let (_adx, _plus_di, minus_di) = adx(high, low, close, period);
     minus_di
 }

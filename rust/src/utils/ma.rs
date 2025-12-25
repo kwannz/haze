@@ -82,11 +82,6 @@ pub fn ema(values: &[f64], period: usize) -> Vec<f64> {
         count += 1;
         sum += values[i];
 
-        if count > period {
-            sum -= values[i - period];
-            count = period;
-        }
-
         if count == period {
             result[i] = sum / period as f64;
             start_idx = Some(i);

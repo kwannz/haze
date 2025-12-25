@@ -2,6 +2,8 @@
 //
 // 包含：Entropy, Aberration, Squeeze, QQE, CTI, ER, Bias, PSL, RVI, Inertia
 
+#![allow(unused_variables)]
+
 use crate::utils::{ema, sma, stdev, rma, rolling_max, rolling_min};
 use crate::indicators::{atr, bollinger_bands, keltner_channel, rsi};
 
@@ -961,11 +963,12 @@ fn wma(values: &[f64], period: usize) -> Vec<f64> {
         let mut valid = true;
 
         for j in 0..period {
-            if values[i - period + 1 + j].is_nan() {
+            let idx = i + 1 + j - period;
+            if values[idx].is_nan() {
                 valid = false;
                 break;
             }
-            weighted_sum += values[i - period + 1 + j] * (j + 1) as f64;
+            weighted_sum += values[idx] * (j + 1) as f64;
         }
 
         if valid {

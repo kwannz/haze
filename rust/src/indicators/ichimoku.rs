@@ -1,4 +1,5 @@
 // indicators/ichimoku.rs - Ichimoku Cloud（一目均衡表）
+#![allow(dead_code)]
 //
 // 一目均衡表是日本传统技术分析系统，包含 5 条线：
 // 1. Tenkan-sen（转换线）：9 周期高低平均

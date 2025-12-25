@@ -1,3 +1,6 @@
+// TA-Lib 兼容 API: 部分函数需要 high/low 参数但未使用
+#![allow(unused_variables)]
+
 /// Candlestick Pattern Recognition Module
 ///
 /// 实现经典的蜡烛图形态识别，包括：
@@ -748,14 +751,8 @@ pub fn marubozu(
         let upper = upper_shadow(high[i], open[i], close[i]);
         let lower = lower_shadow(low[i], open[i], close[i]);
 
-        if range > 0.0 && body / range > 0.95 && upper < body * 0.05 && lower < body * 0.05 {
-            if is_bullish(open[i], close[i]) {
-                result[i] = 1.0; // Bullish Marubozu
-            } else if is_bearish(open[i], close[i]) {
-                result[i] = -1.0; // Bearish Marubozu
-            } else {
-                result[i] = 0.0;
-            }
+        if range > 0.0 && body > 0.0 && body / range > 0.95 && upper < body * 0.05 && lower < body * 0.05 {
+            result[i] = if is_bullish(open[i], close[i]) { 1.0 } else { -1.0 };
         } else {
             result[i] = 0.0;
         }
@@ -2579,8 +2576,8 @@ pub fn highwave(
     for i in 0..n {
         let range = total_range(high[i], low[i]);
         let body = body_length(open[i], close[i]);
-        let upper = upper_shadow(open[i], high[i], close[i]);
-        let lower = lower_shadow(open[i], low[i], close[i]);
+        let upper = upper_shadow(high[i], open[i], close[i]);
+        let lower = lower_shadow(low[i], open[i], close[i]);
 
         // 小实体
         let small_body = range > 0.0 && body < range * body_threshold;
@@ -3021,6 +3018,14 @@ pub fn breakaway(
 #[cfg(test)]
 mod tests_extended {
     use super::*;
+
+    #[test]
+    fn test_average_body_length_empty() {
+        let open = vec![1.0];
+        let close = vec![1.0];
+        let avg = average_body_length(&open, &close, 1, 0);
+        assert_eq!(avg, 0.0);
+    }
 
     #[test]
     fn test_marubozu() {

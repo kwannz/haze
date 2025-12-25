@@ -20,6 +20,11 @@ use crate::utils::{rma, sma, stdev, rolling_max, rolling_min};
 /// # 返回
 /// - 与输入等长的向量，第一个值为 high[0] - low[0]
 pub fn true_range(high: &[f64], low: &[f64], close: &[f64], drift: usize) -> Vec<f64> {
+    // 边界检查：空数组
+    if high.is_empty() || low.is_empty() || close.is_empty() {
+        return vec![];
+    }
+
     let n = high.len();
     if n != low.len() || n != close.len() {
         return vec![f64::NAN; n];
@@ -57,6 +62,11 @@ pub fn true_range(high: &[f64], low: &[f64], close: &[f64], drift: usize) -> Vec
 /// # 返回
 /// - 与输入等长的向量，前 period-1 个值为 NaN
 pub fn atr(high: &[f64], low: &[f64], close: &[f64], period: usize) -> Vec<f64> {
+    // 边界检查：空数组
+    if high.is_empty() || low.is_empty() || close.is_empty() {
+        return vec![];
+    }
+
     let tr = true_range(high, low, close, 1);
     rma(&tr, period)
 }
@@ -74,6 +84,11 @@ pub fn atr(high: &[f64], low: &[f64], close: &[f64], period: usize) -> Vec<f64> 
 /// # 返回
 /// - 与输入等长的向量，单位为百分比
 pub fn natr(high: &[f64], low: &[f64], close: &[f64], period: usize) -> Vec<f64> {
+    // 边界检查：空数组
+    if high.is_empty() || low.is_empty() || close.is_empty() {
+        return vec![];
+    }
+
     let atr_values = atr(high, low, close, period);
     atr_values
         .iter()

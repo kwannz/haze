@@ -1,4 +1,7 @@
 // types.rs - 核心数据类型定义
+// 内部辅助函数保留供未来扩展
+#![allow(dead_code)]
+
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 #[cfg(not(feature = "python"))]

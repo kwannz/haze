@@ -1,6 +1,7 @@
 // indicators/overlap.rs - Overlap/MA 指标
 //
 // 大部分 MA 函数已在 utils/ma.rs 中实现，这里重新导出并添加一些高级 MA
+#![allow(dead_code)]
 
 #[allow(unused_imports)]
 pub use crate::utils::{dema, ema, hma, rma, sma, tema, wma};

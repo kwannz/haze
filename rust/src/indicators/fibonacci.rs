@@ -3,6 +3,7 @@
 // 提供 Fibonacci 比率计算和关键价位标记
 // - Retracement Levels（回撤位）：0.236, 0.382, 0.5, 0.618, 0.786
 // - Extension Levels（扩展位）：1.272, 1.414, 1.618, 2.0, 2.618
+#![allow(dead_code)]
 
 use std::collections::HashMap;
 

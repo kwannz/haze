@@ -1,3 +1,6 @@
+// 价格变换函数保留供未来扩展
+#![allow(dead_code)]
+
 /// Price Transform Indicators Module
 ///
 /// 价格变换指标，用于从 OHLC 数据计算各种典型价格

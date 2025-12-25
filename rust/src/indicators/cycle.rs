@@ -232,24 +232,22 @@ pub fn ht_trendmode(values: &[f64]) -> Vec<f64> {
     let mut trend_count = 0;
     
     for i in 63..n {
-        if !period[i].is_nan() {
-            // If period is increasing, likely in trend
-            let period_slope = if i > 63 {
-                period[i] - period[i-1]
-            } else {
-                0.0
-            };
-            
-            // Trend detection logic
-            if period[i] > 40.0 || period_slope > 1.0 {
-                trend_count += 1;
-            } else if period[i] < 15.0 {
-                trend_count = (trend_count - 1).max(0);
-            }
-            
-            // Smooth the trend mode
-            result[i] = if trend_count > 3 { 1.0 } else { 0.0 };
+        // If period is increasing, likely in trend
+        let period_slope = if i > 63 {
+            period[i] - period[i-1]
+        } else {
+            0.0
+        };
+
+        // Trend detection logic
+        if period[i] > 40.0 || period_slope > 1.0 {
+            trend_count += 1;
+        } else if period[i] < 15.0 {
+            trend_count = (trend_count - 1).max(0);
         }
+
+        // Smooth the trend mode
+        result[i] = if trend_count > 3 { 1.0 } else { 0.0 };
     }
     
     result

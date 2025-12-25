@@ -1,4 +1,5 @@
 // utils/stats.rs - 统计工具函数
+#![allow(dead_code)]
 
 use std::collections::VecDeque;
 

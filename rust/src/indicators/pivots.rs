@@ -1,4 +1,5 @@
 // indicators/pivots.rs - Pivot Points（枢轴点）
+#![allow(dead_code)]
 //
 // Pivot Points 是基于前一周期（通常是日）的高低收盘价计算的支撑/阻力位
 // 包含多种计算方法：

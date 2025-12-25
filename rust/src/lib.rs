@@ -8,6 +8,7 @@ use pyo3::prelude::*;
 mod types;
 mod utils;
 mod indicators;
+mod ml;
 
 #[cfg(feature = "python")]
 use types::{Candle, IndicatorResult, MultiIndicatorResult};
@@ -16,7 +17,7 @@ use types::{Candle, IndicatorResult, MultiIndicatorResult};
 
 #[cfg(feature = "python")]
 #[pymodule]
-fn _haze_rust(_py: Python, m: &PyModule) -> PyResult<()> {
+fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // 类型
     m.add_class::<Candle>()?;
     m.add_class::<IndicatorResult>()?;
@@ -213,11 +214,26 @@ fn _haze_rust(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_sarext, m)?)?;
     m.add_function(wrap_pyfunction!(py_mama, m)?)?;
 
-    // SFG 交易信号指标
+    // SFG 交易信号指标 (KNN 版本)
     m.add_function(wrap_pyfunction!(py_ai_supertrend, m)?)?;
     m.add_function(wrap_pyfunction!(py_ai_momentum_index, m)?)?;
     m.add_function(wrap_pyfunction!(py_dynamic_macd, m)?)?;
     m.add_function(wrap_pyfunction!(py_atr2_signals, m)?)?;
+
+    // SFG ML 增强版指标 (linfa)
+    m.add_function(wrap_pyfunction!(py_ai_supertrend_ml, m)?)?;
+    m.add_function(wrap_pyfunction!(py_atr2_signals_ml, m)?)?;
+    m.add_function(wrap_pyfunction!(py_ai_momentum_index_ml, m)?)?;
+    m.add_function(wrap_pyfunction!(py_pivot_buy_sell, m)?)?;
+
+    // SFG 市场结构分析
+    m.add_function(wrap_pyfunction!(py_detect_divergence, m)?)?;
+    m.add_function(wrap_pyfunction!(py_fvg_signals, m)?)?;
+    m.add_function(wrap_pyfunction!(py_volume_filter, m)?)?;
+
+    // SFG 信号工具
+    m.add_function(wrap_pyfunction!(py_combine_signals, m)?)?;
+    m.add_function(wrap_pyfunction!(py_calculate_stops, m)?)?;
 
     // 周期指标 (Hilbert Transform)
     m.add_function(wrap_pyfunction!(py_ht_dcperiod, m)?)?;
@@ -1945,6 +1961,230 @@ fn py_atr2_signals(
     ))
 }
 
+// ==================== SFG ML 增强版指标包装 ====================
+
+/// AI SuperTrend ML 增强版
+/// 返回: (supertrend, direction, buy_signals, sell_signals, stop_loss, take_profit)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_ai_supertrend_ml(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    st_length: Option<usize>,
+    st_multiplier: Option<f64>,
+    model_type: Option<String>,
+    lookback: Option<usize>,
+    train_window: Option<usize>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+    let model_str = model_type.unwrap_or_else(|| "linreg".to_string());
+    let result = indicators::ai_supertrend_ml(
+        &high,
+        &low,
+        &close,
+        st_length.unwrap_or(10),
+        st_multiplier.unwrap_or(3.0),
+        &model_str,
+        lookback.unwrap_or(10),
+        train_window.unwrap_or(200),
+    );
+    Ok((
+        result.supertrend,
+        result.direction,
+        result.buy_signals,
+        result.sell_signals,
+        result.stop_loss,
+        result.take_profit,
+    ))
+}
+
+/// ATR2 信号 ML 增强版
+/// 返回: (rsi, buy_signals, sell_signals, signal_strength, stop_loss, take_profit)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_atr2_signals_ml(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    volume: Vec<f64>,
+    rsi_period: Option<usize>,
+    atr_period: Option<usize>,
+    ridge_alpha: Option<f64>,
+    momentum_window: Option<usize>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+    let result = indicators::atr2_signals_ml(
+        &high,
+        &low,
+        &close,
+        &volume,
+        rsi_period.unwrap_or(14),
+        atr_period.unwrap_or(14),
+        ridge_alpha.unwrap_or(1.0),
+        momentum_window.unwrap_or(10),
+    );
+    Ok((
+        result.rsi,
+        result.buy_signals,
+        result.sell_signals,
+        result.signal_strength,
+        result.stop_loss,
+        result.take_profit,
+    ))
+}
+
+/// AI Momentum Index ML 增强版
+/// 返回: (rsi, predicted_momentum, zero_cross_buy, zero_cross_sell, overbought, oversold)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_ai_momentum_index_ml(
+    close: Vec<f64>,
+    rsi_period: Option<usize>,
+    smooth_period: Option<usize>,
+    use_polynomial: Option<bool>,
+    lookback: Option<usize>,
+    train_window: Option<usize>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+    let result = indicators::ai_momentum_index_ml(
+        &close,
+        rsi_period.unwrap_or(14),
+        smooth_period.unwrap_or(3),
+        use_polynomial.unwrap_or(false),
+        lookback.unwrap_or(5),
+        train_window.unwrap_or(200),
+    );
+    Ok((
+        result.rsi,
+        result.predicted_momentum,
+        result.zero_cross_buy,
+        result.zero_cross_sell,
+        result.overbought,
+        result.oversold,
+    ))
+}
+
+/// Pivot 买卖信号
+/// 返回: (pivot, r1, r2, s1, s2, buy_signals, sell_signals)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_pivot_buy_sell(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    lookback: Option<usize>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+    let result = indicators::pivot_buy_sell(&high, &low, &close, lookback.unwrap_or(5));
+    Ok((
+        result.pivot,
+        result.r1,
+        result.r2,
+        result.s1,
+        result.s2,
+        result.buy_signals,
+        result.sell_signals,
+    ))
+}
+
+// ==================== SFG 市场结构分析包装 ====================
+
+/// 背离检测
+/// 返回: (divergence_type, strength)
+/// divergence_type: 0=None, 1=RegularBullish, 2=RegularBearish, 3=HiddenBullish, 4=HiddenBearish
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_detect_divergence(
+    price: Vec<f64>,
+    indicator: Vec<f64>,
+    lookback: Option<usize>,
+    threshold: Option<f64>,
+) -> PyResult<(Vec<i32>, Vec<f64>)> {
+    let result = indicators::detect_divergence(
+        &price,
+        &indicator,
+        lookback.unwrap_or(5),
+        threshold.unwrap_or(0.01),
+    );
+    let divergence_type: Vec<i32> = result
+        .divergence_type
+        .iter()
+        .map(|d| match d {
+            indicators::DivergenceType::None => 0,
+            indicators::DivergenceType::RegularBullish => 1,
+            indicators::DivergenceType::RegularBearish => 2,
+            indicators::DivergenceType::HiddenBullish => 3,
+            indicators::DivergenceType::HiddenBearish => 4,
+        })
+        .collect();
+    Ok((divergence_type, result.strength))
+}
+
+/// FVG (Fair Value Gap) 信号
+/// 返回: (bullish_fvg, bearish_fvg, fvg_upper, fvg_lower)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_fvg_signals(high: Vec<f64>, low: Vec<f64>) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+    let (bullish, bearish, upper, lower) = indicators::fvg_signals(&high, &low);
+    Ok((bullish, bearish, upper, lower))
+}
+
+/// 成交量过滤器
+/// 返回: (above_average, relative_volume, volume_spike)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_volume_filter(volume: Vec<f64>, period: Option<usize>) -> PyResult<(Vec<bool>, Vec<f64>, Vec<bool>)> {
+    let result = indicators::volume_filter(&volume, period.unwrap_or(20));
+    Ok((result.above_average, result.relative_volume, result.volume_spike))
+}
+
+// ==================== SFG 信号工具包装 ====================
+
+/// 简单信号组合 (加权平均)
+/// 返回: (combined_buy, combined_sell)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_combine_signals(
+    buy1: Vec<f64>,
+    sell1: Vec<f64>,
+    buy2: Vec<f64>,
+    sell2: Vec<f64>,
+    weight1: Option<f64>,
+) -> PyResult<(Vec<f64>, Vec<f64>)> {
+    let len = buy1.len();
+    let w1 = weight1.unwrap_or(0.5);
+    let w2 = 1.0 - w1;
+    let mut combined_buy = vec![0.0; len];
+    let mut combined_sell = vec![0.0; len];
+
+    for i in 0..len {
+        combined_buy[i] = buy1[i] * w1 + buy2[i] * w2;
+        combined_sell[i] = sell1[i] * w1 + sell2[i] * w2;
+    }
+
+    Ok((combined_buy, combined_sell))
+}
+
+/// 计算止损止盈
+/// 返回: (stop_loss, take_profit)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_calculate_stops(
+    entry_price: f64,
+    atr_value: f64,
+    is_long: bool,
+    sl_multiplier: Option<f64>,
+    tp_multiplier: Option<f64>,
+) -> PyResult<(f64, f64)> {
+    let sl_mult = sl_multiplier.unwrap_or(1.5);
+    let tp_mult = tp_multiplier.unwrap_or(2.5);
+
+    let (stop_loss, take_profit) = if is_long {
+        (entry_price - atr_value * sl_mult, entry_price + atr_value * tp_mult)
+    } else {
+        (entry_price + atr_value * sl_mult, entry_price - atr_value * tp_mult)
+    };
+
+    Ok((stop_loss, take_profit))
+}
+
 // ==================== 周期指标包装 (Hilbert Transform) ====================
 #[cfg(feature = "python")]
 #[pyfunction]
@@ -2119,9 +2359,9 @@ fn py_minus_di(
 fn py_t3(
     values: Vec<f64>,
     period: Option<usize>,
-    v_factor: Option<f64>,
+    vfactor: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(utils::t3(&values, period.unwrap_or(5), v_factor.unwrap_or(0.7)))
+    Ok(utils::t3(&values, period.unwrap_or(5), vfactor.unwrap_or(0.7)))
 }
 
 #[cfg(feature = "python")]
