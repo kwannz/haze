@@ -257,6 +257,11 @@ pub fn detect_swing_points(
     let n = high.len();
     let mut swings = Vec::new();
 
+    // 防止空数据或数据不足导致下溢
+    if n == 0 || n < left_bars + right_bars + 1 {
+        return swings;
+    }
+
     for i in left_bars..(n - right_bars) {
         // 检测高点：当前高价 >= 左右窗口内所有高价
         let is_swing_high = (i - left_bars..i).all(|j| high[i] >= high[j])
@@ -969,12 +974,23 @@ pub fn harmonics_signal(
     left_bars: usize, right_bars: usize, min_probability: f64,
 ) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
     let n = high.len();
+
+    // 空数据或数据不足的情况
+    if n == 0 {
+        return (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    }
+
     let mut signals = vec![0.0; n];
     let mut prz_upper = vec![f64::NAN; n];
     let mut prz_lower = vec![f64::NAN; n];
     let mut probability = vec![f64::NAN; n];
 
     let _ = close; // 保留参数以备后续使用
+
+    // 数据不足以形成摆动点
+    if n < left_bars + right_bars + 1 {
+        return (signals, prz_upper, prz_lower, probability);
+    }
 
     let completed = detect_all_harmonics(high, low, left_bars, right_bars);
 

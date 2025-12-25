@@ -13,6 +13,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MANIFEST.in for proper Python packaging
 - .gitignore for clean repository
 
+## [0.1.1] - 2025-12-26
+
+### Added - Harmonic Patterns 🎵
+
+#### Batch 11: Harmonic Pattern Indicators (212 → 215)
+- **Harmonic Pattern Detection (3)**:
+  - `py_harmonics`: Time-series signal output (signals, prz_upper, prz_lower, probability)
+  - `py_harmonics_patterns`: Detailed pattern objects with PyHarmonicPattern class
+  - `py_harmonics_prz`: PRZ (Potential Reversal Zone) calculation
+
+- **Supported Harmonic Patterns (9 types)**:
+  - Gartley (伽利形态)
+  - Bat (蝙蝠形态)
+  - Butterfly (蝴蝶形态)
+  - Crab (螃蟹形态)
+  - Deep Crab (深蟹形态)
+  - Shark (鲨鱼形态)
+  - Cypher (赛弗形态)
+  - Three Drive (三驱形态)
+  - Alt Bat (变体蝙蝠)
+
+- **Features**:
+  - XABCD swing point detection with configurable left/right bars
+  - Fibonacci ratio validation per pattern type
+  - PRZ zone calculation (confluence of multiple Fib projections)
+  - Completion probability estimation
+  - Target price and stop-loss calculation
+  - Forming pattern detection (incomplete XABC patterns)
+  - Bilingual support (English + Chinese pattern names)
+
+### Fixed
+- Empty data crash in harmonics.rs with bounds checking
+
+---
+
 ## [0.1.0] - 2025-12-25
 
 ### Added - Implementation Complete (212/212 Indicators) 🎉
@@ -127,6 +162,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
+- **v0.1.1** (2025-12-26): Harmonic Pattern Detection - 215 indicators
 - **v0.1.0** (2025-12-25): 100% Implementation Complete - 212 indicators
 - **v0.0.1** (2025-12-20): Initial release - 30 indicators
 

@@ -1,9 +1,9 @@
 # Haze-Library 已实现指标清单
 
 **版本**: 0.1.0
-**更新日期**: 2025-12-25
-**总计**: 212 个指标
-**目标**: 212+ 指标（完成度 100% ✅）
+**更新日期**: 2025-12-26
+**总计**: 215 个指标
+**目标**: 215+ 指标（完成度 100% ✅）
 
 ---
 
@@ -99,7 +99,7 @@
 | HMA | `py_hma` | (values, period) | 船体移动平均 |
 | RMA | `py_rma` | (values, period) | 威尔德移动平均 |
 | **ZLMA** | `py_zlma` | (values, period) | 零滞后移动平均 |
-| **T3** | `py_t3` | (values, period, v_factor=0.7) | Tillson T3 |
+| **T3** | `py_t3` | (values, period, vfactor=0.7) | Tillson T3 |
 | **KAMA** | `py_kama` | (values, period=10, fast_period=2, slow_period=30) | 考夫曼自适应移动平均 |
 | **FRAMA** | `py_frama` | (values, period=16) | 分形自适应移动平均 |
 | **ALMA** | `py_alma` | (values, period=9, offset=0.85, sigma=6.0) | 阿诺·勒古克斯移动平均（高斯加权） |
@@ -343,6 +343,48 @@
 
 ---
 
+## 15. 谐波形态指标 (Harmonic Patterns) - 3个
+
+| 指标 | 函数名 | 参数 | 说明 |
+|------|--------|------|------|
+| **Swing Points** | `py_swing_points` | (high, low, left_bars=5, right_bars=5) | 摆动点检测（返回高/低点列表） |
+| **Harmonics Signal** | `py_harmonics` | (high, low, close, left_bars=5, right_bars=5, min_probability=0.5) | 谐波形态时间序列信号（返回 signals, prz_upper, prz_lower, probability） |
+| **Harmonics Patterns** | `py_harmonics_patterns` | (high, low, left_bars=5, right_bars=5, include_forming=True) | 谐波形态详情（返回 PyHarmonicPattern 列表） |
+
+### 支持的形态类型（9种）
+
+| 形态 | 英文名 | 中文名 | AB/XA | AD/XA |
+|------|--------|--------|-------|-------|
+| Gartley | Gartley | 伽利形态 | 0.618 | 0.786 |
+| Bat | Bat | 蝙蝠形态 | 0.382-0.500 | 0.886 |
+| Butterfly | Butterfly | 蝴蝶形态 | 0.786 | 1.27-1.618 |
+| Crab | Crab | 螃蟹形态 | 0.382-0.618 | 1.618 |
+| Deep Crab | DeepCrab | 深蟹形态 | 0.886 | 1.618 |
+| Shark | Shark | 鲨鱼形态 | 0.382-0.618 | 0.886-1.13 |
+| Cypher | Cypher | 赛弗形态 | 0.382-0.618 | 0.786 |
+| Three Drive | ThreeDrive | 三驱形态 | 1.272-1.618 | 1.272-1.618 |
+| Alt Bat | AltBat | 变体蝙蝠 | 0.382 | 1.13 |
+
+### PyHarmonicPattern 属性
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| pattern_type | str | 形态英文名 |
+| pattern_type_zh | str | 形态中文名 |
+| is_bullish | bool | 是否看涨 |
+| state | str | "forming" 或 "complete" |
+| x_index, x_price | int, float | X 点位置和价格 |
+| a_index, a_price | int, float | A 点位置和价格 |
+| b_index, b_price | int, float | B 点位置和价格 |
+| c_index, c_price | int, float | C 点位置和价格（可选） |
+| d_index, d_price | int, float | D 点位置和价格（可选） |
+| prz_high, prz_low, prz_center | float | 潜在反转区（PRZ） |
+| probability | float | 完成概率（0-1） |
+| tp1, tp2, tp3 | float | 三个目标价位 |
+| stop_loss | float | 止损价位 |
+
+---
+
 ## 实现进度统计
 
 ### 按类别分布
@@ -362,8 +404,9 @@
 - 一目均衡表: 1 个
 - 枢轴点: 1 个
 - **pandas-ta 独有指标: 25 个（Batch 8-10 完整）**
+- **谐波形态指标: 3 个（9种形态，含 PRZ、概率、目标价）** 🆕
 
-**总计**: 212 个指标 ✅
+**总计**: 215 个指标 ✅
 
 ### 本次更新新增（2025-12-25）
 **第一批（117 → 117 个）**
@@ -425,9 +468,17 @@
   - SINWMA（正弦加权 MA，正弦曲线权重）
   - SWMA（对称加权 MA，对称三角形权重）
 
+**第十一批（212 → 215 个）- Batch 11（2025-12-26）**
+- 谐波形态指标（3个）：
+  - `py_swing_points` - 摆动点检测
+  - `py_harmonics` - 时间序列信号（signals, PRZ, probability）
+  - `py_harmonics_patterns` - 形态详情（PyHarmonicPattern 对象）
+- 支持 9 种谐波形态：Gartley, Bat, Butterfly, Crab, DeepCrab, Shark, Cypher, ThreeDrive, AltBat
+- 特性：PRZ 计算、完成概率、目标价位、止损价位、中文名称
+
 ### 与目标对比
-- **目标**: 212+ 指标（TA-Lib 150+ + pandas-ta 独有 + pyharmonics）
-- **已完成**: 212 个 ✅
+- **目标**: 215+ 指标（TA-Lib 150+ + pandas-ta 独有 + pyharmonics）
+- **已完成**: 215 个 ✅
 - **完成度**: 100% 🎉
 - **剩余**: 0 个指标（已达成里程碑！）
 
@@ -435,24 +486,23 @@
 
 ## 下一步计划
 
-### Sprint 2 - 扩展指标库（Week 3-6）
-1. **TA-Lib 剩余指标**（~50 个）
+### ✅ Sprint 2 - 扩展指标库（已完成）
+1. **TA-Lib 剩余指标** ✅
    - 价格变换（AVGPRICE, MEDPRICE, TYPPRICE, WCLPRICE）
    - 周期指标（HT_DCPERIOD, HT_DCPHASE, HT_PHASOR, HT_SINE, HT_TRENDMODE）
    - 数学运算（MAX, MIN, SUM, SQRT, LN, LOG10, SIN, COS, TAN, ATAN, CEIL, FLOOR）
-   - 模式识别（更多蜡烛图形态）
+   - 模式识别（61 个蜡烛图形态）
 
-2. **pandas-ta-kw 独有指标**（~80 个）
-   - Aberration, Aligator, Balance of Power
-   - Coppock Curve, Elder Ray Index
-   - KST Oscillator, Know Sure Thing
-   - Psychological Line, Quantitative QStick
-   - True Strength Index variants
+2. **pandas-ta 独有指标** ✅
+   - 25 个指标（Batch 8-10 完整）
+   - Aberration, Alligator, BOP, Coppock, KST, STC, WAE 等
 
-3. **pyharmonics 谐波形态**（~10 个）
-   - XABCD 形态已部分实现
-   - 需要完善：Gartley, Bat, Butterfly, Crab, Shark, Cypher
-   - 自动扫描和可视化支持
+3. **pyharmonics 谐波形态** ✅（2025-12-26 完成）
+   - 9 种 XABCD 形态：Gartley, Bat, Butterfly, Crab, DeepCrab, Shark, Cypher, ThreeDrive, AltBat
+   - PRZ（潜在反转区）计算
+   - 完成概率估算
+   - 目标价位和止损计算
+   - 中文名称支持
 
 ### Sprint 3 - 性能优化（Week 7-10）
 - SIMD 向量化（AVX2）
@@ -491,7 +541,7 @@ pip install target/wheels/haze_library-0.1.0-cp314-cp314-macosx_11_0_arm64.whl
 ## 使用示例
 
 ```python
-import _haze_rust as haze
+import haze_library as haze
 
 # 波动率指标
 close = [100, 102, 101, 103, 105]
@@ -513,10 +563,21 @@ engulfing_signals = haze.py_bullish_engulfing(open_prices, close)
 # 统计指标
 slope, intercept, r2 = haze.py_linear_regression(close, period=3)
 zscore_values = haze.py_zscore(close, period=3)
+
+# 谐波形态检测
+patterns = haze.py_harmonics_patterns(high, low, 5, 5, True)
+for p in patterns:
+    print(f"{p.pattern_type_zh}: {p.state}, 概率={p.probability:.1%}")
+    if p.state == "complete":
+        print(f"  PRZ: {p.prz_low:.2f} - {p.prz_high:.2f}")
+        print(f"  目标: TP1={p.tp1:.2f}, TP2={p.tp2:.2f}, TP3={p.tp3:.2f}")
+
+# 时间序列信号
+signals, prz_upper, prz_lower, prob = haze.py_harmonics(high, low, close)
 ```
 
 ---
 
 **生成工具**: Haze-Library Development Team
 **许可证**: MIT
-**最后更新**: 2025-12-25
+**最后更新**: 2025-12-26

@@ -22,7 +22,7 @@
 
 ### ✨ Key Features
 
-- **🚀 212 Technical Indicators**: Complete coverage of TA-Lib, pandas-ta, and custom indicators
+- **🚀 215 Technical Indicators**: Complete coverage of TA-Lib, pandas-ta, harmonic patterns, and custom indicators
 - **⚡ Rust Performance**: 5-10x faster than pure Python implementations
 - **🎯 High Precision**: < 1e-9 error tolerance vs reference implementations
 - **🔒 Type Safe**: Full type annotations and Pydantic validation
@@ -51,7 +51,7 @@ maturin develop --release
 ### 🚀 Quick Start
 
 ```python
-import _haze_rust as haze
+import haze_library as haze
 
 # Price data
 close_prices = [100.0, 101.0, 102.0, 101.5, 103.0, 102.5, 104.0]
@@ -78,9 +78,18 @@ adx = haze.py_adx(high_prices, low_prices, close_prices, period=3)
 # Volume Indicators
 obv = haze.py_obv(close_prices, volume)
 mfi = haze.py_mfi(high_prices, low_prices, close_prices, volume, period=3)
+
+# Harmonic Patterns (XABCD Pattern Detection)
+# Returns: signals(1=bullish/-1=bearish), prz_upper, prz_lower, probability
+signals, prz_up, prz_lo, prob = haze.py_harmonics(high_prices, low_prices, close_prices)
+
+# Get detailed pattern information
+patterns = haze.py_harmonics_patterns(high_prices, low_prices, left_bars=5, right_bars=5, include_forming=True)
+for p in patterns:
+    print(f"{p.pattern_type_zh}: {p.state}, PRZ={p.prz_center:.2f}, Prob={p.completion_probability:.1%}")
 ```
 
-### 📊 Indicator Categories (212 Total)
+### 📊 Indicator Categories (215 Total)
 
 <details>
 <summary><b>🔹 Volatility (10 indicators)</b></summary>
@@ -133,6 +142,7 @@ mfi = haze.py_mfi(high_prices, low_prices, close_prices, volume, period=3)
 - **Cycle Indicators (5)**: HT_DCPERIOD, HT_DCPHASE, HT_PHASOR, HT_SINE, HT_TRENDMODE
 - **Advanced Trading Signals (4)**: AI SuperTrend, AI Momentum Index, Dynamic MACD, ATR2 Signals
 - **pandas-ta Exclusive (25)**: Entropy, Aberration, Squeeze, QQE, CTI, ER, Bias, PSL, RVI, Inertia, Alligator, EFI, KST, STC, TDFI, WAE, SMI, Coppock, PGO, VWMA, BOP, SSL Channel, CFO, Slope, Percent Rank
+- **Harmonic Patterns (3)**: py_harmonics (signal), py_harmonics_patterns (detailed), py_harmonics_prz (PRZ calculation)
 - **Others (8)**: Fibonacci Retracement/Extension, Ichimoku Cloud, Classic Pivots
 </details>
 
@@ -171,10 +181,10 @@ Haze-Library:  1.9 ms  (6.0x faster than TA-Lib)
                          │ PyO3 Bindings
                          ▼
 ┌─────────────────────────────────────────────────────────┐
-│              _haze_rust Module (Python)                  │
+│              haze_library Module (Python)                │
 │     • py_rsi()  • py_macd()  • py_bollinger_bands()     │
 │     • py_supertrend()  • py_obv()  • py_kdj()           │
-│              (212 Python-callable functions)             │
+│              (215 Python-callable functions)             │
 └────────────────────────┬────────────────────────────────┘
                          │
                          │ Rust FFI
@@ -185,6 +195,7 @@ Haze-Library:  1.9 ms  (6.0x faster than TA-Lib)
 │  │  Indicators Module                                 │  │
 │  │  • momentum.rs  • volatility.rs  • trend.rs       │  │
 │  │  • volume.rs    • ma.rs          • candlestick.rs │  │
+│  │  • harmonics.rs (Harmonic Patterns)               │  │
 │  └───────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -215,7 +226,7 @@ For commercial licensing inquiries, please contact: team@haze-library.com
 
 ### ✨ 核心特性
 
-- **🚀 212 个技术指标**：完整覆盖 TA-Lib、pandas-ta 和自定义指标
+- **🚀 215 个技术指标**：完整覆盖 TA-Lib、pandas-ta、谐波形态和自定义指标
 - **⚡ Rust 性能**：比纯 Python 实现快 5-10 倍
 - **🎯 高精度**：与参考实现相比误差容忍度 < 1e-9
 - **🔒 类型安全**：完整的类型注解和 Pydantic 验证
@@ -244,7 +255,7 @@ maturin develop --release
 ### 🚀 快速开始
 
 ```python
-import _haze_rust as haze
+import haze_library as haze
 
 # 价格数据
 close_prices = [100.0, 101.0, 102.0, 101.5, 103.0, 102.5, 104.0]
@@ -271,9 +282,18 @@ adx = haze.py_adx(high_prices, low_prices, close_prices, period=3)
 # 成交量指标
 obv = haze.py_obv(close_prices, volume)
 mfi = haze.py_mfi(high_prices, low_prices, close_prices, volume, period=3)
+
+# 谐波形态检测（XABCD 形态）
+# 返回：信号（1=看涨/-1=看跌）、PRZ 上沿、PRZ 下沿、完成概率
+signals, prz_up, prz_lo, prob = haze.py_harmonics(high_prices, low_prices, close_prices)
+
+# 获取详细形态信息
+patterns = haze.py_harmonics_patterns(high_prices, low_prices, left_bars=5, right_bars=5, include_forming=True)
+for p in patterns:
+    print(f"{p.pattern_type_zh}: {p.state}, PRZ={p.prz_center:.2f}, 概率={p.completion_probability:.1%}")
 ```
 
-### 📊 指标分类（共 212 个）
+### 📊 指标分类（共 215 个）
 
 <details>
 <summary><b>🔹 波动率指标（10 个）</b></summary>
@@ -326,6 +346,7 @@ mfi = haze.py_mfi(high_prices, low_prices, close_prices, volume, period=3)
 - **周期指标（5 个）**：希尔伯特变换系列
 - **高级交易信号（4 个）**：AI SuperTrend、AI 动量指数、动态 MACD、ATR2 信号
 - **pandas-ta 独有（25 个）**：熵、偏离度、挤压、QQE、CTI、ER、乖离率、心理线、RVI、惯性、鳄鱼、EFI、KST、STC、TDFI、WAE、SMI、Coppock、PGO、VWMA、BOP、SSL 通道、CFO、斜率、百分位排名
+- **谐波形态（3 个）**：py_harmonics（信号）、py_harmonics_patterns（详细形态）、py_harmonics_prz（PRZ 计算）
 - **其他（8 个）**：斐波那契回撤/扩展、一目均衡表、枢轴点
 </details>
 
@@ -364,10 +385,10 @@ Haze-Library:  1.9 毫秒（比 TA-Lib 快 6.0 倍）
                          │ PyO3 绑定
                          ▼
 ┌─────────────────────────────────────────────────────────┐
-│              _haze_rust 模块（Python）                   │
+│              haze_library 模块（Python）                 │
 │     • py_rsi()  • py_macd()  • py_bollinger_bands()     │
 │     • py_supertrend()  • py_obv()  • py_kdj()           │
-│              （212 个 Python 可调用函数）                 │
+│              （215 个 Python 可调用函数）                 │
 └────────────────────────┬────────────────────────────────┘
                          │
                          │ Rust FFI
@@ -378,6 +399,7 @@ Haze-Library:  1.9 毫秒（比 TA-Lib 快 6.0 倍）
 │  │  指标模块                                          │  │
 │  │  • momentum.rs  • volatility.rs  • trend.rs       │  │
 │  │  • volume.rs    • ma.rs          • candlestick.rs │  │
+│  │  • harmonics.rs（谐波形态）                        │  │
 │  └───────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────┘
 ```
