@@ -1,0 +1,27 @@
+[package]
+name = "haze-library"
+version = "0.1.0"
+edition = "2021"
+description = "Rust backend for Haze quantitative trading indicators library"
+license = "MIT"
+homepage = "https://github.com/haze-library/haze-library"
+repository = "https://github.com/haze-library/haze-library"
+
+[lib]
+name = "haze_library"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.21", optional = true, features = ["extension-module"] }
+numpy = { version = "0.21", optional = true }
+rayon = "1.8"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"
+
+[dependencies.ndarray]
+version = "0.15"
+features = ["rayon"]
+
+[features]
+default = []
+python = ["pyo3", "numpy"]
