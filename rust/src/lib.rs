@@ -11,6 +11,12 @@ mod utils;
 mod indicators;
 mod ml;
 mod dataframe;
+#[macro_use]
+mod macros;
+
+// 可选模块：Polars 集成
+#[cfg(feature = "polars")]
+mod polars_compat;
 
 pub use errors::{HazeError, HazeResult};
 pub use dataframe::{OhlcvFrame, create_ohlcv_frame};
@@ -240,6 +246,12 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_combine_signals, m)?)?;
     m.add_function(wrap_pyfunction!(py_calculate_stops, m)?)?;
 
+    // SFG 新增指标 (PD Array, Breaker Block, General Parameters, LinReg S/D)
+    m.add_function(wrap_pyfunction!(py_pd_array_signals, m)?)?;
+    m.add_function(wrap_pyfunction!(py_breaker_block_signals, m)?)?;
+    m.add_function(wrap_pyfunction!(py_general_parameters_signals, m)?)?;
+    m.add_function(wrap_pyfunction!(py_linreg_supply_demand_signals, m)?)?;
+
     // 周期指标 (Hilbert Transform)
     m.add_function(wrap_pyfunction!(py_ht_dcperiod, m)?)?;
     m.add_function(wrap_pyfunction!(py_ht_dcphase, m)?)?;
@@ -309,6 +321,10 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_harmonics, m)?)?;
     m.add_function(wrap_pyfunction!(py_harmonics_patterns, m)?)?;
     m.add_function(wrap_pyfunction!(py_swing_points, m)?)?;
+
+    // Polars 集成（可选）
+    #[cfg(feature = "polars")]
+    polars_compat::register_polars_functions(m)?;
 
     Ok(())
 }
@@ -891,7 +907,7 @@ fn py_doji(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::doji(&open, &high, &low, &close, body_threshold.unwrap_or(0.1)))
+    Ok(indicators::doji(&open, &high, &low, &close, body_threshold.unwrap_or(0.1))?)
 }
 
 #[cfg(feature = "python")]
@@ -902,7 +918,7 @@ fn py_hammer(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::hammer(&open, &high, &low, &close))
+    Ok(indicators::hammer(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -913,7 +929,7 @@ fn py_inverted_hammer(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::inverted_hammer(&open, &high, &low, &close))
+    Ok(indicators::inverted_hammer(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -924,7 +940,7 @@ fn py_hanging_man(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::hanging_man(&open, &high, &low, &close))
+    Ok(indicators::hanging_man(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -933,7 +949,7 @@ fn py_bullish_engulfing(
     open: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::bullish_engulfing(&open, &close))
+    Ok(indicators::bullish_engulfing(&open, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -942,7 +958,7 @@ fn py_bearish_engulfing(
     open: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::bearish_engulfing(&open, &close))
+    Ok(indicators::bearish_engulfing(&open, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -951,7 +967,7 @@ fn py_bullish_harami(
     open: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::bullish_harami(&open, &close))
+    Ok(indicators::bullish_harami(&open, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -960,7 +976,7 @@ fn py_bearish_harami(
     open: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::bearish_harami(&open, &close))
+    Ok(indicators::bearish_harami(&open, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -970,7 +986,7 @@ fn py_piercing_pattern(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::piercing_pattern(&open, &low, &close))
+    Ok(indicators::piercing_pattern(&open, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -980,7 +996,7 @@ fn py_dark_cloud_cover(
     high: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::dark_cloud_cover(&open, &high, &close))
+    Ok(indicators::dark_cloud_cover(&open, &high, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -991,7 +1007,7 @@ fn py_morning_star(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::morning_star(&open, &high, &low, &close))
+    Ok(indicators::morning_star(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1002,7 +1018,7 @@ fn py_evening_star(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::evening_star(&open, &high, &low, &close))
+    Ok(indicators::evening_star(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1012,7 +1028,7 @@ fn py_three_white_soldiers(
     high: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::three_white_soldiers(&open, &high, &close))
+    Ok(indicators::three_white_soldiers(&open, &high, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1022,7 +1038,7 @@ fn py_three_black_crows(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::three_black_crows(&open, &low, &close))
+    Ok(indicators::three_black_crows(&open, &low, &close)?)
 }
 
 // ==================== 统计指标包装 ====================
@@ -1279,7 +1295,7 @@ fn py_shooting_star(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::shooting_star(&open, &high, &low, &close))
+    Ok(indicators::shooting_star(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1290,7 +1306,7 @@ fn py_marubozu(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::marubozu(&open, &high, &low, &close))
+    Ok(indicators::marubozu(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1301,7 +1317,7 @@ fn py_spinning_top(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::spinning_top(&open, &high, &low, &close))
+    Ok(indicators::spinning_top(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1313,7 +1329,7 @@ fn py_dragonfly_doji(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::dragonfly_doji(&open, &high, &low, &close, body_threshold.unwrap_or(0.1)))
+    Ok(indicators::dragonfly_doji(&open, &high, &low, &close, body_threshold.unwrap_or(0.1))?)
 }
 
 #[cfg(feature = "python")]
@@ -1325,7 +1341,7 @@ fn py_gravestone_doji(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::gravestone_doji(&open, &high, &low, &close, body_threshold.unwrap_or(0.1)))
+    Ok(indicators::gravestone_doji(&open, &high, &low, &close, body_threshold.unwrap_or(0.1))?)
 }
 
 #[cfg(feature = "python")]
@@ -1337,7 +1353,7 @@ fn py_long_legged_doji(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::long_legged_doji(&open, &high, &low, &close, body_threshold.unwrap_or(0.1)))
+    Ok(indicators::long_legged_doji(&open, &high, &low, &close, body_threshold.unwrap_or(0.1))?)
 }
 
 #[cfg(feature = "python")]
@@ -1348,7 +1364,7 @@ fn py_tweezers_top(
     close: Vec<f64>,
     tolerance: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::tweezers_top(&open, &high, &close, tolerance.unwrap_or(0.01)))
+    Ok(indicators::tweezers_top(&open, &high, &close, tolerance.unwrap_or(0.01))?)
 }
 
 #[cfg(feature = "python")]
@@ -1359,7 +1375,7 @@ fn py_tweezers_bottom(
     close: Vec<f64>,
     tolerance: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::tweezers_bottom(&open, &low, &close, tolerance.unwrap_or(0.01)))
+    Ok(indicators::tweezers_bottom(&open, &low, &close, tolerance.unwrap_or(0.01))?)
 }
 
 #[cfg(feature = "python")]
@@ -1370,7 +1386,7 @@ fn py_rising_three_methods(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::rising_three_methods(&open, &high, &low, &close))
+    Ok(indicators::rising_three_methods(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -2194,6 +2210,102 @@ fn py_calculate_stops(
     };
 
     Ok((stop_loss, take_profit))
+}
+
+// ==================== SFG 新增指标包装 ====================
+
+/// PD Array (Premium/Discount Array) 信号
+/// 返回: (buy_signals, sell_signals, stop_loss, take_profit)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_pd_array_signals(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    swing_lookback: Option<usize>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+    // Compute ATR internally for convenience
+    let atr_values = indicators::atr(&high, &low, &close, 14);
+    let (buy, sell, sl, tp) = indicators::pd_array_signals(
+        &high,
+        &low,
+        &close,
+        swing_lookback.unwrap_or(20),
+        &atr_values,
+    );
+    Ok((buy, sell, sl, tp))
+}
+
+/// Breaker Block 信号
+/// 返回: (buy_signals, sell_signals, breaker_upper, breaker_lower)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_breaker_block_signals(
+    open: Vec<f64>,
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    lookback: Option<usize>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+    let (buy, sell, upper, lower) = indicators::breaker_block_signals(
+        &open,
+        &high,
+        &low,
+        &close,
+        lookback.unwrap_or(20),
+    );
+    Ok((buy, sell, upper, lower))
+}
+
+/// General Parameters 信号 (EMA通道 + 网格入场)
+/// 返回: (buy_signals, sell_signals, stop_loss, take_profit)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_general_parameters_signals(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    ema_fast: Option<usize>,
+    ema_slow: Option<usize>,
+    atr_period: Option<usize>,
+    grid_multiplier: Option<f64>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+    let (buy, sell, sl, tp) = indicators::general_parameters_signals(
+        &high,
+        &low,
+        &close,
+        ema_fast.unwrap_or(20),
+        ema_slow.unwrap_or(50),
+        atr_period.unwrap_or(14),
+        grid_multiplier.unwrap_or(1.0),
+    );
+    Ok((buy, sell, sl, tp))
+}
+
+/// Linear Regression + Supply/Demand Zones 信号
+/// 返回: (buy_signals, sell_signals, stop_loss, take_profit)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_linreg_supply_demand_signals(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    volume: Vec<f64>,
+    linreg_period: Option<usize>,
+    tolerance: Option<f64>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+    // Compute ATR internally for convenience
+    let atr_values = indicators::atr(&high, &low, &close, 14);
+    let (buy, sell, sl, tp) = indicators::linreg_supply_demand_signals(
+        &high,
+        &low,
+        &close,
+        &volume,
+        &atr_values,
+        linreg_period.unwrap_or(20),
+        tolerance.unwrap_or(0.02),
+    );
+    Ok((buy, sell, sl, tp))
 }
 
 // ==================== 周期指标包装 (Hilbert Transform) ====================

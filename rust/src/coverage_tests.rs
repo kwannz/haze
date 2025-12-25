@@ -138,61 +138,61 @@ fn test_candlestick_patterns_extra() {
     let inv_high = vec![103.0, 104.0];
     let inv_low = vec![98.5, 94.0];
     let inv_close = vec![99.0, 101.0];
-    let inverted = inverted_hammer(&inv_open, &inv_high, &inv_low, &inv_close);
+    let inverted = inverted_hammer(&inv_open, &inv_high, &inv_low, &inv_close).unwrap();
     assert_eq!(inverted[0], -1.0);
 
     let hang_open = vec![100.0, 98.0];
     let hang_high = vec![100.5, 104.0];
     let hang_low = vec![96.0, 94.0];
     let hang_close = vec![99.0, 101.0];
-    let hanging = hanging_man(&hang_open, &hang_high, &hang_low, &hang_close);
+    let hanging = hanging_man(&hang_open, &hang_high, &hang_low, &hang_close).unwrap();
     assert_eq!(hanging[0], -1.0);
 
-    let bullish_harami_vals = bullish_harami(&[105.0, 96.0], &[95.0, 100.0]);
+    let bullish_harami_vals = bullish_harami(&[105.0, 96.0], &[95.0, 100.0]).unwrap();
     assert_eq!(bullish_harami_vals[1], 1.0);
 
-    let bearish_harami_vals = bearish_harami(&[95.0, 104.0], &[105.0, 100.0]);
+    let bearish_harami_vals = bearish_harami(&[95.0, 104.0], &[105.0, 100.0]).unwrap();
     assert_eq!(bearish_harami_vals[1], -1.0);
 
-    let bearish_engulf_vals = bearish_engulfing(&[98.0, 103.0], &[102.0, 97.0]);
+    let bearish_engulf_vals = bearish_engulfing(&[98.0, 103.0], &[102.0, 97.0]).unwrap();
     assert_eq!(bearish_engulf_vals[1], -1.0);
 
-    let piercing_vals = piercing_pattern(&[105.0, 90.0], &[94.0, 89.0], &[95.0, 101.0]);
+    let piercing_vals = piercing_pattern(&[105.0, 90.0], &[94.0, 89.0], &[95.0, 101.0]).unwrap();
     assert_eq!(piercing_vals[1], 1.0);
 
-    let dark_cloud_vals = dark_cloud_cover(&[95.0, 107.0], &[106.0, 108.0], &[105.0, 99.0]);
+    let dark_cloud_vals = dark_cloud_cover(&[95.0, 107.0], &[106.0, 108.0], &[105.0, 99.0]).unwrap();
     assert_eq!(dark_cloud_vals[1], -1.0);
 
     let evening_open = vec![100.0, 112.0, 110.0];
     let evening_high = vec![111.0, 113.0, 110.0];
     let evening_low = vec![95.0, 110.0, 98.0];
     let evening_close = vec![110.0, 111.0, 99.0];
-    let evening_vals = evening_star(&evening_open, &evening_high, &evening_low, &evening_close);
+    let evening_vals = evening_star(&evening_open, &evening_high, &evening_low, &evening_close).unwrap();
     assert_eq!(evening_vals[2], -1.0);
 
     let open_crows = vec![105.0, 104.0, 103.0];
     let low_crows = vec![99.0, 98.0, 97.0];
     let close_crows = vec![100.0, 99.0, 98.0];
-    let crows = three_black_crows(&open_crows, &low_crows, &close_crows);
+    let crows = three_black_crows(&open_crows, &low_crows, &close_crows).unwrap();
     assert_eq!(crows[2], -1.0);
 
-    let shooting_vals = shooting_star(&inv_open, &inv_high, &inv_low, &inv_close);
+    let shooting_vals = shooting_star(&inv_open, &inv_high, &inv_low, &inv_close).unwrap();
     assert_eq!(shooting_vals[0], -1.0);
 
-    let gravestone_vals = gravestone_doji(&[100.0], &[110.0], &[99.8], &[100.5], 0.1);
+    let gravestone_vals = gravestone_doji(&[100.0], &[110.0], &[99.8], &[100.5], 0.1).unwrap();
     assert_eq!(gravestone_vals[0], -1.0);
 
-    let long_legged_vals = long_legged_doji(&[100.0], &[110.0], &[90.0], &[100.2], 0.1);
+    let long_legged_vals = long_legged_doji(&[100.0], &[110.0], &[90.0], &[100.2], 0.1).unwrap();
     assert_eq!(long_legged_vals[0], 1.0);
 
-    let tweezers_bottom_vals = tweezers_bottom(&[105.0, 100.0], &[95.0, 95.1], &[100.0, 104.0], 0.01);
+    let tweezers_bottom_vals = tweezers_bottom(&[105.0, 100.0], &[95.0, 95.1], &[100.0, 104.0], 0.01).unwrap();
     assert_eq!(tweezers_bottom_vals[1], 1.0);
 
     let rising_open = vec![100.0, 109.0, 108.5, 108.0, 109.0];
     let rising_high = vec![111.0, 109.5, 109.0, 108.5, 112.0];
     let rising_low = vec![99.0, 107.5, 107.0, 106.5, 108.0];
     let rising_close = vec![110.0, 108.0, 107.5, 107.0, 112.0];
-    let rising_vals = rising_three_methods(&rising_open, &rising_high, &rising_low, &rising_close);
+    let rising_vals = rising_three_methods(&rising_open, &rising_high, &rising_low, &rising_close).unwrap();
     assert_eq!(rising_vals[4], 1.0);
 
     let falling_open = vec![110.0, 101.0, 101.5, 102.0, 101.0];
@@ -1190,36 +1190,36 @@ fn test_sfg_branches() {
 fn test_candlestick_single_patterns() {
     use indicators::candlestick::*;
 
-    let doji_vals = doji(&[100.0], &[101.0], &[99.0], &[100.05], 0.1);
+    let doji_vals = doji(&[100.0], &[101.0], &[99.0], &[100.05], 0.1).unwrap();
     assert_eq!(doji_vals[0], 1.0);
 
-    let hammer_vals = hammer(&[100.0], &[101.0], &[96.0], &[101.0]);
+    let hammer_vals = hammer(&[100.0], &[101.0], &[96.0], &[101.0]).unwrap();
     assert_eq!(hammer_vals[0], 1.0);
 
-    let inverted_vals = inverted_hammer(&[100.0], &[105.0], &[99.5], &[101.0]);
+    let inverted_vals = inverted_hammer(&[100.0], &[105.0], &[99.5], &[101.0]).unwrap();
     assert_eq!(inverted_vals[0], 1.0);
 
-    let hanging_vals = hanging_man(&[100.0], &[101.0], &[96.0], &[101.0]);
+    let hanging_vals = hanging_man(&[100.0], &[101.0], &[96.0], &[101.0]).unwrap();
     assert_eq!(hanging_vals[0], -1.0);
 
-    let shooting_vals = shooting_star(&[100.0], &[105.0], &[99.5], &[101.0]);
+    let shooting_vals = shooting_star(&[100.0], &[105.0], &[99.5], &[101.0]).unwrap();
     assert_eq!(shooting_vals[0], -1.0);
 
-    let maru_bull = marubozu(&[100.0], &[110.1], &[99.9], &[110.0]);
+    let maru_bull = marubozu(&[100.0], &[110.1], &[99.9], &[110.0]).unwrap();
     assert_eq!(maru_bull[0], 1.0);
-    let maru_bear = marubozu(&[110.0], &[110.1], &[99.9], &[100.0]);
+    let maru_bear = marubozu(&[110.0], &[110.1], &[99.9], &[100.0]).unwrap();
     assert_eq!(maru_bear[0], -1.0);
 
-    let spin = spinning_top(&[100.0], &[105.0], &[95.0], &[101.0]);
+    let spin = spinning_top(&[100.0], &[105.0], &[95.0], &[101.0]).unwrap();
     assert_eq!(spin[0], 1.0);
 
-    let dragon = dragonfly_doji(&[100.0], &[100.2], &[95.0], &[100.05], 0.1);
+    let dragon = dragonfly_doji(&[100.0], &[100.2], &[95.0], &[100.05], 0.1).unwrap();
     assert_eq!(dragon[0], 1.0);
 
-    let grave = gravestone_doji(&[100.0], &[105.0], &[99.8], &[100.05], 0.1);
+    let grave = gravestone_doji(&[100.0], &[105.0], &[99.8], &[100.05], 0.1).unwrap();
     assert_eq!(grave[0], -1.0);
 
-    let long_leg = long_legged_doji(&[100.0], &[106.0], &[94.0], &[100.05], 0.1);
+    let long_leg = long_legged_doji(&[100.0], &[106.0], &[94.0], &[100.05], 0.1).unwrap();
     assert_eq!(long_leg[0], 1.0);
 
     let takuri_vals = takuri(&[100.0], &[100.3], &[95.0], &[100.2]);
@@ -1267,40 +1267,40 @@ fn test_candlestick_single_patterns() {
 fn test_candlestick_two_candle_patterns() {
     use indicators::candlestick::*;
 
-    let bull_eng = bullish_engulfing(&[105.0, 100.0], &[100.0, 110.0]);
+    let bull_eng = bullish_engulfing(&[105.0, 100.0], &[100.0, 110.0]).unwrap();
     assert_eq!(bull_eng[1], 1.0);
 
-    let bear_eng = bearish_engulfing(&[100.0, 110.0], &[110.0, 95.0]);
+    let bear_eng = bearish_engulfing(&[100.0, 110.0], &[110.0, 95.0]).unwrap();
     assert_eq!(bear_eng[1], -1.0);
 
-    let bull_harami = bullish_harami(&[110.0, 102.0], &[100.0, 108.0]);
+    let bull_harami = bullish_harami(&[110.0, 102.0], &[100.0, 108.0]).unwrap();
     assert_eq!(bull_harami[1], 1.0);
 
-    let bear_harami = bearish_harami(&[100.0, 108.0], &[110.0, 102.0]);
+    let bear_harami = bearish_harami(&[100.0, 108.0], &[110.0, 102.0]).unwrap();
     assert_eq!(bear_harami[1], -1.0);
 
     let piercing_open = vec![110.0, 95.0];
     let piercing_low = vec![100.0, 94.0];
     let piercing_close = vec![100.0, 106.0];
-    let piercing_vals = piercing_pattern(&piercing_open, &piercing_low, &piercing_close);
+    let piercing_vals = piercing_pattern(&piercing_open, &piercing_low, &piercing_close).unwrap();
     assert_eq!(piercing_vals[1], 1.0);
 
     let dark_open = vec![100.0, 115.0];
     let dark_high = vec![112.0, 116.0];
     let dark_close = vec![110.0, 104.0];
-    let dark_vals = dark_cloud_cover(&dark_open, &dark_high, &dark_close);
+    let dark_vals = dark_cloud_cover(&dark_open, &dark_high, &dark_close).unwrap();
     assert_eq!(dark_vals[1], -1.0);
 
     let tweez_top_open = vec![100.0, 110.0];
     let tweez_top_high = vec![120.0, 119.9];
     let tweez_top_close = vec![110.0, 100.0];
-    let tweez_top_vals = tweezers_top(&tweez_top_open, &tweez_top_high, &tweez_top_close, 0.01);
+    let tweez_top_vals = tweezers_top(&tweez_top_open, &tweez_top_high, &tweez_top_close, 0.01).unwrap();
     assert_eq!(tweez_top_vals[1], -1.0);
 
     let tweez_bot_open = vec![110.0, 100.0];
     let tweez_bot_low = vec![90.0, 90.1];
     let tweez_bot_close = vec![100.0, 110.0];
-    let tweez_bot_vals = tweezers_bottom(&tweez_bot_open, &tweez_bot_low, &tweez_bot_close, 0.01);
+    let tweez_bot_vals = tweezers_bottom(&tweez_bot_open, &tweez_bot_low, &tweez_bot_close, 0.01).unwrap();
     assert_eq!(tweez_bot_vals[1], 1.0);
 
     let harami_open = vec![120.0, 110.0];
@@ -1396,14 +1396,14 @@ fn test_candlestick_three_candle_patterns_a() {
     let morning_high = vec![106.0, 95.0, 106.0];
     let morning_low = vec![95.0, 93.0, 95.0];
     let morning_close = vec![95.0, 94.5, 104.0];
-    let morning_vals = morning_star(&morning_open, &morning_high, &morning_low, &morning_close);
+    let morning_vals = morning_star(&morning_open, &morning_high, &morning_low, &morning_close).unwrap();
     assert_eq!(morning_vals[2], 1.0);
 
     let evening_open = vec![95.0, 106.0, 104.0];
     let evening_high = vec![106.0, 107.0, 105.0];
     let evening_low = vec![94.0, 105.0, 94.0];
     let evening_close = vec![105.0, 106.5, 96.0];
-    let evening_vals = evening_star(&evening_open, &evening_high, &evening_low, &evening_close);
+    let evening_vals = evening_star(&evening_open, &evening_high, &evening_low, &evening_close).unwrap();
     assert_eq!(evening_vals[2], -1.0);
 
     let mds_open = vec![110.0, 98.0, 99.0];
@@ -1423,13 +1423,13 @@ fn test_candlestick_three_candle_patterns_a() {
     let soldiers_open = vec![100.0, 104.0, 107.0];
     let soldiers_high = vec![105.5, 108.5, 112.5];
     let soldiers_close = vec![105.0, 108.0, 112.0];
-    let soldiers_vals = three_white_soldiers(&soldiers_open, &soldiers_high, &soldiers_close);
+    let soldiers_vals = three_white_soldiers(&soldiers_open, &soldiers_high, &soldiers_close).unwrap();
     assert_eq!(soldiers_vals[2], 1.0);
 
     let crows_open = vec![105.0, 101.0, 97.0];
     let crows_low = vec![99.5, 95.5, 91.5];
     let crows_close = vec![100.0, 96.0, 92.0];
-    let crows_vals = three_black_crows(&crows_open, &crows_low, &crows_close);
+    let crows_vals = three_black_crows(&crows_open, &crows_low, &crows_close).unwrap();
     assert_eq!(crows_vals[2], -1.0);
 
     let inside_open = vec![110.0, 102.0, 105.0];
@@ -1572,7 +1572,7 @@ fn test_candlestick_multi_candle_patterns() {
     let rising_high = vec![111.0, 109.0, 108.0, 107.0, 113.0];
     let rising_low = vec![99.0, 105.0, 104.0, 103.0, 107.0];
     let rising_close = vec![110.0, 106.0, 105.0, 104.0, 112.0];
-    let rising_vals = rising_three_methods(&rising_open, &rising_high, &rising_low, &rising_close);
+    let rising_vals = rising_three_methods(&rising_open, &rising_high, &rising_low, &rising_close).unwrap();
     assert_eq!(rising_vals[4], 1.0);
 
     let falling_open = vec![110.0, 102.0, 103.0, 104.0, 105.0];
@@ -1855,35 +1855,35 @@ fn test_pandas_ta_edge_cases() {
 fn test_candlestick_two_candle_branches() {
     use indicators::candlestick::*;
 
-    let bull_eng = bullish_engulfing(&[10.0, 9.0, 8.0], &[8.0, 9.5, 7.0]);
+    let bull_eng = bullish_engulfing(&[10.0, 9.0, 8.0], &[8.0, 9.5, 7.0]).unwrap();
     assert_eq!(bull_eng[1], 0.0);
     assert_eq!(bull_eng[2], 0.0);
 
-    let bear_eng = bearish_engulfing(&[8.0, 9.0, 9.0], &[10.0, 8.5, 10.0]);
+    let bear_eng = bearish_engulfing(&[8.0, 9.0, 9.0], &[10.0, 8.5, 10.0]).unwrap();
     assert_eq!(bear_eng[1], 0.0);
     assert_eq!(bear_eng[2], 0.0);
 
-    let bull_harami = bullish_harami(&[10.0, 9.0, 8.0], &[8.0, 10.5, 7.0]);
+    let bull_harami = bullish_harami(&[10.0, 9.0, 8.0], &[8.0, 10.5, 7.0]).unwrap();
     assert_eq!(bull_harami[1], 0.0);
     assert_eq!(bull_harami[2], 0.0);
 
-    let bear_harami = bearish_harami(&[8.0, 9.0, 9.0], &[10.0, 7.5, 10.0]);
+    let bear_harami = bearish_harami(&[8.0, 9.0, 9.0], &[10.0, 7.5, 10.0]).unwrap();
     assert_eq!(bear_harami[1], 0.0);
     assert_eq!(bear_harami[2], 0.0);
 
-    let piercing = piercing_pattern(&[10.0, 9.0, 8.0], &[7.0, 8.0, 7.5], &[8.0, 9.5, 7.0]);
+    let piercing = piercing_pattern(&[10.0, 9.0, 8.0], &[7.0, 8.0, 7.5], &[8.0, 9.5, 7.0]).unwrap();
     assert_eq!(piercing[1], 0.0);
     assert_eq!(piercing[2], 0.0);
 
-    let dark_cloud = dark_cloud_cover(&[8.0, 9.0, 9.5], &[12.0, 10.0, 10.5], &[10.0, 8.5, 10.0]);
+    let dark_cloud = dark_cloud_cover(&[8.0, 9.0, 9.5], &[12.0, 10.0, 10.5], &[10.0, 8.5, 10.0]).unwrap();
     assert_eq!(dark_cloud[1], 0.0);
     assert_eq!(dark_cloud[2], 0.0);
 
-    let tweez_top = tweezers_top(&[10.0, 11.0, 12.0], &[15.0, 18.0, 12.5], &[12.0, 10.0, 13.0], 0.01);
+    let tweez_top = tweezers_top(&[10.0, 11.0, 12.0], &[15.0, 18.0, 12.5], &[12.0, 10.0, 13.0], 0.01).unwrap();
     assert_eq!(tweez_top[1], 0.0);
     assert_eq!(tweez_top[2], 0.0);
 
-    let tweez_bot = tweezers_bottom(&[12.0, 11.0, 10.0], &[5.0, 8.0, 9.5], &[10.0, 12.0, 9.0], 0.01);
+    let tweez_bot = tweezers_bottom(&[12.0, 11.0, 10.0], &[5.0, 8.0, 9.5], &[10.0, 12.0, 9.0], 0.01).unwrap();
     assert_eq!(tweez_bot[1], 0.0);
     assert_eq!(tweez_bot[2], 0.0);
 }
@@ -1991,7 +1991,7 @@ fn test_candlestick_three_candle_branches_a() {
     let morning_high = vec![10.2, 9.6, 10.4, 10.2];
     let morning_low = vec![7.5, 8.5, 9.0, 9.4];
     let morning_close = vec![8.0, 9.4, 10.2, 10.0];
-    let morning = morning_star(&morning_open, &morning_high, &morning_low, &morning_close);
+    let morning = morning_star(&morning_open, &morning_high, &morning_low, &morning_close).unwrap();
     assert_eq!(morning[2], 0.0);
     assert_eq!(morning[3], 0.0);
 
@@ -1999,32 +1999,32 @@ fn test_candlestick_three_candle_branches_a() {
     let evening_high = vec![10.2, 9.8, 9.7, 9.3];
     let evening_low = vec![7.8, 9.0, 8.8, 8.7];
     let evening_close = vec![10.0, 9.4, 8.8, 9.1];
-    let evening = evening_star(&evening_open, &evening_high, &evening_low, &evening_close);
+    let evening = evening_star(&evening_open, &evening_high, &evening_low, &evening_close).unwrap();
     assert_eq!(evening[2], 0.0);
     assert_eq!(evening[3], 0.0);
 
     let soldiers_open = vec![10.0, 15.0, 20.0];
     let soldiers_high = vec![12.1, 17.1, 22.1];
     let soldiers_close = vec![12.0, 17.0, 22.0];
-    let soldiers = three_white_soldiers(&soldiers_open, &soldiers_high, &soldiers_close);
+    let soldiers = three_white_soldiers(&soldiers_open, &soldiers_high, &soldiers_close).unwrap();
     assert_eq!(soldiers[2], 0.0);
 
     let soldiers_open2 = vec![10.0, 15.0, 20.0];
     let soldiers_high2 = vec![12.1, 16.0, 21.0];
     let soldiers_close2 = vec![12.0, 14.0, 18.0];
-    let soldiers2 = three_white_soldiers(&soldiers_open2, &soldiers_high2, &soldiers_close2);
+    let soldiers2 = three_white_soldiers(&soldiers_open2, &soldiers_high2, &soldiers_close2).unwrap();
     assert_eq!(soldiers2[2], 0.0);
 
     let crows_open = vec![20.0, 15.0, 10.0];
     let crows_low = vec![12.0, 10.0, 6.0];
     let crows_close = vec![18.0, 13.0, 8.0];
-    let crows = three_black_crows(&crows_open, &crows_low, &crows_close);
+    let crows = three_black_crows(&crows_open, &crows_low, &crows_close).unwrap();
     assert_eq!(crows[2], 0.0);
 
     let crows_open2 = vec![20.0, 15.0, 10.0];
     let crows_low2 = vec![12.0, 10.0, 6.0];
     let crows_close2 = vec![18.0, 16.0, 8.0];
-    let crows2 = three_black_crows(&crows_open2, &crows_low2, &crows_close2);
+    let crows2 = three_black_crows(&crows_open2, &crows_low2, &crows_close2).unwrap();
     assert_eq!(crows2[2], 0.0);
 }
 
@@ -2234,14 +2234,14 @@ fn test_candlestick_multi_candle_branches() {
     let rising_high = vec![15.5, 16.0, 13.5, 12.5, 16.5];
     let rising_low = vec![9.5, 12.0, 11.5, 10.5, 11.5];
     let rising_close = vec![15.0, 13.0, 12.0, 11.0, 16.0];
-    let rising_vals = rising_three_methods(&rising_open, &rising_high, &rising_low, &rising_close);
+    let rising_vals = rising_three_methods(&rising_open, &rising_high, &rising_low, &rising_close).unwrap();
     assert_eq!(rising_vals[4], 0.0);
 
     let rising_open2 = vec![10.0, 11.0, 12.0, 13.0, 14.0];
     let rising_high2 = vec![12.0, 13.0, 14.0, 15.0, 16.0];
     let rising_low2 = vec![9.5, 10.5, 11.5, 12.5, 13.5];
     let rising_close2 = vec![12.0, 13.0, 14.0, 15.0, 16.0];
-    let rising_vals2 = rising_three_methods(&rising_open2, &rising_high2, &rising_low2, &rising_close2);
+    let rising_vals2 = rising_three_methods(&rising_open2, &rising_high2, &rising_low2, &rising_close2).unwrap();
     assert_eq!(rising_vals2[4], 0.0);
 
     let falling_open = vec![15.0, 11.0, 12.0, 13.0, 13.0];
