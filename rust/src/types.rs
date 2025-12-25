@@ -7,31 +7,39 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// K线数据结构（OHLCV）
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg(feature = "python")]
+#[pyo3::prelude::pyclass]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Candle {
-#[cfg_attr(feature = "python", pyo3(get, set))]
+    #[pyo3(get, set)]
     pub timestamp: i64,  // Unix 毫秒时间戳
-
-#[cfg_attr(feature = "python", pyo3(get, set))]
+    #[pyo3(get, set)]
     pub open: f64,
-
-#[cfg_attr(feature = "python", pyo3(get, set))]
+    #[pyo3(get, set)]
     pub high: f64,
-
-#[cfg_attr(feature = "python", pyo3(get, set))]
+    #[pyo3(get, set)]
     pub low: f64,
-
-#[cfg_attr(feature = "python", pyo3(get, set))]
+    #[pyo3(get, set)]
     pub close: f64,
-
-#[cfg_attr(feature = "python", pyo3(get, set))]
+    #[pyo3(get, set)]
     pub volume: f64,
 }
 
-#[cfg_attr(feature = "python", pymethods)]
+#[cfg(not(feature = "python"))]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct Candle {
+    pub timestamp: i64,
+    pub open: f64,
+    pub high: f64,
+    pub low: f64,
+    pub close: f64,
+    pub volume: f64,
+}
+
+#[cfg(feature = "python")]
+#[pyo3::pymethods]
 impl Candle {
-#[cfg_attr(feature = "python", new)]
+    #[new]
     pub fn new(
         timestamp: i64,
         open: f64,
@@ -63,19 +71,19 @@ impl Candle {
     }
 
     /// 获取典型价格 (high + low + close) / 3
-#[cfg_attr(feature = "python", getter)]
+    #[getter]
     pub fn typical_price(&self) -> f64 {
         (self.high + self.low + self.close) / 3.0
     }
 
     /// 获取中间价 (high + low) / 2
-#[cfg_attr(feature = "python", getter)]
+    #[getter]
     pub fn median_price(&self) -> f64 {
         (self.high + self.low) / 2.0
     }
 
     /// 获取加权收盘价 (high + low + 2*close) / 4
-#[cfg_attr(feature = "python", getter)]
+    #[getter]
     pub fn weighted_close(&self) -> f64 {
         (self.high + self.low + 2.0 * self.close) / 4.0
     }
@@ -89,23 +97,82 @@ impl Candle {
     }
 }
 
+#[cfg(not(feature = "python"))]
+impl Candle {
+    pub fn new(
+        timestamp: i64,
+        open: f64,
+        high: f64,
+        low: f64,
+        close: f64,
+        volume: f64,
+    ) -> Self {
+        Self {
+            timestamp,
+            open,
+            high,
+            low,
+            close,
+            volume,
+        }
+    }
+
+    pub fn to_dict(&self) -> Result<HashMap<String, f64>, String> {
+        let mut map = HashMap::new();
+        map.insert("timestamp".to_string(), self.timestamp as f64);
+        map.insert("open".to_string(), self.open);
+        map.insert("high".to_string(), self.high);
+        map.insert("low".to_string(), self.low);
+        map.insert("close".to_string(), self.close);
+        map.insert("volume".to_string(), self.volume);
+        Ok(map)
+    }
+
+    pub fn typical_price(&self) -> f64 {
+        (self.high + self.low + self.close) / 3.0
+    }
+
+    pub fn median_price(&self) -> f64 {
+        (self.high + self.low) / 2.0
+    }
+
+    pub fn weighted_close(&self) -> f64 {
+        (self.high + self.low + 2.0 * self.close) / 4.0
+    }
+
+    pub fn __repr__(&self) -> String {
+        format!(
+            "Candle(O:{:.2}, H:{:.2}, L:{:.2}, C:{:.2}, V:{:.2})",
+            self.open, self.high, self.low, self.close, self.volume
+        )
+    }
+}
+
 /// 指标计算结果（单序列）
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg(feature = "python")]
+#[pyo3::prelude::pyclass]
 #[derive(Debug, Clone)]
 pub struct IndicatorResult {
-#[cfg_attr(feature = "python", pyo3(get))]
+    #[pyo3(get)]
     pub name: String,
-
-#[cfg_attr(feature = "python", pyo3(get))]
+    #[pyo3(get)]
     pub values: Vec<f64>,
-
-#[cfg_attr(feature = "python", pyo3(get))]
+    #[pyo3(get)]
     pub metadata: HashMap<String, String>,
 }
 
-#[cfg_attr(feature = "python", pymethods)]
+#[cfg(not(feature = "python"))]
+#[derive(Debug, Clone)]
+pub struct IndicatorResult {
+    pub name: String,
+    pub values: Vec<f64>,
+    pub metadata: HashMap<String, String>,
+}
+
+#[cfg(feature = "python")]
+#[pyo3::pymethods]
 impl IndicatorResult {
-#[cfg_attr(feature = "python", new)]
+    #[new]
     pub fn new(name: String, values: Vec<f64>) -> Self {
         Self {
             name,
@@ -120,29 +187,56 @@ impl IndicatorResult {
     }
 
     /// 获取长度
-#[cfg_attr(feature = "python", getter)]
+    #[getter]
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+}
+
+#[cfg(not(feature = "python"))]
+impl IndicatorResult {
+    pub fn new(name: String, values: Vec<f64>) -> Self {
+        Self {
+            name,
+            values,
+            metadata: HashMap::new(),
+        }
+    }
+
+    pub fn add_metadata(&mut self, key: String, value: String) {
+        self.metadata.insert(key, value);
+    }
+
     pub fn len(&self) -> usize {
         self.values.len()
     }
 }
 
 /// 多序列指标结果（如 MACD 返回 3 条线）
-#[cfg_attr(feature = "python", pyclass)]
+#[cfg(feature = "python")]
+#[pyo3::prelude::pyclass]
 #[derive(Debug, Clone)]
 pub struct MultiIndicatorResult {
-#[cfg_attr(feature = "python", pyo3(get))]
+    #[pyo3(get)]
     pub name: String,
-
-#[cfg_attr(feature = "python", pyo3(get))]
+    #[pyo3(get)]
     pub series: HashMap<String, Vec<f64>>,
-
-#[cfg_attr(feature = "python", pyo3(get))]
+    #[pyo3(get)]
     pub metadata: HashMap<String, String>,
 }
 
-#[cfg_attr(feature = "python", pymethods)]
+#[cfg(not(feature = "python"))]
+#[derive(Debug, Clone)]
+pub struct MultiIndicatorResult {
+    pub name: String,
+    pub series: HashMap<String, Vec<f64>>,
+    pub metadata: HashMap<String, String>,
+}
+
+#[cfg(feature = "python")]
+#[pyo3::pymethods]
 impl MultiIndicatorResult {
-#[cfg_attr(feature = "python", new)]
+    #[new]
     pub fn new(name: String) -> Self {
         Self {
             name,
@@ -157,6 +251,25 @@ impl MultiIndicatorResult {
     }
 
     /// 添加元数据
+    pub fn add_metadata(&mut self, key: String, value: String) {
+        self.metadata.insert(key, value);
+    }
+}
+
+#[cfg(not(feature = "python"))]
+impl MultiIndicatorResult {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            series: HashMap::new(),
+            metadata: HashMap::new(),
+        }
+    }
+
+    pub fn add_series(&mut self, key: String, values: Vec<f64>) {
+        self.series.insert(key, values);
+    }
+
     pub fn add_metadata(&mut self, key: String, value: String) {
         self.metadata.insert(key, value);
     }

@@ -845,22 +845,7 @@ fn py_zlma(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(utils::zlma(&values, period))
 }
 
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_t3(values: Vec<f64>, period: usize, v_factor: Option<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::t3(&values, period, v_factor.unwrap_or(0.7)))
-}
-
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_kama(
-    values: Vec<f64>,
-    period: Option<usize>,
-    fast_period: Option<usize>,
-    slow_period: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(utils::kama(&values, period.unwrap_or(10), fast_period.unwrap_or(2), slow_period.unwrap_or(30)))
-}
+// Note: py_t3 and py_kama are defined later in the file with better Optional parameter support
 
 #[cfg(feature = "python")]
 #[pyfunction]

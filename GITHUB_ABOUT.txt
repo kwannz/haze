@@ -1,0 +1,1 @@
+🌫️ Haze-Library: 212 technical indicators powered by Rust for 5-10x faster quantitative trading. PyO3-based Python bindings with high precision (< 1e-9 error). Non-commercial license (CC BY-NC 4.0).

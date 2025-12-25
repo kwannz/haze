@@ -19,7 +19,7 @@ maintainers = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Financial and Insurance Industry",
-    "License :: OSI Approved :: MIT License",
+    "License :: Free For Educational Use",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -60,11 +60,11 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/haze-library/haze-library"
-Documentation = "https://haze-library.readthedocs.io/"
-Repository = "https://github.com/haze-library/haze-library"
-Issues = "https://github.com/haze-library/haze-library/issues"
-Changelog = "https://github.com/haze-library/haze-library/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/kwannz/haze"
+Documentation = "https://github.com/kwannz/haze"
+Repository = "https://github.com/kwannz/haze"
+Issues = "https://github.com/kwannz/haze/issues"
+Changelog = "https://github.com/kwannz/haze/blob/main/CHANGELOG.md"
 
 [tool.maturin]
 python-source = "src"
