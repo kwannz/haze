@@ -1,7 +1,8 @@
-/// Math Operations Module
-///
-/// 数学运算函数，对应 TA-Lib 的 Math Operators
-/// 提供向量化的数学运算，支持滚动窗口计算
+//! Math Operations Module
+#![allow(dead_code)]
+//!
+//! 数学运算函数，对应 TA-Lib 的 Math Operators
+//! 提供向量化的数学运算，支持滚动窗口计算
 
 /// MAX - Highest value over a specified period
 ///

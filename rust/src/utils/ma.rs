@@ -1,4 +1,5 @@
 // utils/ma.rs - 移动平均工具函数
+#![allow(dead_code)]
 //
 // 所有 MA 函数均为其他指标的构建块（ATR 使用 RMA，MACD 使用 EMA 等）
 

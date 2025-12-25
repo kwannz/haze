@@ -2,16 +2,18 @@
 //
 // 包含：RSI, MACD, Stochastic, StochRSI, CCI, Williams %R, AO, Fisher Transform
 
-use crate::utils::{ema, rma, sma, rolling_max, rolling_min};
+use crate::utils::{ema, sma, rolling_max, rolling_min};
 
 /// RSI - Relative Strength Index（相对强弱指标）
 ///
 /// 算法：
 /// 1. 计算价格变化：change[i] = close[i] - close[i-1]
 /// 2. 分离涨跌：gain = max(change, 0), loss = max(-change, 0)
-/// 3. 平滑增益和损失：avg_gain = RMA(gain, period), avg_loss = RMA(loss, period)
-/// 4. 计算 RS = avg_gain / avg_loss
-/// 5. RSI = 100 - (100 / (1 + RS))
+/// 3. 初始均值：avg_gain = SMA(gain[1..=period]), avg_loss = SMA(loss[1..=period])
+/// 4. Wilder 平滑：avg_gain = (prev_avg_gain*(period-1) + gain[i]) / period
+///                 avg_loss = (prev_avg_loss*(period-1) + loss[i]) / period
+/// 5. 计算 RS = avg_gain / avg_loss
+/// 6. RSI = 100 - (100 / (1 + RS))
 ///
 /// # 参数
 /// - `close`: 收盘价序列
@@ -21,7 +23,7 @@ use crate::utils::{ema, rma, sma, rolling_max, rolling_min};
 /// - 0-100 之间的值，前 period 个值为 NaN
 pub fn rsi(close: &[f64], period: usize) -> Vec<f64> {
     let n = close.len();
-    if period == 0 || period >= n {
+    if period == 0 || n == 0 || period >= n {
         return vec![f64::NAN; n];
     }
 
@@ -38,25 +40,41 @@ pub fn rsi(close: &[f64], period: usize) -> Vec<f64> {
         }
     }
 
-    // 使用 RMA 平滑
-    let avg_gain = rma(&gains, period);
-    let avg_loss = rma(&losses, period);
+    let mut result = vec![f64::NAN; n];
+    let period_f = period as f64;
 
-    // 计算 RSI
-    avg_gain
-        .iter()
-        .zip(&avg_loss)
-        .map(|(&gain, &loss)| {
-            if gain.is_nan() || loss.is_nan() {
-                f64::NAN
-            } else if loss == 0.0 {
-                100.0
-            } else {
-                let rs = gain / loss;
-                100.0 - (100.0 / (1.0 + rs))
-            }
-        })
-        .collect()
+    // 初始平均值使用 gains/losses 的前 period 个变动（从索引 1 开始）
+    let mut sum_gain = 0.0;
+    let mut sum_loss = 0.0;
+    for i in 1..=period {
+        sum_gain += gains[i];
+        sum_loss += losses[i];
+    }
+
+    let mut avg_gain = sum_gain / period_f;
+    let mut avg_loss = sum_loss / period_f;
+
+    let rsi_value = |gain: f64, loss: f64| -> f64 {
+        if gain.is_nan() || loss.is_nan() {
+            f64::NAN
+        } else if loss == 0.0 {
+            if gain == 0.0 { 0.0 } else { 100.0 }
+        } else {
+            let rs = gain / loss;
+            100.0 - (100.0 / (1.0 + rs))
+        }
+    };
+
+    result[period] = rsi_value(avg_gain, avg_loss);
+
+    // Wilder 平滑
+    for i in (period + 1)..n {
+        avg_gain = (avg_gain * (period_f - 1.0) + gains[i]) / period_f;
+        avg_loss = (avg_loss * (period_f - 1.0) + losses[i]) / period_f;
+        result[i] = rsi_value(avg_gain, avg_loss);
+    }
+
+    result
 }
 
 /// MACD - Moving Average Convergence Divergence（指数平滑移动平均线）
@@ -80,26 +98,39 @@ pub fn macd(
     slow_period: usize,
     signal_period: usize,
 ) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
-    let ema_fast = ema(close, fast_period);
-    let ema_slow = ema(close, slow_period);
+    let n = close.len();
+    if n == 0 {
+        return (vec![], vec![], vec![]);
+    }
+    if fast_period == 0 || slow_period == 0 || signal_period == 0 || slow_period > n {
+        return (vec![f64::NAN; n], vec![f64::NAN; n], vec![f64::NAN; n]);
+    }
 
-    // MACD Line
-    let macd_line: Vec<f64> = ema_fast
-        .iter()
-        .zip(&ema_slow)
-        .map(|(&fast, &slow)| {
-            if fast.is_nan() || slow.is_nan() {
-                f64::NAN
-            } else {
-                fast - slow
-            }
-        })
-        .collect();
+    // TA-Lib 兼容：fast EMA 以 slow_period-1 为起点重新初始化
+    let seed_index = slow_period - 1;
+    let lookback = slow_period + signal_period - 2;
+    if seed_index < fast_period - 1 || lookback >= n {
+        return (vec![f64::NAN; n], vec![f64::NAN; n], vec![f64::NAN; n]);
+    }
 
-    // Signal Line
-    let signal_line = ema(&macd_line, signal_period);
+    let ema_fast = ema_with_seed(close, fast_period, seed_index);
+    let ema_slow = ema_with_seed(close, slow_period, seed_index);
 
-    // Histogram
+    let mut macd_raw = vec![f64::NAN; n];
+    for i in 0..n {
+        if !ema_fast[i].is_nan() && !ema_slow[i].is_nan() {
+            macd_raw[i] = ema_fast[i] - ema_slow[i];
+        }
+    }
+
+    let signal_line = ema_with_seed(&macd_raw, signal_period, lookback);
+
+    // 输出对齐 TA-Lib：macd_line 与 signal 同起点
+    let mut macd_line = macd_raw;
+    for val in macd_line.iter_mut().take(lookback) {
+        *val = f64::NAN;
+    }
+
     let histogram: Vec<f64> = macd_line
         .iter()
         .zip(&signal_line)
@@ -113,6 +144,25 @@ pub fn macd(
         .collect();
 
     (macd_line, signal_line, histogram)
+}
+
+fn ema_with_seed(values: &[f64], period: usize, seed_index: usize) -> Vec<f64> {
+    let n = values.len();
+    let mut result = vec![f64::NAN; n];
+    if period == 0 || n == 0 || seed_index >= n || seed_index < period - 1 {
+        return result;
+    }
+
+    let start = seed_index + 1 - period;
+    let sum: f64 = values[start..=seed_index].iter().sum();
+    let alpha = 2.0 / (period as f64 + 1.0);
+    result[seed_index] = sum / period as f64;
+
+    for i in (seed_index + 1)..n {
+        result[i] = alpha * values[i] + (1.0 - alpha) * result[i - 1];
+    }
+
+    result
 }
 
 /// Stochastic Oscillator（随机振荡器）
@@ -410,12 +460,14 @@ mod tests {
 
     #[test]
     fn test_rsi() {
-        let close = vec![44.0, 44.25, 44.375, 44.0, 43.75, 43.625, 43.875, 44.0, 44.25, 44.5, 44.75, 44.875, 45.0, 45.125, 45.25];
+        // RSI 需要 period+1 个数据点才能产生第一个有效值
+        // period=14 时，第一个有效值在 index 14
+        let close = vec![44.0, 44.25, 44.375, 44.0, 43.75, 43.625, 43.875, 44.0, 44.25, 44.5, 44.75, 44.875, 45.0, 45.125, 45.25, 45.5];
         let result = rsi(&close, 14);
 
-        assert!(result[0..13].iter().all(|x| x.is_nan()));
-        assert!(!result[13].is_nan());
-        assert!(result[13] >= 0.0 && result[13] <= 100.0);
+        assert!(result[0..14].iter().all(|x| x.is_nan()));
+        assert!(!result[14].is_nan());
+        assert!(result[14] >= 0.0 && result[14] <= 100.0);
     }
 
     #[test]

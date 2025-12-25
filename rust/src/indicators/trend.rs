@@ -63,28 +63,35 @@ pub fn supertrend(
     let mut supertrend_line = vec![f64::NAN; n];
     let mut direction = vec![f64::NAN; n];
 
-    // 从第 period 个值开始（ATR 有效后）
-    for i in (period - 1)..n {
+    // 从 period 开始（ATR 在 TA-Lib 模式下首个有效值在 index=period）
+    for i in period..n {
         if atr_values[i].is_nan() {
             continue;
         }
 
-        // 更新 upper band
-        if i > period - 1 && !upper[i - 1].is_nan() && basic_upper[i] < upper[i - 1] {
+        // 更新 upper band（首个有效点直接赋值，否则取较小值以确保只向下收敛）
+        if i == period || upper[i - 1].is_nan() {
+            upper[i] = basic_upper[i];
+        } else if basic_upper[i] < upper[i - 1] {
             upper[i] = basic_upper[i];
         } else {
-            upper[i] = if i > 0 { basic_upper[i].min(upper[i - 1]) } else { basic_upper[i] };
+            upper[i] = upper[i - 1];
         }
 
-        // 更新 lower band
-        if i > period - 1 && !lower[i - 1].is_nan() && basic_lower[i] > lower[i - 1] {
+        // 更新 lower band（首个有效点直接赋值，否则取较大值以确保只向上收敛）
+        if i == period || lower[i - 1].is_nan() {
+            lower[i] = basic_lower[i];
+        } else if basic_lower[i] > lower[i - 1] {
             lower[i] = basic_lower[i];
         } else {
-            lower[i] = if i > 0 { basic_lower[i].max(lower[i - 1]) } else { basic_lower[i] };
+            lower[i] = lower[i - 1];
         }
 
         // 确定趋势方向
-        if i == period - 1 {
+        // 初始方向：使用 close > hl2 判断（收盘价高于中间价 = 上升趋势）
+        // 注：这是常见的启发式方法，与某些库（如 pandas-ta）可能略有差异
+        // pandas-ta 可能使用 close > supertrend_line 或前一根 K 线延续
+        if i == period {
             direction[i] = if close[i] > hl2[i] { 1.0 } else { -1.0 };
         } else {
             let prev_dir = direction[i - 1];
@@ -104,35 +111,16 @@ pub fn supertrend(
     (supertrend_line, direction, upper, lower)
 }
 
-/// ADX - Average Directional Index（平均趋向指标）
+/// 内部辅助函数：计算方向指标 (+DI, -DI)
 ///
-/// 算法：
-/// 1. +DM = max(high - prev_high, 0)
-/// 2. -DM = max(prev_low - low, 0)
-/// 3. 如果 +DM > -DM：-DM = 0，否则 +DM = 0
-/// 4. +DI = 100 * RMA(+DM, period) / ATR
-/// 5. -DI = 100 * RMA(-DM, period) / ATR
-/// 6. DX = 100 * |(+DI - -DI)| / (+DI + -DI)
-/// 7. ADX = RMA(DX, period)
-///
-/// # 参数
-/// - `high`: 最高价序列
-/// - `low`: 最低价序列
-/// - `close`: 收盘价序列
-/// - `period`: 周期（默认 14）
-///
-/// # 返回
-/// - (adx, plus_di, minus_di)
-pub fn adx(
+/// 提取公共逻辑，供 adx 和 dx 复用
+fn compute_di(
     high: &[f64],
     low: &[f64],
     close: &[f64],
     period: usize,
-) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+) -> (Vec<f64>, Vec<f64>) {
     let n = high.len();
-    if n != low.len() || n != close.len() {
-        return (vec![f64::NAN; n], vec![f64::NAN; n], vec![f64::NAN; n]);
-    }
 
     // 计算方向移动
     let mut plus_dm = vec![0.0; n];
@@ -178,7 +166,42 @@ pub fn adx(
         })
         .collect();
 
-    // 计算 DX
+    (plus_di, minus_di)
+}
+
+/// ADX - Average Directional Index（平均趋向指标）
+///
+/// 算法：
+/// 1. +DM = max(high - prev_high, 0)
+/// 2. -DM = max(prev_low - low, 0)
+/// 3. 如果 +DM > -DM：-DM = 0，否则 +DM = 0
+/// 4. +DI = 100 * RMA(+DM, period) / ATR
+/// 5. -DI = 100 * RMA(-DM, period) / ATR
+/// 6. DX = 100 * |(+DI - -DI)| / (+DI + -DI)
+/// 7. ADX = RMA(DX, period)
+///
+/// # 参数
+/// - `high`: 最高价序列
+/// - `low`: 最低价序列
+/// - `close`: 收盘价序列
+/// - `period`: 周期（默认 14）
+///
+/// # 返回
+/// - (adx, plus_di, minus_di)
+pub fn adx(
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    period: usize,
+) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+    let n = high.len();
+    if n != low.len() || n != close.len() {
+        return (vec![f64::NAN; n], vec![f64::NAN; n], vec![f64::NAN; n]);
+    }
+
+    let (plus_di, minus_di) = compute_di(high, low, close, period);
+
+    // 计算 DX（ADX 内部使用 0.0 替代 NaN 以便 RMA 平滑）
     let dx: Vec<f64> = (0..n)
         .map(|i| {
             if plus_di[i].is_nan() || minus_di[i].is_nan() {
@@ -226,57 +249,15 @@ pub fn dx(
         return vec![];
     }
 
-    // 复用 adx 函数的逻辑，但只返回 DX 部分
     let n = high.len();
     if n != low.len() || n != close.len() {
         return vec![f64::NAN; n];
     }
 
-    // 计算方向移动
-    let mut plus_dm = vec![0.0; n];
-    let mut minus_dm = vec![0.0; n];
+    // 复用 compute_di 计算 +DI 和 -DI
+    let (plus_di, minus_di) = compute_di(high, low, close, period);
 
-    for i in 1..n {
-        let up_move = high[i] - high[i - 1];
-        let down_move = low[i - 1] - low[i];
-
-        if up_move > down_move && up_move > 0.0 {
-            plus_dm[i] = up_move;
-        }
-        if down_move > up_move && down_move > 0.0 {
-            minus_dm[i] = down_move;
-        }
-    }
-
-    // ATR
-    let atr_values = atr(high, low, close, period);
-
-    // 平滑 DM
-    let smooth_plus_dm = rma(&plus_dm, period);
-    let smooth_minus_dm = rma(&minus_dm, period);
-
-    // 计算 DI
-    let plus_di: Vec<f64> = (0..n)
-        .map(|i| {
-            if atr_values[i].is_nan() || atr_values[i] == 0.0 {
-                f64::NAN
-            } else {
-                100.0 * smooth_plus_dm[i] / atr_values[i]
-            }
-        })
-        .collect();
-
-    let minus_di: Vec<f64> = (0..n)
-        .map(|i| {
-            if atr_values[i].is_nan() || atr_values[i] == 0.0 {
-                f64::NAN
-            } else {
-                100.0 * smooth_minus_dm[i] / atr_values[i]
-            }
-        })
-        .collect();
-
-    // 计算 DX
+    // 计算 DX（DI 无效时返回 NaN，区别于 ADX 内部使用 0.0）
     (0..n)
         .map(|i| {
             if plus_di[i].is_nan() || minus_di[i].is_nan() {
@@ -498,15 +479,28 @@ mod tests {
 
     #[test]
     fn test_supertrend() {
+        // 测试数据：持续上涨趋势
         let high = vec![102.0, 105.0, 104.0, 106.0, 108.0, 107.0, 109.0, 111.0];
         let low = vec![99.0, 101.0, 100.0, 102.0, 104.0, 103.0, 105.0, 107.0];
         let close = vec![101.0, 103.0, 102.0, 105.0, 107.0, 106.0, 108.0, 110.0];
 
-        let (supertrend, direction, _upper, _lower) = supertrend(&high, &low, &close, 3, 3.0);
+        let period = 3;
+        let (supertrend, direction, upper, lower) = supertrend(&high, &low, &close, period, 3.0);
 
         assert_eq!(supertrend.len(), 8);
         assert_eq!(direction.len(), 8);
-        assert!(direction[2..].iter().all(|&d| d == 1.0 || d == -1.0));
+
+        // ATR 在 TA-Lib 模式下首个有效值在 index=period
+        assert!(direction[..period].iter().all(|d| d.is_nan()));
+
+        // 上涨趋势：所有有效方向应为 1.0（上升趋势）
+        assert!(direction[period..].iter().all(|&d| d == 1.0));
+
+        // 上升趋势时，supertrend 线应等于 lower band
+        for i in period..8 {
+            assert_eq!(supertrend[i], lower[i]);
+            assert!(!upper[i].is_nan());
+        }
     }
 
     #[test]

@@ -6,9 +6,14 @@
 use pyo3::prelude::*;
 
 mod types;
+mod errors;
 mod utils;
 mod indicators;
 mod ml;
+mod dataframe;
+
+pub use errors::{HazeError, HazeResult};
+pub use dataframe::{OhlcvFrame, create_ohlcv_frame};
 
 #[cfg(feature = "python")]
 use types::{Candle, IndicatorResult, MultiIndicatorResult};
@@ -298,6 +303,12 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_cfo, m)?)?;
     m.add_function(wrap_pyfunction!(py_slope, m)?)?;
     m.add_function(wrap_pyfunction!(py_percent_rank, m)?)?;
+
+    // 谐波形态指标 (Harmonic Patterns)
+    m.add_class::<PyHarmonicPattern>()?;
+    m.add_function(wrap_pyfunction!(py_harmonics, m)?)?;
+    m.add_function(wrap_pyfunction!(py_harmonics_patterns, m)?)?;
+    m.add_function(wrap_pyfunction!(py_swing_points, m)?)?;
 
     Ok(())
 }
@@ -2768,4 +2779,149 @@ fn py_percent_rank(
     period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
     Ok(indicators::percent_rank(&values, period.unwrap_or(14)))
+}
+
+// ==================== 谐波形态指标包装 ====================
+
+/// 谐波形态 Python 类
+#[cfg(feature = "python")]
+#[pyclass]
+#[derive(Clone)]
+pub struct PyHarmonicPattern {
+    #[pyo3(get)]
+    pub pattern_type: String,
+    #[pyo3(get)]
+    pub pattern_type_zh: String,
+    #[pyo3(get)]
+    pub is_bullish: bool,
+    #[pyo3(get)]
+    pub state: String,
+    #[pyo3(get)]
+    pub x_index: usize,
+    #[pyo3(get)]
+    pub x_price: f64,
+    #[pyo3(get)]
+    pub a_index: usize,
+    #[pyo3(get)]
+    pub a_price: f64,
+    #[pyo3(get)]
+    pub b_index: usize,
+    #[pyo3(get)]
+    pub b_price: f64,
+    #[pyo3(get)]
+    pub c_index: Option<usize>,
+    #[pyo3(get)]
+    pub c_price: Option<f64>,
+    #[pyo3(get)]
+    pub d_index: Option<usize>,
+    #[pyo3(get)]
+    pub d_price: Option<f64>,
+    #[pyo3(get)]
+    pub prz_high: Option<f64>,
+    #[pyo3(get)]
+    pub prz_low: Option<f64>,
+    #[pyo3(get)]
+    pub prz_center: Option<f64>,
+    #[pyo3(get)]
+    pub probability: f64,
+    #[pyo3(get)]
+    pub target_prices: Vec<f64>,
+    #[pyo3(get)]
+    pub stop_loss: Option<f64>,
+}
+
+/// 谐波形态信号（时间序列格式）
+/// 返回: (signals, prz_upper, prz_lower, probability)
+/// - signals: 1=看涨, -1=看跌, 0=无信号
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (high, low, close, left_bars=None, right_bars=None, min_probability=None))]
+fn py_harmonics(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    left_bars: Option<usize>,
+    right_bars: Option<usize>,
+    min_probability: Option<f64>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+    Ok(indicators::harmonics::harmonics_signal(
+        &high,
+        &low,
+        &close,
+        left_bars.unwrap_or(5),
+        right_bars.unwrap_or(5),
+        min_probability.unwrap_or(0.5),
+    ))
+}
+
+/// 谐波形态详细信息
+/// 返回 PyHarmonicPattern 列表
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (high, low, left_bars=None, right_bars=None, include_forming=None))]
+fn py_harmonics_patterns(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    left_bars: Option<usize>,
+    right_bars: Option<usize>,
+    include_forming: Option<bool>,
+) -> PyResult<Vec<PyHarmonicPattern>> {
+    let patterns = indicators::harmonics::detect_all_harmonics_ext(
+        &high,
+        &low,
+        left_bars.unwrap_or(5),
+        right_bars.unwrap_or(5),
+        include_forming.unwrap_or(true),
+    );
+
+    let result = patterns.iter().map(|p| {
+        let state = match p.state {
+            indicators::harmonics::PatternState::Forming => "forming".to_string(),
+            indicators::harmonics::PatternState::Complete => "complete".to_string(),
+        };
+
+        PyHarmonicPattern {
+            pattern_type: p.pattern_type.name_en().to_string(),
+            pattern_type_zh: p.pattern_type.name_zh().to_string(),
+            is_bullish: p.is_bullish,
+            state,
+            x_index: p.x.index,
+            x_price: p.x.price,
+            a_index: p.a.index,
+            a_price: p.a.price,
+            b_index: p.b.index,
+            b_price: p.b.price,
+            c_index: p.c.map(|c| c.index),
+            c_price: p.c.map(|c| c.price),
+            d_index: p.d.map(|d| d.index),
+            d_price: p.d.map(|d| d.price),
+            prz_high: p.prz.as_ref().map(|prz| prz.price_high),
+            prz_low: p.prz.as_ref().map(|prz| prz.price_low),
+            prz_center: p.prz.as_ref().map(|prz| prz.price_center),
+            probability: p.completion_probability,
+            target_prices: p.target_prices.clone(),
+            stop_loss: p.stop_loss,
+        }
+    }).collect();
+
+    Ok(result)
+}
+
+/// 检测摆动点
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (high, low, left_bars=None, right_bars=None))]
+fn py_swing_points(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    left_bars: Option<usize>,
+    right_bars: Option<usize>,
+) -> PyResult<Vec<(usize, f64, bool)>> {
+    let swings = indicators::harmonics::detect_swing_points(
+        &high,
+        &low,
+        left_bars.unwrap_or(5),
+        right_bars.unwrap_or(5),
+    );
+    Ok(swings.iter().map(|s| (s.index, s.price, s.is_high)).collect())
 }

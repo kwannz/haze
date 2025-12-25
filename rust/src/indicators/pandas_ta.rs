@@ -4,7 +4,7 @@
 
 #![allow(unused_variables)]
 
-use crate::utils::{ema, sma, stdev, rma, rolling_max, rolling_min};
+use crate::utils::{ema, sma, stdev, rma, rolling_max, rolling_min, tsf};
 use crate::indicators::{atr, bollinger_bands, keltner_channel, rsi};
 
 /// Entropy - 信息熵指标（价格不确定性度量）
@@ -1372,36 +1372,18 @@ pub fn cfo(close: &[f64], period: usize) -> Vec<f64> {
         return vec![f64::NAN; n];
     }
 
-    let mut result = vec![f64::NAN; n];
-
-    for i in (period - 1)..n {
-        let window = &close[i + 1 - period..=i];
-
-        // 计算线性回归
-        let x_mean = (period - 1) as f64 / 2.0;
-        let y_mean: f64 = window.iter().sum::<f64>() / period as f64;
-
-        let mut numerator = 0.0;
-        let mut denominator = 0.0;
-
-        for (j, &y) in window.iter().enumerate() {
-            let x_diff = j as f64 - x_mean;
-            numerator += x_diff * (y - y_mean);
-            denominator += x_diff * x_diff;
-        }
-
-        if denominator > 1e-10 {
-            let slope = numerator / denominator;
-            let intercept = y_mean - slope * x_mean;
-            let forecast = slope * (period - 1) as f64 + intercept;
-
-            if close[i] != 0.0 {
-                result[i] = ((close[i] - forecast) / close[i]) * 100.0;
+    let forecast = tsf(close, period);
+    forecast
+        .iter()
+        .zip(close)
+        .map(|(&f, &c)| {
+            if f.is_nan() || c == 0.0 {
+                f64::NAN
+            } else {
+                ((c - f) / c) * 100.0
             }
-        }
-    }
-
-    result
+        })
+        .collect()
 }
 
 /// Slope - Linear Slope Indicator（线性斜率指标）

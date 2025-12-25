@@ -2,7 +2,7 @@
 //
 // 包含：True Range, ATR, NATR, Bollinger Bands, Keltner Channel, Donchian Channel
 
-use crate::utils::{rma, sma, stdev, rolling_max, rolling_min};
+use crate::utils::{sma, stdev_population, rolling_max, rolling_min};
 /// True Range（真实波幅）
 ///
 /// 算法：TR = MAX(
@@ -18,7 +18,7 @@ use crate::utils::{rma, sma, stdev, rolling_max, rolling_min};
 /// - `drift`: 前一收盘价的偏移量（默认 1）
 ///
 /// # 返回
-/// - 与输入等长的向量，第一个值为 high[0] - low[0]
+/// - 与输入等长的向量，前 drift 个值为 NaN
 pub fn true_range(high: &[f64], low: &[f64], close: &[f64], drift: usize) -> Vec<f64> {
     // 边界检查：空数组
     if high.is_empty() || low.is_empty() || close.is_empty() {
@@ -30,12 +30,9 @@ pub fn true_range(high: &[f64], low: &[f64], close: &[f64], drift: usize) -> Vec
         return vec![f64::NAN; n];
     }
 
-    let mut result = vec![0.0; n];
+    let mut result = vec![f64::NAN; n];
 
-    // 第一个 TR = high - low（无前一收盘价）
-    result[0] = high[0] - low[0];
-
-    // 从第 drift 个开始计算完整 TR
+    // 从第 drift 个开始计算完整 TR（前 drift 个值无前一收盘价）
     for i in drift..n {
         let prev_close = close[i - drift];
         let tr1 = high[i] - low[i];
@@ -67,8 +64,27 @@ pub fn atr(high: &[f64], low: &[f64], close: &[f64], period: usize) -> Vec<f64> 
         return vec![];
     }
 
+    let n = high.len();
+    if period == 0 || period >= n {
+        return vec![f64::NAN; n];
+    }
+
     let tr = true_range(high, low, close, 1);
-    rma(&tr, period)
+    let mut result = vec![f64::NAN; n];
+
+    // TA-Lib 兼容：忽略 TR[0]，初始 ATR 为 TR[1..=period] 的均值
+    let mut sum = 0.0;
+    for i in 1..=period {
+        sum += tr[i];
+    }
+    let period_f = period as f64;
+    result[period] = sum / period_f;
+
+    for i in (period + 1)..n {
+        result[i] = (result[i - 1] * (period_f - 1.0) + tr[i]) / period_f;
+    }
+
+    result
 }
 
 /// NATR - Normalized ATR（归一化 ATR，百分比形式）
@@ -123,7 +139,7 @@ pub fn bollinger_bands(
     std_multiplier: f64,
 ) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
     let middle = sma(close, period);
-    let std = stdev(close, period);
+    let std = stdev_population(close, period);
 
     let upper: Vec<f64> = middle
         .iter()
@@ -254,8 +270,8 @@ mod tests {
 
         let tr = true_range(&high, &low, &close, 1);
 
-        // TR[0] = 102 - 99 = 3.0
-        assert_eq!(tr[0], 3.0);
+        // TR[0] 无前一收盘价，返回 NaN
+        assert!(tr[0].is_nan());
 
         // TR[1] = MAX(105-101, |105-101|, |101-101|) = MAX(4, 4, 0) = 4.0
         assert_eq!(tr[1], 4.0);
@@ -274,7 +290,8 @@ mod tests {
 
         assert!(result[0].is_nan());
         assert!(result[1].is_nan());
-        assert!(!result[2].is_nan());  // ATR 从第 3 个值开始有效
+        assert!(result[2].is_nan());
+        assert!(!result[3].is_nan());  // ATR 从第 4 个值开始有效
     }
 
     #[test]

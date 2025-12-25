@@ -32,6 +32,35 @@ pub fn stdev(values: &[f64], period: usize) -> Vec<f64> {
     result
 }
 
+/// 标准差（总体标准差，使用 n 作为分母）
+///
+/// # 参数
+/// - `values`: 输入序列
+/// - `period`: 周期
+///
+/// # 返回
+/// - 与输入等长的向量，前 period-1 个值为 NaN
+pub fn stdev_population(values: &[f64], period: usize) -> Vec<f64> {
+    if period < 2 || period > values.len() {
+        return vec![f64::NAN; values.len()];
+    }
+
+    let mut result = vec![f64::NAN; values.len()];
+
+    for i in (period - 1)..values.len() {
+        let window = &values[i + 1 - period..=i];
+        let mean: f64 = window.iter().sum::<f64>() / period as f64;
+        let variance: f64 = window
+            .iter()
+            .map(|&x| (x - mean).powi(2))
+            .sum::<f64>()
+            / period as f64;
+        result[i] = variance.sqrt();
+    }
+
+    result
+}
+
 /// 最大值（滚动窗口）
 ///
 /// # 参数

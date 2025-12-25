@@ -1108,8 +1108,10 @@ fn test_trend_branches() {
     let (adx_vals, _plus, _minus) = adx(&high_flat, &low_flat, &close_flat, 2);
     assert_eq!(adx_vals[1], 0.0);
 
+    // DX 在 index < period 时返回 NaN（ATR 尚未有效）
     let dx_vals = dx(&high_flat, &low_flat, &close_flat, 2);
-    assert_eq!(dx_vals[1], 0.0);
+    assert!(dx_vals[1].is_nan()); // ATR 在 TA-Lib 模式下首个有效值在 index=period
+    assert_eq!(dx_vals[2], 0.0); // 平价数据：+DI = -DI = 0 -> DX = 0
 
     let dx_mismatch = dx(&[1.0, 2.0], &[1.0], &[1.0, 2.0], 2);
     assert!(dx_mismatch.iter().all(|v| v.is_nan()));
@@ -1762,11 +1764,14 @@ fn test_pandas_ta_edge_cases() {
     assert_eq!(sq_off[10], 0.0);
     assert!(sq_on[0].is_nan());
 
+    // 测试高波动 close + 跟踪 close 的 high/low：
+    // 由于 True Range = max(H-L, |H-prev_C|, |L-prev_C|)，大幅价格波动导致 TR/ATR 很大
+    // 因此 KC 很宽，BB 反而在 KC 内部 -> squeeze_on
     let close_var = vec![100.0, 110.0, 90.0, 115.0, 85.0];
     let high_narrow: Vec<f64> = close_var.iter().map(|v| v + 0.1).collect();
     let low_narrow: Vec<f64> = close_var.iter().map(|v| v - 0.1).collect();
-    let (_sq_on, sq_off_var, _) = squeeze(&high_narrow, &low_narrow, &close_var, 3, 2.0, 3, 3, 1.5);
-    assert_eq!(sq_off_var[4], 1.0);
+    let (sq_on_var, _sq_off_var, _) = squeeze(&high_narrow, &low_narrow, &close_var, 3, 2.0, 3, 3, 1.5);
+    assert_eq!(sq_on_var[4], 1.0); // BB 在 KC 内 -> 挤压状态
 
     let (_fast, slow_short, _signal) = qqe(&close_short, 10, 2, 1.0);
     assert!(slow_short.iter().all(|v| v.is_nan()));
