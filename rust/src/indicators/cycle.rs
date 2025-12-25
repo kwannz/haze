@@ -58,11 +58,7 @@ pub fn ht_dcperiod(values: &[f64]) -> Vec<f64> {
             0.0
         };
         
-        let delta_phase = if i > 0 {
-            (phase - (smooth_i[i-1] * smooth_q[i-1]).atan()).abs()
-        } else {
-            0.0
-        };
+        let delta_phase = (phase - (smooth_i[i - 1] * smooth_q[i - 1]).atan()).abs();
         
         if delta_phase < 0.1 {
             period[i] = period[i-1];
@@ -273,9 +269,8 @@ mod tests {
         assert!(result[0].is_nan());
         assert!(result[31].is_nan());
         // After warmup, should have values
-        if result.len() > 40 {
-            assert!(!result[40].is_nan());
-        }
+        assert!(result.len() > 40);
+        assert!(!result[40].is_nan());
     }
 
     #[test]

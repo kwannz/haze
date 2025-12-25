@@ -336,29 +336,28 @@ pub fn linear_regression(y_values: &[f64], period: usize) -> (Vec<f64>, Vec<f64>
             ss_total += y_diff * y_diff;
         }
 
-        if denominator > 0.0 {
-            let m = numerator / denominator;
-            let b = y_mean - m * x_mean;
+        debug_assert!(denominator > 0.0);
+        let m = numerator / denominator;
+        let b = y_mean - m * x_mean;
 
-            slope[i] = m;
-            intercept[i] = b;
+        slope[i] = m;
+        intercept[i] = b;
 
-            // 计算 R²
-            if ss_total > 0.0 {
-                let ss_residual: f64 = window
-                    .iter()
-                    .enumerate()
-                    .map(|(j, &y)| {
-                        let x = j as f64;
-                        let y_pred = m * x + b;
-                        (y - y_pred).powi(2)
-                    })
-                    .sum();
+        // 计算 R²
+        if ss_total > 0.0 {
+            let ss_residual: f64 = window
+                .iter()
+                .enumerate()
+                .map(|(j, &y)| {
+                    let x = j as f64;
+                    let y_pred = m * x + b;
+                    (y - y_pred).powi(2)
+                })
+                .sum();
 
-                r_squared[i] = 1.0 - (ss_residual / ss_total);
-            } else {
-                r_squared[i] = 1.0; // 完美拟合（所有 y 值相同）
-            }
+            r_squared[i] = 1.0 - (ss_residual / ss_total);
+        } else {
+            r_squared[i] = 1.0; // 完美拟合（所有 y 值相同）
         }
     }
 
@@ -586,27 +585,24 @@ pub fn standard_error(y_values: &[f64], period: usize) -> Vec<f64> {
             denominator += x_diff * x_diff;
         }
 
-        if denominator > 0.0 {
-            let slope = numerator / denominator;
-            let intercept = y_mean - slope * x_mean;
+        debug_assert!(denominator > 0.0);
+        let slope = numerator / denominator;
+        let intercept = y_mean - slope * x_mean;
 
-            // 计算残差平方和
-            let ss_residual: f64 = window
-                .iter()
-                .enumerate()
-                .map(|(j, &y)| {
-                    let x = j as f64;
-                    let y_pred = slope * x + intercept;
-                    (y - y_pred).powi(2)
-                })
-                .sum();
+        // 计算残差平方和
+        let ss_residual: f64 = window
+            .iter()
+            .enumerate()
+            .map(|(j, &y)| {
+                let x = j as f64;
+                let y_pred = slope * x + intercept;
+                (y - y_pred).powi(2)
+            })
+            .sum();
 
-            // 自由度为 n - 2（估计了两个参数：slope 和 intercept）
-            let degrees_of_freedom = (period - 2) as f64;
-            if degrees_of_freedom > 0.0 {
-                result[i] = (ss_residual / degrees_of_freedom).sqrt();
-            }
-        }
+        // 自由度为 n - 2（估计了两个参数：slope 和 intercept）
+        let degrees_of_freedom = (period - 2) as f64;
+        result[i] = (ss_residual / degrees_of_freedom).sqrt();
     }
 
     result
@@ -708,11 +704,8 @@ pub fn linearreg(values: &[f64], period: usize) -> Vec<f64> {
             denominator += x_diff.powi(2);
         }
 
-        let slope = if denominator != 0.0 {
-            numerator / denominator
-        } else {
-            0.0
-        };
+        debug_assert!(denominator != 0.0);
+        let slope = numerator / denominator;
 
         let intercept = y_mean - slope * x_mean;
         result[i] = intercept + slope * (period - 1) as f64;
@@ -747,11 +740,8 @@ pub fn linearreg_slope(values: &[f64], period: usize) -> Vec<f64> {
             denominator += x_diff.powi(2);
         }
 
-        result[i] = if denominator != 0.0 {
-            numerator / denominator
-        } else {
-            0.0
-        };
+        debug_assert!(denominator != 0.0);
+        result[i] = numerator / denominator;
     }
 
     result
@@ -797,11 +787,8 @@ pub fn linearreg_intercept(values: &[f64], period: usize) -> Vec<f64> {
             denominator += x_diff.powi(2);
         }
 
-        let slope = if denominator != 0.0 {
-            numerator / denominator
-        } else {
-            0.0
-        };
+        debug_assert!(denominator != 0.0);
+        let slope = numerator / denominator;
 
         result[i] = y_mean - slope * x_mean;
     }
@@ -860,11 +847,8 @@ pub fn tsf(values: &[f64], period: usize) -> Vec<f64> {
             denominator += x_diff.powi(2);
         }
 
-        let slope = if denominator != 0.0 {
-            numerator / denominator
-        } else {
-            0.0
-        };
+        debug_assert!(denominator != 0.0);
+        let slope = numerator / denominator;
 
         let intercept = y_mean - slope * x_mean;
 
@@ -874,4 +858,3 @@ pub fn tsf(values: &[f64], period: usize) -> Vec<f64> {
 
     result
 }
-

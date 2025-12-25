@@ -789,39 +789,39 @@ mod kdj_tests {
         let (k, d, j) = kdj(&high, &low, &close, 9, 3);
 
         // 横盘市场中，K=D=50，J=3*50-2*50=50
-        let valid_idx = 15;
-        if !k[valid_idx].is_nan() && !d[valid_idx].is_nan() {
-            assert!((k[valid_idx] - 50.0).abs() < 5.0);
-            assert!((d[valid_idx] - 50.0).abs() < 5.0);
-            assert!((j[valid_idx] - 50.0).abs() < 5.0);
-        }
+        let valid_idx = k
+            .iter()
+            .zip(&d)
+            .position(|(&k_val, &d_val)| !k_val.is_nan() && !d_val.is_nan())
+            .unwrap();
+        assert!((k[valid_idx] - 50.0).abs() < 5.0);
+        assert!((d[valid_idx] - 50.0).abs() < 5.0);
+        assert!((j[valid_idx] - 50.0).abs() < 5.0);
     }
 
     #[test]
     fn test_tsi_basic() {
-        let close: Vec<f64> = (100..130).map(|x| x as f64).collect();
+        let close: Vec<f64> = (100..150).map(|x| x as f64).collect();
 
-        let (tsi, _signal) = tsi(&close, 25, 13, 13);
+        let (tsi, _signal) = tsi(&close, 5, 3, 3);
 
         // 上升趋势中，TSI 应为正值
-        let valid_idx = 28;
-        if !tsi[valid_idx].is_nan() {
-            assert!(tsi[valid_idx] > 0.0);
-        }
+        let valid_idx = 10;
+        assert!(!tsi[valid_idx].is_nan());
+        assert!(tsi[valid_idx] > 0.0);
     }
 
     #[test]
     fn test_uo_basic() {
-        let high = vec![110.0; 50];
-        let low = vec![100.0; 50];
-        let close = vec![105.0; 50];
+        let high: Vec<f64> = (100..150).map(|x| x as f64 + 5.0).collect();
+        let low: Vec<f64> = (100..150).map(|x| x as f64).collect();
+        let close: Vec<f64> = (100..150).map(|x| x as f64 + 2.5).collect();
 
         let uo = ultimate_oscillator(&high, &low, &close, 7, 14, 28);
 
         // 横盘市场中，UO 应接近 50
         let valid_idx = 30;
-        if !uo[valid_idx].is_nan() {
-            assert!(uo[valid_idx] > 30.0 && uo[valid_idx] < 70.0);
-        }
+        assert!(!uo[valid_idx].is_nan());
+        assert!(uo[valid_idx] > 30.0 && uo[valid_idx] < 70.0);
     }
 }

@@ -532,6 +532,7 @@ pub fn ease_of_movement(
     }
 
     let mut emv = vec![f64::NAN; n];
+    emv[0] = 0.0;
 
     for i in 1..n {
         let mid_current = (high[i] + low[i]) / 2.0;
@@ -652,9 +653,8 @@ mod volume_extended_tests {
 
         // 横盘市场中，EOM 应接近 0
         let valid_idx = 15;
-        if !eom[valid_idx].is_nan() {
-            assert!(eom[valid_idx].abs() < 10.0);
-        }
+        assert!(!eom[valid_idx].is_nan());
+        assert!(eom[valid_idx].abs() < 10.0);
     }
 
     #[test]
@@ -668,8 +668,7 @@ mod volume_extended_tests {
 
         // 横盘市场中，ADOSC 应接近 0
         let valid_idx = 15;
-        if !adosc[valid_idx].is_nan() {
-            assert!(adosc[valid_idx].abs() < 1000.0);
-        }
+        assert!(!adosc[valid_idx].is_nan());
+        assert!(adosc[valid_idx].abs() < 1000.0);
     }
 }

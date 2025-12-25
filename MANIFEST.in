@@ -1,0 +1,30 @@
+# Include important project files
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include IMPLEMENTED_INDICATORS.md
+include pyproject.toml
+
+# Include Rust source code
+recursive-include rust/src *.rs
+include rust/Cargo.toml
+
+# Exclude build artifacts
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude *.so
+global-exclude .DS_Store
+
+# Exclude test files from distribution
+prune tests/
+prune rust/target/
+
+# Exclude development files
+exclude .gitignore
+exclude .git*
+exclude *.md.bak
+exclude sprint.md
+exclude claude.md
+exclude grok.md
+exclude INDICATOR_PLAN.md

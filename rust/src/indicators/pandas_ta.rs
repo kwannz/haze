@@ -253,16 +253,18 @@ pub fn qqe(
         }
 
         let threshold = tr_rsi[i] * multiplier;
+        let prev_slow = slow_line.get(i - 1).copied().unwrap_or(50.0);
+        let prev_slow = if prev_slow.is_nan() { 50.0 } else { prev_slow };
 
         // 动态阈值逻辑
-        if fast_line[i] > slow_line.get(i - 1).copied().unwrap_or(50.0) {
-            slow_line[i] = (slow_line.get(i - 1).copied().unwrap_or(50.0) + threshold).min(fast_line[i]);
+        if fast_line[i] > prev_slow {
+            slow_line[i] = (prev_slow + threshold).min(fast_line[i]);
             signal[i] = 1.0; // 看涨
-        } else if fast_line[i] < slow_line.get(i - 1).copied().unwrap_or(50.0) {
-            slow_line[i] = (slow_line.get(i - 1).copied().unwrap_or(50.0) - threshold).max(fast_line[i]);
+        } else if fast_line[i] < prev_slow {
+            slow_line[i] = (prev_slow - threshold).max(fast_line[i]);
             signal[i] = -1.0; // 看跌
         } else {
-            slow_line[i] = slow_line.get(i - 1).copied().unwrap_or(50.0);
+            slow_line[i] = prev_slow;
             signal[i] = 0.0; // 中性
         }
     }

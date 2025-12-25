@@ -793,10 +793,10 @@ mod vortex_tests {
 
         // 上升趋势中，VI+ 应 > VI-
         let valid_idx = 20;
-        if !vi_plus[valid_idx].is_nan() && !vi_minus[valid_idx].is_nan() {
-            assert!(vi_plus[valid_idx] > 0.0);
-            assert!(vi_minus[valid_idx] > 0.0);
-        }
+        assert!(!vi_plus[valid_idx].is_nan());
+        assert!(!vi_minus[valid_idx].is_nan());
+        assert!(vi_plus[valid_idx] > 0.0);
+        assert!(vi_minus[valid_idx] > 0.0);
     }
 
     #[test]
@@ -810,9 +810,8 @@ mod vortex_tests {
 
         // 横盘市场中，CHOP 应 > 61.8
         let valid_idx = 20;
-        if !chop[valid_idx].is_nan() {
-            assert!(chop[valid_idx] > 50.0);
-        }
+        assert!(!chop[valid_idx].is_nan());
+        assert!(chop[valid_idx] > 50.0);
     }
 
     #[test]
@@ -824,9 +823,8 @@ mod vortex_tests {
 
         // 上升趋势中（收盘价 > 开盘价），QStick > 0
         let valid_idx = 4;
-        if !qstick[valid_idx].is_nan() {
-            assert!(qstick[valid_idx] > 0.0);
-        }
+        assert!(!qstick[valid_idx].is_nan());
+        assert!(qstick[valid_idx] > 0.0);
     }
 
     #[test]
@@ -838,8 +836,7 @@ mod vortex_tests {
 
         // 强趋势中，VHF 应较高
         let valid_idx = 40;
-        if !vhf_values[valid_idx].is_nan() {
-            assert!(vhf_values[valid_idx] > 0.2);
-        }
+        assert!(!vhf_values[valid_idx].is_nan());
+        assert!(vhf_values[valid_idx] > 0.2);
     }
 }

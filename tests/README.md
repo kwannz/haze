@@ -1,0 +1,236 @@
+# Haze-Library 测试框架
+
+## 📂 测试结构
+
+```
+tests/
+├── README.md                    # 本文档
+├── precision_validator.py       # 精度验证框架核心
+├── run_precision_tests.py       # 批量精度验证脚本
+├── precision_report.txt         # 生成的精度验证报告（运行后）
+├── unit/                        # 单元测试（待实现）
+│   ├── test_volatility.py
+│   ├── test_momentum.py
+│   ├── test_trend.py
+│   ├── test_volume.py
+│   └── test_moving_averages.py
+└── integration/                 # 集成测试（待实现）
+    ├── test_real_data.py
+    └── test_performance.py
+```
+
+## 🎯 测试目标
+
+### 阶段 1: 精度验证 ✅（当前阶段）
+- **目标**：验证所有 212 个指标与参考库（pandas-ta, TA-Lib）的精度一致性
+- **标准**：最大误差 < 1e-9（纳米级精度）
+- **覆盖率**：100% 指标覆盖
+
+### 阶段 2: 单元测试 ⏳（待实施）
+- **目标**：代码覆盖率 > 90%
+- **标准**：每个指标至少 3 个测试用例（正常、边界、异常）
+- **框架**：pytest + pytest-cov
+
+### 阶段 3: 性能测试 ⏳（待实施）
+- **目标**：性能基准 vs Python 实现
+- **标准**：Rust 实现 > 10x 性能提升
+- **框架**：pytest-benchmark
+
+## 🚀 快速开始
+
+### 1. 安装依赖
+
+```bash
+# 进入项目根目录
+cd /Users/zhaoleon/Desktop/haze/haze-Library
+
+# 安装测试依赖
+pip install -e ".[test]"
+```
+
+**注意**：TA-Lib 需要先安装系统库：
+
+```bash
+# macOS
+brew install ta-lib
+
+# 然后安装 Python 包装器
+pip install TA-Lib
+```
+
+### 2. 编译 Rust 库
+
+```bash
+cd rust
+maturin develop --release
+```
+
+### 3. 运行精度验证
+
+```bash
+# 返回项目根目录
+cd ..
+
+# 运行精度验证
+python tests/run_precision_tests.py
+```
+
+## 📊 精度验证指标
+
+### 计算指标
+
+| 指标 | 说明 | 公式 |
+|------|------|------|
+| **MAE** | 平均绝对误差 | `mean(\|haze - ref\|)` |
+| **RMSE** | 均方根误差 | `sqrt(mean((haze - ref)²))` |
+| **Max Error** | 最大误差 | `max(\|haze - ref\|)` |
+| **Correlation** | 皮尔逊相关系数 | `corrcoef(haze, ref)` |
+| **Pass Rate** | 通过率 | `count(error < 1e-9) / total` |
+
+### 验证标准
+
+- ✅ **通过**：Max Error < 1e-9 且 Correlation > 0.9999
+- ⚠️  **警告**：Max Error < 1e-6 且 Correlation > 0.999
+- ❌ **失败**：Max Error >= 1e-6 或 Correlation < 0.999
+
+## 📝 验证清单
+
+### 波动率指标（10 个）
+- [x] ATR - Average True Range
+- [x] NATR - Normalized ATR
+- [ ] Bollinger Bands
+- [ ] Keltner Channel
+- [ ] Donchian Channel
+- [ ] Chandelier Exit
+- [ ] Historical Volatility
+- [ ] Ulcer Index
+- [ ] Mass Index
+- [ ] True Range
+
+### 动量指标（17 个）
+- [x] RSI - Relative Strength Index
+- [x] MACD - Moving Average Convergence Divergence
+- [x] CCI - Commodity Channel Index
+- [x] MFI - Money Flow Index
+- [x] Williams %R
+- [x] ROC - Rate of Change
+- [x] MOM - Momentum
+- [ ] Fisher Transform
+- [ ] Stochastic
+- [ ] Stochastic RSI
+- [ ] KDJ
+- [ ] TSI - True Strength Index
+- [ ] Ultimate Oscillator
+- [ ] Awesome Oscillator
+- [ ] APO
+- [ ] PPO
+- [ ] CMO
+
+### 移动平均线（16 个）
+- [x] SMA - Simple Moving Average
+- [x] EMA - Exponential Moving Average
+- [x] WMA - Weighted Moving Average
+- [x] DEMA - Double EMA
+- [x] TEMA - Triple EMA
+- [x] T3 - Tillson T3
+- [x] KAMA - Kaufman Adaptive MA
+- [ ] HMA - Hull MA
+- [ ] RMA - Wilder's MA
+- [ ] ZLMA - Zero Lag MA
+- [ ] FRAMA - Fractal Adaptive MA
+- [ ] ALMA - Arnaud Legoux MA
+- [ ] VIDYA - Variable Index Dynamic Average
+- [ ] PWMA - Pascal's Weighted MA
+- [ ] SINWMA - Sine Weighted MA
+- [ ] SWMA - Symmetric Weighted MA
+
+### 趋势指标（14 个）
+- [ ] SuperTrend
+- [ ] ADX - Average Directional Index
+- [ ] Parabolic SAR
+- [ ] Aroon
+- [ ] DMI
+- [ ] TRIX
+- [ ] DPO - Detrended Price Oscillator
+- [ ] Vortex
+- [ ] Choppiness
+- [ ] QStick
+- [ ] VHF
+- [ ] DX
+- [ ] +DI
+- [ ] -DI
+
+### 成交量指标（11 个）
+- [ ] OBV - On Balance Volume
+- [ ] VWAP - Volume Weighted Average Price
+- [ ] Force Index
+- [ ] CMF - Chaikin Money Flow
+- [ ] Volume Oscillator
+- [ ] AD - Accumulation/Distribution
+- [ ] PVT - Price Volume Trend
+- [ ] NVI - Negative Volume Index
+- [ ] PVI - Positive Volume Index
+- [ ] EOM - Ease of Movement
+- [ ] ADOSC - Chaikin A/D Oscillator
+
+## 🐛 调试指南
+
+### 常见问题
+
+**Q: `ImportError: No module named '_haze_rust'`**
+
+A: 请先编译 Rust 库：
+```bash
+cd rust
+maturin develop --release
+```
+
+**Q: `ModuleNotFoundError: No module named 'talib'`**
+
+A: 需要先安装 TA-Lib 系统库：
+```bash
+brew install ta-lib
+pip install TA-Lib
+```
+
+**Q: 精度验证失败**
+
+A: 检查以下几点：
+1. 参数是否一致（period, multiplier 等）
+2. NaN 处理是否正确（前导 NaN 应该被忽略）
+3. 算法实现是否有误（参考 IMPLEMENTED_INDICATORS.md）
+
+## 📈 进度追踪
+
+- [x] 精度验证框架搭建
+- [x] 测试数据生成器
+- [ ] 波动率指标验证（30% 完成）
+- [ ] 动量指标验证（40% 完成）
+- [ ] 移动平均验证（40% 完成）
+- [ ] 趋势指标验证（0% 完成）
+- [ ] 成交量指标验证（0% 完成）
+- [ ] 统计指标验证（0% 完成）
+- [ ] pandas-ta 独有指标验证（0% 完成）
+- [ ] 单元测试用例编写（0% 完成）
+- [ ] 性能基准测试（0% 完成）
+
+## 📚 参考资源
+
+- [TA-Lib 官方文档](https://ta-lib.org/)
+- [pandas-ta GitHub](https://github.com/twopirllc/pandas-ta)
+- [pytest 文档](https://docs.pytest.org/)
+- [numpy 测试最佳实践](https://numpy.org/doc/stable/reference/testing.html)
+
+## 🤝 贡献指南
+
+欢迎贡献！请遵循以下步骤：
+
+1. 添加新指标验证到 `run_precision_tests.py`
+2. 确保精度验证通过（Max Error < 1e-9）
+3. 编写相应的单元测试
+4. 更新本文档的验证清单
+
+---
+
+**Last Updated**: 2025-12-25
+**Maintainer**: Haze Team

@@ -307,17 +307,17 @@ mod tests {
 
     #[test]
     fn test_cloud_thickness() {
-        let high = vec![110.0; 100];
-        let low = vec![100.0; 100];
-        let close = vec![105.0; 100];
-
-        let ichimoku = ichimoku_cloud(&high, &low, &close, 9, 26, 52);
+        let ichimoku = IchimokuCloud {
+            tenkan_sen: vec![0.0; 3],
+            kijun_sen: vec![0.0; 3],
+            senkou_span_a: vec![110.0, 111.0, 112.0],
+            senkou_span_b: vec![109.9, 110.2, 111.6],
+            chikou_span: vec![0.0; 3],
+        };
         let thickness = cloud_thickness(&ichimoku);
 
         // 横盘市场中，Span A 和 Span B 应接近，厚度接近 0
-        let valid_idx = 52; // 确保所有线都计算完成
-        if !thickness[valid_idx].is_nan() {
-            assert!(thickness[valid_idx] < 1.0);
-        }
+        let valid_idx = 2;
+        assert!(thickness[valid_idx] < 1.0);
     }
 }

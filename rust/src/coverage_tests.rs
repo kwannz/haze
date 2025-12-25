@@ -226,6 +226,54 @@ fn test_candlestick_short_inputs() {
     let _ = three_black_crows(&open, &low, &close);
     let _ = rising_three_methods(&open, &high, &low, &close);
     let _ = falling_three_methods(&open, &high, &low, &close);
+    let _ = doji(&open, &high, &low, &close, 0.1);
+    let _ = hammer(&open, &high, &low, &close);
+    let _ = inverted_hammer(&open, &high, &low, &close);
+    let _ = hanging_man(&open, &high, &low, &close);
+    let _ = shooting_star(&open, &high, &low, &close);
+    let _ = marubozu(&open, &high, &low, &close);
+    let _ = spinning_top(&open, &high, &low, &close);
+    let _ = dragonfly_doji(&open, &high, &low, &close, 0.1);
+    let _ = gravestone_doji(&open, &high, &low, &close, 0.1);
+    let _ = long_legged_doji(&open, &high, &low, &close, 0.1);
+    let _ = tweezers_top(&open, &high, &close, 0.01);
+    let _ = harami_cross(&open, &high, &low, &close, 0.1);
+    let _ = morning_doji_star(&open, &high, &low, &close, 0.1);
+    let _ = evening_doji_star(&open, &high, &low, &close, 0.1);
+    let _ = three_inside(&open, &high, &low, &close);
+    let _ = three_outside(&open, &high, &low, &close);
+    let _ = abandoned_baby(&open, &high, &low, &close, 0.1);
+    let _ = kicking(&open, &high, &low, &close);
+    let _ = long_line(&open, &high, &low, &close, 2);
+    let _ = short_line(&open, &high, &low, &close, 2);
+    let _ = doji_star(&open, &high, &low, &close, 0.1);
+    let _ = identical_three_crows(&open, &high, &low, &close);
+    let _ = stick_sandwich(&open, &high, &low, &close, 0.01);
+    let _ = tristar(&open, &high, &low, &close, 0.1);
+    let _ = upside_gap_two_crows(&open, &high, &low, &close);
+    let _ = gap_sidesidewhite(&open, &high, &low, &close);
+    let _ = takuri(&open, &high, &low, &close);
+    let _ = homing_pigeon(&open, &high, &low, &close);
+    let _ = matching_low(&open, &high, &low, &close, 0.01);
+    let _ = separating_lines(&open, &high, &low, &close, 0.005);
+    let _ = thrusting(&open, &high, &low, &close);
+    let _ = inneck(&open, &high, &low, &close, 0.01);
+    let _ = onneck(&open, &high, &low, &close, 0.01);
+    let _ = advance_block(&open, &high, &low, &close);
+    let _ = stalled_pattern(&open, &high, &low, &close);
+    let _ = belthold(&open, &high, &low, &close);
+    let _ = concealing_baby_swallow(&open, &high, &low, &close);
+    let _ = counterattack(&open, &high, &low, &close, 0.005);
+    let _ = highwave(&open, &high, &low, &close, 0.15);
+    let _ = hikkake(&open, &high, &low, &close);
+    let _ = hikkake_mod(&open, &high, &low, &close);
+    let _ = ladder_bottom(&open, &high, &low, &close);
+    let _ = mat_hold(&open, &high, &low, &close);
+    let _ = rickshaw_man(&open, &high, &low, &close, 0.1);
+    let _ = unique_3_river(&open, &high, &low, &close);
+    let _ = xside_gap_3_methods(&open, &high, &low, &close);
+    let _ = closing_marubozu(&open, &high, &low, &close);
+    let _ = breakaway(&open, &high, &low, &close);
 }
 
 #[test]
@@ -587,4 +635,453 @@ fn test_sfg_atr2_signals() {
     assert_eq!(stop_loss.len(), close.len());
     assert_eq!(take_profit.len(), close.len());
     assert!(signals.iter().any(|&s| s == 1.0) || signals.iter().any(|&s| s == -1.0));
+}
+
+#[test]
+fn test_utils_ma_branches() {
+    use crate::utils::ma::{ema, frama, kama, tema};
+
+    let values = vec![1.0, 2.0, 3.0, f64::NAN, 5.0, 6.0, 7.0];
+    let ema_vals = ema(&values, 3);
+    assert!(!ema_vals[2].is_nan());
+    assert_eq!(ema_vals[3], ema_vals[2]);
+
+    let trend: Vec<f64> = (1..30).map(|i| i as f64).collect();
+    let tema_vals = tema(&trend, 3);
+    let tema_idx = tema_vals.iter().position(|v| !v.is_nan()).unwrap();
+    assert!(tema_vals[tema_idx] > 0.0);
+
+    let flat = vec![10.0; 20];
+    let kama_vals = kama(&flat, 5, 2, 30);
+    assert!(!kama_vals[5].is_nan());
+    assert!((kama_vals[5] - 10.0).abs() < 1e-10);
+
+    let frama_vals = frama(&flat, 10);
+    assert_eq!(frama_vals[9], 10.0);
+
+    let frama_edge = frama(&vec![5.0; 10], 10);
+    assert_eq!(frama_edge.len(), 10);
+}
+
+#[test]
+fn test_utils_math_ops_branches() {
+    use crate::utils::math_ops::{div, minmaxindex, tan};
+
+    let tan_vals = tan(&[0.0, std::f64::consts::FRAC_PI_4]);
+    assert!((tan_vals[1] - 1.0).abs() < 1e-10);
+
+    let div_vals = div(&[2.0, 4.0], &[1.0, 2.0]);
+    assert_eq!(div_vals, vec![2.0, 2.0]);
+
+    let div_zero = div(&[1.0], &[0.0]);
+    assert!(div_zero[0].is_nan());
+
+    let (min_idx, max_idx) = minmaxindex(&[1.0, 2.0], 0);
+    assert!(min_idx.iter().all(|v| v.is_nan()));
+    assert!(max_idx.iter().all(|v| v.is_nan()));
+}
+
+#[test]
+fn test_utils_stats_branches() {
+    use crate::utils::stats::*;
+
+    let values = vec![0.0, 1.0, 2.0, 3.0];
+    let roc_vals = roc(&values, 1);
+    assert!(roc_vals[1].is_nan());
+    assert!(!roc_vals[2].is_nan());
+
+    let const_vals = vec![2.0; 5];
+    let (_slope, _intercept, r2) = linear_regression(&const_vals, 5);
+    assert!((r2[4] - 1.0).abs() < 1e-10);
+
+    let corr_vals = correlation(&const_vals, &const_vals, 5);
+    assert_eq!(corr_vals[4], 0.0);
+
+    let z_vals = zscore(&const_vals, 5);
+    assert_eq!(z_vals[4], 0.0);
+
+    let beta_vals = beta(&const_vals, &const_vals, 5);
+    assert_eq!(beta_vals[4], 0.0);
+
+    let corr_wrapper = correl(&values, &values, 2);
+    assert_eq!(corr_wrapper.len(), values.len());
+
+    let lin_invalid = linearreg(&values, 1);
+    assert!(lin_invalid.iter().all(|v| v.is_nan()));
+    let lin_valid = linearreg(&values, 3);
+    assert!(!lin_valid[2].is_nan());
+
+    let slope_invalid = linearreg_slope(&values, 1);
+    assert!(slope_invalid.iter().all(|v| v.is_nan()));
+    let slope_valid = linearreg_slope(&values, 3);
+    assert!(!slope_valid[2].is_nan());
+
+    let angle_vals = linearreg_angle(&values, 3);
+    assert!(!angle_vals[2].is_nan());
+
+    let intercept_invalid = linearreg_intercept(&values, 1);
+    assert!(intercept_invalid.iter().all(|v| v.is_nan()));
+    let intercept_valid = linearreg_intercept(&values, 3);
+    assert!(!intercept_valid[2].is_nan());
+
+    let var_invalid = var(&values, 1);
+    assert!(var_invalid.iter().all(|v| v.is_nan()));
+    let var_valid = var(&values, 3);
+    assert!(!var_valid[2].is_nan());
+
+    let tsf_invalid = tsf(&values, 1);
+    assert!(tsf_invalid.iter().all(|v| v.is_nan()));
+    let tsf_valid = tsf(&values, 3);
+    assert!(!tsf_valid[2].is_nan());
+}
+
+#[test]
+fn test_cycle_branches() {
+    use indicators::cycle::*;
+
+    let short = vec![1.0; 10];
+    let dc_short = ht_dcperiod(&short);
+    assert!(dc_short.iter().all(|x| x.is_nan()));
+
+    let phase_zero = ht_dcphase(&vec![0.0; 64]);
+    assert_eq!(phase_zero[40], 0.0);
+
+    let (phasor_short, quad_short) = ht_phasor(&short);
+    assert!(phasor_short.iter().all(|x| x.is_nan()));
+    assert!(quad_short.iter().all(|x| x.is_nan()));
+
+    let values_fast: Vec<f64> = (0..160).map(|i| (i as f64 * 1.3).sin() * 15.0 + 100.0).collect();
+    let dc_vals = ht_dcperiod(&values_fast);
+    assert_eq!(dc_vals.len(), values_fast.len());
+
+    let (sine, lead) = ht_sine(&values_fast);
+    assert!(sine.iter().any(|v| !v.is_nan()));
+    assert!(lead.iter().any(|v| !v.is_nan()));
+
+    let values_trend: Vec<f64> = (0..200).map(|i| (i as f64 * 2.0).sin() * 8.0 + 100.0).collect();
+    let trend = ht_trendmode(&values_trend);
+    assert!(trend.iter().any(|v| *v == 0.0 || *v == 1.0));
+}
+
+#[test]
+fn test_harmonics_branches() {
+    use indicators::harmonics::{detect_bat, detect_butterfly, detect_crab, detect_cypher, detect_gartley, detect_shark, SwingPoint};
+
+    let non_alt = vec![
+        SwingPoint { index: 0, price: 10.0, is_high: true },
+        SwingPoint { index: 1, price: 11.0, is_high: true },
+        SwingPoint { index: 2, price: 9.0, is_high: false },
+        SwingPoint { index: 3, price: 12.0, is_high: true },
+        SwingPoint { index: 4, price: 8.0, is_high: false },
+    ];
+
+    assert!(detect_gartley(&non_alt).is_empty());
+    assert!(detect_bat(&non_alt).is_empty());
+    assert!(detect_butterfly(&non_alt).is_empty());
+    assert!(detect_crab(&non_alt).is_empty());
+    assert!(detect_shark(&non_alt).is_empty());
+    assert!(detect_cypher(&non_alt).is_empty());
+
+    let zero_ref = vec![
+        SwingPoint { index: 0, price: 10.0, is_high: false },
+        SwingPoint { index: 1, price: 10.0, is_high: true },
+        SwingPoint { index: 2, price: 9.0, is_high: false },
+        SwingPoint { index: 3, price: 12.0, is_high: true },
+        SwingPoint { index: 4, price: 8.0, is_high: false },
+    ];
+    let _ = detect_gartley(&zero_ref);
+}
+
+#[test]
+fn test_pivots_branches() {
+    use indicators::pivots::{demark_pivots, detect_pivot_touch, PivotLevels};
+
+    let dm_down = demark_pivots(10.0, 12.0, 8.0, 9.0);
+    assert!(dm_down.r1 > dm_down.s1);
+
+    let dm_equal = demark_pivots(10.0, 12.0, 8.0, 10.0);
+    assert!((dm_equal.pivot - 10.0).abs() < 5.0);
+
+    let levels = PivotLevels {
+        pivot: 100.0,
+        r1: 110.0,
+        r2: f64::NAN,
+        r3: f64::NAN,
+        r4: Some(120.0),
+        s1: 90.0,
+        s2: f64::NAN,
+        s3: f64::NAN,
+        s4: Some(80.0),
+    };
+
+    let touch_r4 = detect_pivot_touch(120.0, &levels, 0.0001);
+    assert_eq!(touch_r4.as_deref(), Some("R4"));
+    let touch_s4 = detect_pivot_touch(80.0, &levels, 0.0001);
+    assert_eq!(touch_s4.as_deref(), Some("S4"));
+}
+
+#[test]
+fn test_ichimoku_nan_spans() {
+    use indicators::ichimoku::{ichimoku_signals, IchimokuCloud, IchimokuSignal};
+
+    let ichimoku = IchimokuCloud {
+        tenkan_sen: vec![0.0, 0.0],
+        kijun_sen: vec![0.0, 0.0],
+        senkou_span_a: vec![f64::NAN, 1.0],
+        senkou_span_b: vec![1.0, 1.0],
+        chikou_span: vec![0.0, 0.0],
+    };
+    let close = vec![1.0, 1.0];
+    let signals = ichimoku_signals(&close, &ichimoku);
+    assert_eq!(signals[0], IchimokuSignal::Neutral);
+}
+
+#[test]
+fn test_volume_branches() {
+    use indicators::volume::*;
+
+    let obv_bad = obv(&[1.0], &[]);
+    assert!(obv_bad[0].is_nan());
+
+    let obv_equal = obv(&[1.0, 1.0], &[10.0, 5.0]);
+    assert_eq!(obv_equal[1], obv_equal[0]);
+
+    let vwap_bad = vwap(&[1.0], &[1.0, 2.0], &[1.0], &[1.0], 0);
+    assert!(vwap_bad[0].is_nan());
+
+    let tp = vec![10.0, 9.0, 11.0, 10.5];
+    let high: Vec<f64> = tp.iter().map(|v| v + 1.0).collect();
+    let low: Vec<f64> = tp.iter().map(|v| v - 1.0).collect();
+    let close = tp.clone();
+    let volume = vec![100.0; tp.len()];
+
+    let mfi_vals = mfi(&high, &low, &close, &volume, 3);
+    assert!(!mfi_vals[2].is_nan());
+    assert!(!mfi_vals[3].is_nan());
+
+    let cmf_bad = cmf(&high, &low, &close, &volume, 0);
+    assert!(cmf_bad.iter().all(|v| v.is_nan()));
+    let cmf_vals = cmf(&high, &low, &close, &volume, 2);
+    assert!(!cmf_vals[2].is_nan());
+
+    let pvt_short = price_volume_trend(&[1.0], &[1.0]);
+    assert!(pvt_short[0].is_nan());
+    let pvt_zero = price_volume_trend(&[0.0, 1.0], &[10.0, 10.0]);
+    assert_eq!(pvt_zero[1], pvt_zero[0]);
+
+    let nvi_short = negative_volume_index(&[1.0], &[1.0]);
+    assert!(nvi_short[0].is_nan());
+    let pvi_short = positive_volume_index(&[1.0], &[1.0]);
+    assert!(pvi_short[0].is_nan());
+
+    let eom_short = ease_of_movement(&[1.0], &[1.0], &[1.0], 2);
+    assert!(eom_short[0].is_nan());
+    let eom_vals = ease_of_movement(&[2.0, 3.0], &[1.0, 2.0], &[100.0, 100.0], 1);
+    assert!(!eom_vals[1].is_nan());
+}
+
+#[test]
+fn test_overlap_branches() {
+    use indicators::overlap::{mama, sar, sarext};
+
+    let high = vec![10.0, 12.0, 11.0, 9.0, 8.0, 15.0, 14.0];
+    let low = vec![9.0, 11.0, 10.0, 8.0, 7.0, 14.0, 13.0];
+
+    let sar_vals = sar(&high, &low, 0.5, 1.0);
+    assert_eq!(sar_vals.len(), high.len());
+
+    let high_rev = vec![12.0, 11.0, 10.0, 9.0];
+    let low_rev = vec![10.0, 5.0, 4.0, 3.0];
+    let sar_rev = sar(&high_rev, &low_rev, 0.02, 0.2);
+    assert_eq!(sar_rev.len(), high_rev.len());
+
+    let sarext_vals = sarext(&high, &low, 1.0, 0.1, 0.02, 0.02, 0.2, 0.02, 0.02, 0.2);
+    assert_eq!(sarext_vals.len(), high.len());
+
+    let high_ext = vec![12.0, 11.0, 10.0, 20.0];
+    let low_ext = vec![10.0, 5.0, 4.0, 15.0];
+    let sarext_rev = sarext(&high_ext, &low_ext, 0.0, 0.0, 0.02, 0.02, 0.2, 0.02, 0.02, 0.2);
+    assert_eq!(sarext_rev.len(), high_ext.len());
+
+    let values: Vec<f64> = (0..10).map(|i| i as f64 + 1.0).collect();
+    let (mama_vals, fama_vals) = mama(&values, 0.5, 0.05);
+    assert!(!mama_vals[6].is_nan());
+    assert!(!fama_vals[6].is_nan());
+}
+
+#[test]
+fn test_momentum_branches() {
+    use indicators::momentum::*;
+
+    let rsi_invalid = rsi(&[1.0, 2.0], 2);
+    assert!(rsi_invalid.iter().all(|v| v.is_nan()));
+
+    let (k_bad, d_bad) = stochastic(&[1.0, 2.0], &[1.0], &[1.0, 2.0], 2, 3);
+    assert!(k_bad.iter().all(|v| v.is_nan()));
+    assert!(d_bad.iter().all(|v| v.is_nan()));
+
+    let high = vec![10.0, 10.0, 10.0, 10.0];
+    let low = vec![10.0, 10.0, 10.0, 10.0];
+    let close = vec![10.0, 10.0, 10.0, 10.0];
+    let (k_flat, _d_flat) = stochastic(&high, &low, &close, 2, 2);
+    assert_eq!(k_flat[1], 50.0);
+
+    let close_var = vec![10.0, 11.0, 12.0, 11.0, 13.0, 12.0];
+    let (stoch_k, _stoch_d) = stochrsi(&close_var, 1, 2, 2, 2);
+    let stoch_idx = stoch_k.iter().position(|v| !v.is_nan()).unwrap();
+    assert!(stoch_k[stoch_idx] >= 0.0);
+
+    let high_nan = vec![10.0, f64::NAN, 12.0, 13.0];
+    let low_nan = vec![9.0, 9.0, 11.0, 12.0];
+    let close_nan = vec![9.5, 10.0, 11.5, 12.5];
+    let cci_vals = cci(&high_nan, &low_nan, &close_nan, 2);
+    assert!(cci_vals.iter().any(|v| v.is_nan()));
+
+    let will_mismatch = williams_r(&[1.0, 2.0], &[1.0], &[1.0, 2.0], 2);
+    assert!(will_mismatch.iter().all(|v| v.is_nan()));
+
+    let will_range = williams_r(&high, &low, &close, 2);
+    assert_eq!(will_range[1], -50.0);
+
+    let ao_mismatch = awesome_oscillator(&[1.0, 2.0], &[1.0]);
+    assert!(ao_mismatch.iter().all(|v| v.is_nan()));
+
+    let (fisher_nan, _trigger_nan) = fisher_transform(&high_nan, &low_nan, &close_nan, 2);
+    assert!(fisher_nan.iter().any(|v| v.is_nan()));
+
+    let (fisher_flat, _trigger_flat) = fisher_transform(&high, &low, &close, 2);
+    assert_eq!(fisher_flat[1], 0.0);
+
+    let (_k_vals, _d_vals, j_vals) = kdj(&high, &low, &close, 2, 2);
+    let j_idx = j_vals.iter().position(|v| !v.is_nan()).unwrap();
+    assert!(!j_vals[j_idx].is_nan());
+}
+
+#[test]
+fn test_momentum_branches_extended() {
+    use indicators::momentum::*;
+
+    let close_var = vec![10.0, 11.0, 12.0, 11.0, 13.0, 12.0];
+
+    let (tsi_short, signal_short) = tsi(&[1.0], 5, 3, 3);
+    assert!(tsi_short[0].is_nan());
+    assert!(signal_short[0].is_nan());
+
+    let (tsi_vals, _signal_vals) = tsi(&close_var, 2, 2, 2);
+    let tsi_idx = tsi_vals.iter().position(|v| !v.is_nan()).unwrap();
+    assert!(tsi_vals[tsi_idx].is_finite());
+
+    let uo_short = ultimate_oscillator(&[1.0], &[1.0], &[1.0], 7, 14, 28);
+    assert!(uo_short[0].is_nan());
+
+    let apo_vals = apo(&close_var, 2, 3);
+    assert_eq!(apo_vals.len(), close_var.len());
+
+    let ppo_vals = ppo(&close_var, 2, 3);
+    assert_eq!(ppo_vals.len(), close_var.len());
+
+    let cmo_zero = cmo(&vec![1.0; 5], 2);
+    assert_eq!(cmo_zero[2], 0.0);
+    let cmo_vals = cmo(&close_var, 2);
+    assert!(!cmo_vals[2].is_nan());
+
+    let high: Vec<f64> = (100..120).map(|x| x as f64 + 5.0).collect();
+    let low: Vec<f64> = (100..120).map(|x| x as f64).collect();
+    let close: Vec<f64> = (100..120).map(|x| x as f64 + 2.5).collect();
+    let uo = ultimate_oscillator(&high, &low, &close, 3, 5, 7);
+    assert!(!uo[10].is_nan());
+}
+
+#[test]
+fn test_trend_branches() {
+    use indicators::trend::{adx, choppiness_index, dx, minus_di, plus_di, psar, qstick, supertrend, vhf, vortex};
+
+    let high_nan = vec![10.0, f64::NAN, 12.0];
+    let low_nan = vec![9.0, 8.0, 11.0];
+    let close_nan = vec![9.5, 9.0, 11.5];
+    let _ = supertrend(&high_nan, &low_nan, &close_nan, 2, 3.0);
+
+    let adx_bad = adx(&[1.0], &[1.0, 2.0], &[1.0], 2);
+    assert!(adx_bad.0.iter().all(|v| v.is_nan()));
+
+    let high_flat = vec![10.0, 11.0, 12.0];
+    let low_flat = vec![10.0, 9.0, 8.0];
+    let close_flat = vec![10.0, 10.0, 10.0];
+    let (adx_vals, _plus, _minus) = adx(&high_flat, &low_flat, &close_flat, 2);
+    assert_eq!(adx_vals[1], 0.0);
+
+    let dx_vals = dx(&high_flat, &low_flat, &close_flat, 2);
+    assert_eq!(dx_vals[1], 0.0);
+
+    let dx_mismatch = dx(&[1.0, 2.0], &[1.0], &[1.0, 2.0], 2);
+    assert!(dx_mismatch.iter().all(|v| v.is_nan()));
+
+    let high_move = vec![10.0, 12.0, 11.0, 13.0];
+    let low_move = vec![9.0, 10.0, 9.5, 11.0];
+    let close_move = vec![9.5, 11.0, 10.0, 12.0];
+    let dx_nonzero = dx(&high_move, &low_move, &close_move, 2);
+    assert!(!dx_nonzero[2].is_nan());
+
+    let _plus_di = plus_di(&high_flat, &low_flat, &close_flat, 2);
+    let _minus_di = minus_di(&high_flat, &low_flat, &close_flat, 2);
+
+    let psar_short = psar(&[1.0], &[1.0], &[1.0], 0.02, 0.02, 0.2);
+    assert!(psar_short.0[0].is_nan());
+
+    let high_rev = vec![10.0, 9.0, 8.0, 12.0, 13.0];
+    let low_rev = vec![9.0, 8.0, 7.0, 11.0, 12.0];
+    let close_rev = vec![9.5, 9.0, 8.5, 11.5, 12.5];
+    let (psar_vals, trend) = psar(&high_rev, &low_rev, &close_rev, 0.2, 0.2, 0.5);
+    assert_eq!(psar_vals.len(), close_rev.len());
+    assert!(trend.iter().any(|v| *v == 1.0) && trend.iter().any(|v| *v == -1.0));
+
+    let high_v = vec![10.0, 11.0, 12.0, 11.0, 13.0];
+    let low_v = vec![9.0, 10.0, 11.0, 10.0, 12.0];
+    let close_v = vec![9.5, 10.5, 11.5, 10.5, 12.5];
+    let (vi_plus, vi_minus) = vortex(&high_v, &low_v, &close_v, 2);
+    assert!(!vi_plus[2].is_nan());
+    assert!(!vi_minus[2].is_nan());
+
+    let chop_vals = choppiness_index(&high_v, &low_v, &close_v, 2);
+    assert!(!chop_vals[2].is_nan());
+
+    let qstick_empty = qstick(&[], &[], 3);
+    assert!(qstick_empty.is_empty());
+
+    let vhf_short = vhf(&close_v, 0);
+    assert!(vhf_short.iter().all(|v| v.is_nan()));
+    let vhf_vals = vhf(&close_v, 2);
+    assert!(!vhf_vals[2].is_nan());
+}
+
+#[test]
+fn test_sfg_branches() {
+    let close: Vec<f64> = (0..50).map(|i| 100.0 + i as f64 * 0.5).collect();
+    let high: Vec<f64> = close.iter().map(|v| v + 1.0).collect();
+    let low: Vec<f64> = close.iter().map(|v| v - 1.0).collect();
+
+    let (_st, dir) = indicators::ai_supertrend(&high, &low, &close, 3, 10, 3, 3, 3, 1.5);
+    assert_eq!(dir.len(), close.len());
+
+    let mut close_knn = close.clone();
+    close_knn[6] = 0.0;
+    let (prediction, prediction_ma) = indicators::ai_momentum_index(&close_knn, 3, 5, 3);
+    assert_eq!(prediction.len(), close_knn.len());
+    assert!(prediction.iter().any(|v| !v.is_nan()));
+    assert_eq!(prediction_ma.len(), close_knn.len());
+
+    let high_flat = vec![10.0, 10.0, 10.0, 10.0, 10.0];
+    let low_flat = vec![10.0, 10.0, 10.0, 10.0, 10.0];
+    let close_flat = vec![10.0, 10.0, 10.0, 10.0, 10.0];
+    let volume_nan = vec![10.0, f64::NAN, 10.0, 10.0, 10.0];
+    let _ = indicators::atr2_signals(&high_flat, &low_flat, &close_flat, &volume_nan, 2, 0.5, 1);
+
+    let high_down = vec![10.0, 9.0, 8.0, 7.0, 6.0];
+    let low_down = vec![9.0, 8.0, 7.0, 6.0, 5.0];
+    let close_down = vec![9.5, 8.5, 7.5, 6.5, 5.5];
+    let volume = vec![100.0, 100.0, 500.0, 500.0, 500.0];
+    let (signals, stop_loss, take_profit) = indicators::atr2_signals(&high_down, &low_down, &close_down, &volume, 2, 0.1, 1);
+    assert!(signals.iter().any(|&s| s == 1.0));
+    assert!(stop_loss.iter().any(|v| !v.is_nan()));
+    assert!(take_profit.iter().any(|v| !v.is_nan()));
 }

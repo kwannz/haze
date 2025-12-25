@@ -17,15 +17,29 @@ pub fn sma(values: &[f64], period: usize) -> Vec<f64> {
         return vec![f64::NAN; values.len()];
     }
 
-    let mut result = vec![f64::NAN; values.len()];
+    let n = values.len();
+    let mut result = vec![f64::NAN; n];
+    let mut sum = 0.0;
+    let mut count = 0usize;
 
-    // 计算第一个 SMA 值
-    let first_sum: f64 = values[..period].iter().sum();
-    result[period - 1] = first_sum / period as f64;
+    for i in 0..n {
+        if values[i].is_nan() {
+            sum = 0.0;
+            count = 0;
+            continue;
+        }
 
-    // 滚动窗口计算（性能优化：避免重复求和）
-    for i in period..values.len() {
-        result[i] = result[i - 1] + (values[i] - values[i - period]) / period as f64;
+        sum += values[i];
+        count += 1;
+
+        if count > period {
+            sum -= values[i - period];
+            count = period;
+        }
+
+        if count == period {
+            result[i] = sum / period as f64;
+        }
     }
 
     result
