@@ -2852,7 +2852,7 @@ pub fn unique_3_river(
         // 第二根：小黑色蜡烛，类似锤子（长下影线），创新低
         let second_bearish = is_bearish(open[i-1], close[i-1]);
         let second_body = body_length(open[i-1], close[i-1]);
-        let second_lower = lower_shadow(open[i-1], low[i-1], close[i-1]);
+        let second_lower = lower_shadow(low[i-1], open[i-1], close[i-1]);
         let second_hammer_like = second_lower > second_body * 2.0;
         let second_new_low = low[i-1] < low[i-2];
 
