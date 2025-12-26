@@ -861,8 +861,8 @@ mod boundary_tests {
         let a = vec![100.0; 20];
         let result = fast_ema(&a, 5);
         // EMA of constant values should equal the constant
-        for i in 4..20 {
-            assert!((result[i] - 100.0).abs() < 1e-10);
+        for val in result.iter().skip(4) {
+            assert!((*val - 100.0).abs() < 1e-10);
         }
     }
 
@@ -921,9 +921,9 @@ mod boundary_tests {
         let a: Vec<f64> = (0..100).map(|i| 1e10 + i as f64).collect();
         let result = fast_sma(&a, 10);
         // Verify the output is reasonable
-        for i in 9..100 {
-            assert!(!result[i].is_nan());
-            assert!(result[i] >= 1e10);
+        for val in result.iter().skip(9) {
+            assert!(!val.is_nan());
+            assert!(*val >= 1e10);
         }
     }
 

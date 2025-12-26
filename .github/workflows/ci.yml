@@ -63,8 +63,7 @@ jobs:
 
       - name: Run clippy
         if: matrix.rust == 'stable'
-        run: cargo clippy --all-targets -- -W clippy::all
-        continue-on-error: true  # TODO: Fix clippy warnings and re-enable strict mode
+        run: cargo clippy --all-targets -- -D warnings
 
       - name: Run tests
         run: cargo test --verbose

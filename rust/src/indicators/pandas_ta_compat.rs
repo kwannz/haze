@@ -17,6 +17,9 @@ use crate::errors::{HazeError, HazeResult};
 use crate::init_result;
 use crate::utils::math::{is_not_zero, is_zero};
 
+/// Result type for OHLC (Open, High, Low, Close) candle operations
+type OhlcResult = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
+
 // =============================================================================
 // Re-exports (already implemented in Haze)
 // =============================================================================
@@ -122,9 +125,7 @@ fn shift(values: &[f64], periods: usize) -> Vec<f64> {
         return values.to_vec();
     }
     let mut out = vec![f64::NAN; n];
-    for i in periods..n {
-        out[i] = values[i - periods];
-    }
+    out[periods..n].copy_from_slice(&values[..(n - periods)]);
     out
 }
 
@@ -210,14 +211,11 @@ fn shift_signed(values: &[f64], periods: isize) -> Vec<f64> {
 
     if periods > 0 {
         let k = periods as usize;
-        for i in k..n {
-            out[i] = values[i - k];
-        }
+        out[k..n].copy_from_slice(&values[..(n - k)]);
     } else {
         let k = (-periods) as usize;
-        for i in 0..n.saturating_sub(k) {
-            out[i] = values[i + k];
-        }
+        let end = n.saturating_sub(k);
+        out[..end].copy_from_slice(&values[k..(k + end)]);
     }
 
     out
@@ -320,8 +318,7 @@ fn sum_signed_rolling_deltas(
         }
 
         let mut sum = 0.0;
-        for j in (i - window)..i {
-            let o = open[j];
+        for &o in &open[(i - window)..i] {
             if o.is_nan() {
                 continue;
             }
@@ -344,7 +341,7 @@ pub fn ha(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> HazeResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+) -> HazeResult<OhlcResult> {
     validate_not_empty(open, "open")?;
     validate_lengths_match(&[
         (open, "open"),
@@ -388,7 +385,7 @@ pub fn cdl_z(
     close: &[f64],
     period: usize,
     ddof: usize,
-) -> HazeResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+) -> HazeResult<OhlcResult> {
     validate_not_empty(open, "open")?;
     validate_lengths_match(&[
         (open, "open"),
@@ -543,10 +540,9 @@ pub fn cdl_pattern(
     ];
 
     let requested: Vec<&str> = match names {
-        None => supported.to_vec(),
-        Some(list) if list.is_empty() => supported.to_vec(),
+        None | Some([]) => supported.to_vec(),
         Some(list) if list.len() == 1 && list[0].eq_ignore_ascii_case("all") => supported.to_vec(),
-        Some(list) => list.iter().copied().collect(),
+        Some(list) => list.to_vec(),
     };
 
     let mut out = BTreeMap::<String, Vec<f64>>::new();
@@ -844,7 +840,7 @@ pub fn reflex(close: &[f64], length: usize, smooth: usize, alpha: f64) -> HazeRe
     validate_min_length(close, length.max(smooth) + 1)?;
 
     // pandas-ta defaults
-    let pi = 3.14159;
+    let pi = std::f64::consts::PI;
     let sqrt2 = 1.414;
 
     let n = close.len();
@@ -1368,11 +1364,9 @@ pub fn smc(
             continue;
         }
         let is_hv = hld[i] > vol_ratio * hld_ma[i];
-        hv[i] = if asint {
-            bool_to_f64(is_hv)
-        } else {
-            bool_to_f64(is_hv)
-        };
+        // Note: asint parameter currently has no effect as bool_to_f64 always returns 0.0/1.0
+        let _ = asint;
+        hv[i] = bool_to_f64(is_hv);
 
         let bf = btm_imb[i].is_finite()
             && btm_imb[i] > 0.0
@@ -1382,16 +1376,8 @@ pub fn smc(
             && top_imb[i] > 0.0
             && top_pct[i].is_finite()
             && top_pct[i] > 1.0;
-        btm_flag[i] = if asint {
-            bool_to_f64(bf)
-        } else {
-            bool_to_f64(bf)
-        };
-        top_flag[i] = if asint {
-            bool_to_f64(tf)
-        } else {
-            bool_to_f64(tf)
-        };
+        btm_flag[i] = bool_to_f64(bf);
+        top_flag[i] = bool_to_f64(tf);
     }
 
     // Match pandas-ta behavior: fill missing values
@@ -1459,25 +1445,17 @@ pub fn squeeze_pro(
 
     let (bb_u, _bb_m, bb_l) = bbands(close, bb_length, bb_std)?;
 
-    let (kcw_l, _kcw_b, kcw_u) = kc(high, low, close, kc_length, kc_scalar_wide, use_tr, mamode)?;
-    let (kcn_l, _kcn_b, kcn_u) = kc(
-        high,
-        low,
-        close,
-        kc_length,
-        kc_scalar_normal,
-        use_tr,
-        mamode,
-    )?;
-    let (kcs_l, _kcs_b, kcs_u) = kc(
-        high,
-        low,
-        close,
-        kc_length,
-        kc_scalar_narrow,
-        use_tr,
-        mamode,
-    )?;
+    // Inline KC computation to avoid calling `kc()` 3 times (wide/normal/narrow).
+    let range_ = if use_tr {
+        true_range(high, low, close, 1)?
+    } else {
+        high.iter()
+            .zip(low)
+            .map(|(&h, &l)| non_zero_range(h, l))
+            .collect::<Vec<f64>>()
+    };
+    let kc_basis = ma_by_name(mamode, close, kc_length)?;
+    let kc_band = ma_by_name(mamode, &range_, kc_length)?;
 
     let momo = crate::utils::momentum(close, mom_length);
     let squeeze = ma_by_name(mamode, &momo, mom_smooth)?;
@@ -1490,10 +1468,20 @@ pub fn squeeze_pro(
     let mut no = vec![0.0; n];
 
     for i in 0..n {
-        let on_w = bb_l[i] > kcw_l[i] && bb_u[i] < kcw_u[i];
-        let on_n = bb_l[i] > kcn_l[i] && bb_u[i] < kcn_u[i];
-        let on_s = bb_l[i] > kcs_l[i] && bb_u[i] < kcs_u[i];
-        let off_w = bb_l[i] < kcw_l[i] && bb_u[i] > kcw_u[i];
+        let basis = kc_basis[i];
+        let band = kc_band[i];
+
+        let kcw_l = basis - kc_scalar_wide * band;
+        let kcw_u = basis + kc_scalar_wide * band;
+        let kcn_l = basis - kc_scalar_normal * band;
+        let kcn_u = basis + kc_scalar_normal * band;
+        let kcs_l = basis - kc_scalar_narrow * band;
+        let kcs_u = basis + kc_scalar_narrow * band;
+
+        let on_w = bb_l[i] > kcw_l && bb_u[i] < kcw_u;
+        let on_n = bb_l[i] > kcn_l && bb_u[i] < kcn_u;
+        let on_s = bb_l[i] > kcs_l && bb_u[i] < kcs_u;
+        let off_w = bb_l[i] < kcw_l && bb_u[i] > kcw_u;
         let no_s = !on_w && !off_w;
 
         on_wide[i] = bool_to_f64(on_w);
@@ -1519,7 +1507,6 @@ pub fn squeeze_pro(
     }
 
     let mut out = BTreeMap::<String, Vec<f64>>::new();
-    out.insert("SQZPRO".to_string(), squeeze.clone());
     out.insert("SQZPRO_ON_WIDE".to_string(), on_wide);
     out.insert("SQZPRO_ON_NORMAL".to_string(), on_normal);
     out.insert("SQZPRO_ON_NARROW".to_string(), on_narrow);
@@ -1586,6 +1573,7 @@ pub fn squeeze_pro(
         out.insert("SQZPRO_NDEC".to_string(), neg_dec);
     }
 
+    out.insert("SQZPRO".to_string(), squeeze);
     Ok(out)
 }
 
@@ -1857,8 +1845,6 @@ pub fn jma(close: &[f64], length: usize, phase: f64) -> HazeResult<Vec<f64>> {
 
     let n = close.len();
     let mut out = vec![0.0; n];
-    let mut volty = vec![0.0; n];
-    let mut v_sum = vec![0.0; n];
 
     let length_f = 0.5 * (length as f64 - 1.0);
     let pr = if phase < -100.0 {
@@ -1878,8 +1864,10 @@ pub fn jma(close: &[f64], length: usize, phase: f64) -> HazeResult<Vec<f64>> {
         0.0
     };
     let beta = 0.45 * (length as f64 - 1.0) / (0.45 * (length as f64 - 1.0) + 2.0);
+    let one_minus_beta = 1.0 - beta;
 
     let sum_length = 10usize;
+    let inv_sum_length = 1.0 / (sum_length as f64);
     let mut det0 = 0.0;
     let mut det1 = 0.0;
 
@@ -1887,6 +1875,12 @@ pub fn jma(close: &[f64], length: usize, phase: f64) -> HazeResult<Vec<f64>> {
     let mut u_band = close[0];
     let mut l_band = close[0];
     out[0] = close[0];
+
+    // `v_sum[i]` uses `volty[i - sum_length]`, so keep a small ring buffer.
+    let mut volty_window = [0.0_f64; 10];
+    let mut volty_window_pos = 0usize;
+    let mut volty_window_len = 0usize;
+    let mut v_sum_prev = 0.0;
 
     // Rolling average of v_sum over last 66 samples (max)
     let mut vsum_window_sum = 0.0;
@@ -1903,25 +1897,36 @@ pub fn jma(close: &[f64], length: usize, phase: f64) -> HazeResult<Vec<f64>> {
         let del2 = price - l_band;
         let abs1 = del1.abs();
         let abs2 = del2.abs();
-        volty[i] = if (abs1 - abs2).abs() > 0.0 {
+        let volty = if (abs1 - abs2).abs() > 0.0 {
             abs1.max(abs2)
         } else {
             0.0
         };
 
-        let back = if i >= sum_length { i - sum_length } else { 0 };
-        v_sum[i] = v_sum[i - 1] + (volty[i] - volty[back]) / (sum_length as f64);
+        let volty_back = if volty_window_len < sum_length {
+            0.0
+        } else {
+            volty_window[volty_window_pos]
+        };
+        let v_sum = v_sum_prev + (volty - volty_back) * inv_sum_length;
+        v_sum_prev = v_sum;
+
+        if volty_window_len < sum_length {
+            volty_window_len += 1;
+        }
+        volty_window[volty_window_pos] = volty;
+        volty_window_pos = (volty_window_pos + 1) % sum_length;
 
         // Update rolling mean of v_sum (window up to 66)
         if vsum_window_len < 66 {
-            vsum_window[vsum_window_len] = v_sum[i];
-            vsum_window_sum += v_sum[i];
+            vsum_window[vsum_window_len] = v_sum;
+            vsum_window_sum += v_sum;
             vsum_window_len += 1;
         } else {
             let old = vsum_window[vsum_window_pos];
             vsum_window_sum -= old;
-            vsum_window[vsum_window_pos] = v_sum[i];
-            vsum_window_sum += v_sum[i];
+            vsum_window[vsum_window_pos] = v_sum;
+            vsum_window_sum += v_sum;
             vsum_window_pos = (vsum_window_pos + 1) % 66;
         }
 
@@ -1933,25 +1938,27 @@ pub fn jma(close: &[f64], length: usize, phase: f64) -> HazeResult<Vec<f64>> {
         let d_volty = if is_zero(avg_volty) {
             0.0
         } else {
-            volty[i] / avg_volty
+            volty / avg_volty
         };
         let r_volty = 1.0_f64.max(length1_cap.min(d_volty));
 
-        let pow2 = r_volty.powf(pow1);
-        let kv = bet.powf(pow2.sqrt());
+        let power = r_volty.powf(pow1);
+        let kv = bet.powf(power.sqrt());
 
         u_band = if del1 > 0.0 { price } else { price - kv * del1 };
         l_band = if del2 < 0.0 { price } else { price - kv * del2 };
 
-        let power = r_volty.powf(pow1);
         let alpha = beta.powf(power);
+        let one_minus_alpha = 1.0 - alpha;
+        let one_minus_alpha_sq = one_minus_alpha * one_minus_alpha;
+        let alpha_sq = alpha * alpha;
 
-        ma1 = (1.0 - alpha) * price + alpha * ma1;
+        ma1 = one_minus_alpha * price + alpha * ma1;
 
-        det0 = (1.0 - beta) * (price - ma1) + beta * det0;
+        det0 = one_minus_beta * (price - ma1) + beta * det0;
         let ma2 = ma1 + pr * det0;
 
-        det1 = (ma2 - out[i - 1]) * (1.0 - alpha) * (1.0 - alpha) + (alpha * alpha * det1);
+        det1 = (ma2 - out[i - 1]) * one_minus_alpha_sq + (alpha_sq * det1);
         out[i] = out[i - 1] + det1;
     }
 
@@ -2018,7 +2025,7 @@ pub fn ssf(
         return Ok(out);
     }
 
-    let pi = if pi > 0.0 { pi } else { 3.14159 };
+    let pi = if pi > 0.0 { pi } else { std::f64::consts::PI };
     let sqrt2 = if sqrt2 > 0.0 { sqrt2 } else { 1.414 };
 
     if everget {
@@ -2053,7 +2060,7 @@ pub fn ssf3(close: &[f64], length: usize, pi: f64, sqrt3: f64) -> HazeResult<Vec
         return Ok(out);
     }
 
-    let pi = if pi > 0.0 { pi } else { 3.14159 };
+    let pi = if pi > 0.0 { pi } else { std::f64::consts::PI };
     let sqrt3 = if sqrt3 > 0.0 { sqrt3 } else { 1.732 };
 
     let a = (-pi / (length as f64)).exp();
@@ -2666,87 +2673,101 @@ pub fn ht_trendline(close: &[f64], prenan: usize) -> HazeResult<Vec<f64>> {
     let a = 0.0962;
     let b = 0.5769;
 
-    let mut wma4 = vec![0.0; n];
-    let mut dt = vec![0.0; n];
-    let mut q1 = vec![0.0; n];
-    let mut q2 = vec![0.0; n];
-    let mut ji = vec![0.0; n];
-    let mut jq = vec![0.0; n];
-    let mut i1 = vec![0.0; n];
-    let mut i2 = vec![0.0; n];
-    let mut re = vec![0.0; n];
-    let mut im = vec![0.0; n];
-    let mut period = vec![0.0; n];
-    let mut smp = vec![0.0; n];
-    let mut i_trend = vec![0.0; n];
+    // Keep only the recent values required for the recursive Hilbert transform
+    // steps to reduce allocations and improve cache locality.
+    let mut wma4 = [0.0_f64; 7];
+    let mut dt = [0.0_f64; 7];
+    let mut q1 = [0.0_f64; 7];
+    let mut i1 = [0.0_f64; 7];
+    let mut i_trend = [0.0_f64; 4];
+
+    let mut i2_prev = 0.0;
+    let mut q2_prev = 0.0;
+    let mut re_prev = 0.0;
+    let mut im_prev = 0.0;
+    let mut period_prev = 0.0;
+    let mut smp_prev = 0.0;
 
     let mut result = close.to_vec();
 
-    if n >= 14 {
-        result[..13].copy_from_slice(&close[..13]);
-    }
-
     for i in 6..n {
-        let adj_prev_period = 0.075 * period[i - 1] + 0.54;
+        let adj_prev_period = 0.075 * period_prev + 0.54;
 
-        wma4[i] = 0.4 * close[i] + 0.3 * close[i - 1] + 0.2 * close[i - 2] + 0.1 * close[i - 3];
-        dt[i] =
-            adj_prev_period * (a * wma4[i] + b * wma4[i - 2] - b * wma4[i - 4] - a * wma4[i - 6]);
+        let wma4_cur =
+            0.4 * close[i] + 0.3 * close[i - 1] + 0.2 * close[i - 2] + 0.1 * close[i - 3];
+        wma4[i % 7] = wma4_cur;
 
-        q1[i] = adj_prev_period * (a * dt[i] + b * dt[i - 2] - b * dt[i - 4] - a * dt[i - 6]);
-        i1[i] = dt[i - 3];
+        let dt_cur = adj_prev_period
+            * (a * wma4_cur + b * wma4[(i - 2) % 7]
+                - b * wma4[(i - 4) % 7]
+                - a * wma4[(i - 6) % 7]);
+        dt[i % 7] = dt_cur;
 
-        ji[i] = adj_prev_period * (a * i1[i] + b * i1[i - 2] - b * i1[i - 4] - a * i1[i - 6]);
-        jq[i] = adj_prev_period * (a * q1[i] + b * q1[i - 2] - b * q1[i - 4] - a * q1[i - 6]);
+        let q1_cur = adj_prev_period
+            * (a * dt_cur + b * dt[(i - 2) % 7] - b * dt[(i - 4) % 7] - a * dt[(i - 6) % 7]);
+        q1[i % 7] = q1_cur;
 
-        i2[i] = i1[i] - jq[i];
-        q2[i] = q1[i] + ji[i];
+        let i1_cur = dt[(i - 3) % 7];
+        i1[i % 7] = i1_cur;
 
-        i2[i] = 0.2 * i2[i] + 0.8 * i2[i - 1];
-        q2[i] = 0.2 * q2[i] + 0.8 * q2[i - 1];
+        let ji_cur = adj_prev_period
+            * (a * i1_cur + b * i1[(i - 2) % 7] - b * i1[(i - 4) % 7] - a * i1[(i - 6) % 7]);
+        let jq_cur = adj_prev_period
+            * (a * q1_cur + b * q1[(i - 2) % 7] - b * q1[(i - 4) % 7] - a * q1[(i - 6) % 7]);
 
-        re[i] = i2[i] * i2[i - 1] + q2[i] * q2[i - 1];
-        im[i] = i2[i] * q2[i - 1] - q2[i] * i2[i - 1];
+        let i2_raw = i1_cur - jq_cur;
+        let q2_raw = q1_cur + ji_cur;
 
-        re[i] = 0.2 * re[i] + 0.8 * re[i - 1];
-        im[i] = 0.2 * im[i] + 0.8 * im[i - 1];
+        let i2 = 0.2 * i2_raw + 0.8 * i2_prev;
+        let q2 = 0.2 * q2_raw + 0.8 * q2_prev;
 
-        if re[i] != 0.0 && im[i] != 0.0 {
-            let deg = (im[i] / re[i]).atan().to_degrees();
+        let re_raw = i2 * i2_prev + q2 * q2_prev;
+        let im_raw = i2 * q2_prev - q2 * i2_prev;
+
+        let re = 0.2 * re_raw + 0.8 * re_prev;
+        let im = 0.2 * im_raw + 0.8 * im_prev;
+
+        let mut period = 0.0;
+        if re != 0.0 && im != 0.0 {
+            let deg = (im / re).atan().to_degrees();
             if deg != 0.0 {
-                period[i] = 360.0 / deg;
+                period = 360.0 / deg;
             }
         }
-        if period[i] > 1.5 * period[i - 1] {
-            period[i] = 1.5 * period[i - 1];
-        }
-        if period[i] < 0.67 * period[i - 1] {
-            period[i] = 0.67 * period[i - 1];
-        }
-        if period[i] < 6.0 {
-            period[i] = 6.0;
-        }
-        if period[i] > 50.0 {
-            period[i] = 50.0;
-        }
 
-        period[i] = 0.2 * period[i] + 0.8 * period[i - 1];
-        smp[i] = 0.33 * period[i] + 0.67 * smp[i - 1];
+        if period > 1.5 * period_prev {
+            period = 1.5 * period_prev;
+        }
+        if period < 0.67 * period_prev {
+            period = 0.67 * period_prev;
+        }
+        period = period.clamp(6.0, 50.0);
 
-        let dc_period = (smp[i] + 0.5).max(1.0) as usize;
+        period = 0.2 * period + 0.8 * period_prev;
+        let smp = 0.33 * period + 0.67 * smp_prev;
+
+        let dc_period = (smp + 0.5).max(1.0) as usize;
         let mut dcp_avg = 0.0;
         for k in 0..dc_period {
             dcp_avg += close[i - k];
         }
         dcp_avg /= dc_period as f64;
-        i_trend[i] = dcp_avg;
+        let i_trend_cur = dcp_avg;
 
         if i > 12 {
-            result[i] = 0.4 * i_trend[i]
-                + 0.3 * i_trend[i - 1]
-                + 0.2 * i_trend[i - 2]
-                + 0.1 * i_trend[i - 3];
+            result[i] = 0.4 * i_trend_cur
+                + 0.3 * i_trend[(i - 1) % 4]
+                + 0.2 * i_trend[(i - 2) % 4]
+                + 0.1 * i_trend[(i - 3) % 4];
         }
+        i_trend[i % 4] = i_trend_cur;
+
+        i2_prev = i2;
+        q2_prev = q2;
+        re_prev = re;
+        im_prev = im;
+        period_prev = period;
+        smp_prev = smp;
     }
 
     if prenan > 0 {
@@ -2857,30 +2878,28 @@ pub fn zigzag(
                         zz_dev[dev_idx] = 100.0 * current_dev;
                     }
                 }
+            } else if swing[ii] == 1 {
+                if value[ii] > cur_value && zz_idx.len() > 2 {
+                    let prev_value = zz_value[zz_value.len() - 2];
+                    let current_dev = (value[ii] - prev_value) / value[ii];
+                    *zz_idx.last_mut().unwrap() = idx[ii];
+                    *zz_swing.last_mut().unwrap() = swing[ii];
+                    *zz_value.last_mut().unwrap() = value[ii];
+                    let dev_idx = zz_dev.len() - 2;
+                    zz_dev[dev_idx] = 100.0 * current_dev;
+                }
             } else {
-                if swing[ii] == 1 {
-                    if value[ii] > cur_value && zz_idx.len() > 2 {
-                        let prev_value = zz_value[zz_value.len() - 2];
-                        let current_dev = (value[ii] - prev_value) / value[ii];
-                        *zz_idx.last_mut().unwrap() = idx[ii];
-                        *zz_swing.last_mut().unwrap() = swing[ii];
-                        *zz_value.last_mut().unwrap() = value[ii];
-                        let dev_idx = zz_dev.len() - 2;
-                        zz_dev[dev_idx] = 100.0 * current_dev;
+                let current_dev = (cur_value - value[ii]) / value[ii];
+                if current_dev > 0.01 * deviation {
+                    if *zz_idx.last().unwrap() == idx[ii] {
+                        continue;
                     }
-                } else {
-                    let current_dev = (cur_value - value[ii]) / value[ii];
-                    if current_dev > 0.01 * deviation {
-                        if *zz_idx.last().unwrap() == idx[ii] {
-                            continue;
-                        }
-                        zz_idx.push(idx[ii]);
-                        zz_swing.push(swing[ii]);
-                        zz_value.push(value[ii]);
-                        zz_dev.push(0.0);
-                        let dev_idx = zz_dev.len() - 2;
-                        zz_dev[dev_idx] = 100.0 * current_dev;
-                    }
+                    zz_idx.push(idx[ii]);
+                    zz_swing.push(swing[ii]);
+                    zz_value.push(value[ii]);
+                    zz_dev.push(0.0);
+                    let dev_idx = zz_dev.len() - 2;
+                    zz_dev[dev_idx] = 100.0 * current_dev;
                 }
             }
         }
@@ -2939,19 +2958,8 @@ pub fn zigzag(
                     zz_dev.push(100.0 * current_dev);
                     changes = 0;
                 }
-            } else {
-                if swing[i] == 1 {
-                    if value[i] > *zz_value.last().unwrap() {
-                        if zz_idx[base_index] == idx[i] {
-                            continue;
-                        }
-                        zz_idx.push(idx[i]);
-                        zz_swing.push(swing[i]);
-                        zz_value.push(value[i]);
-                        zz_dev.push(100.0 * current_dev);
-                        changes += 1;
-                    }
-                } else if current_dev < -0.01 * deviation {
+            } else if swing[i] == 1 {
+                if value[i] > *zz_value.last().unwrap() {
                     if zz_idx[base_index] == idx[i] {
                         continue;
                     }
@@ -2959,8 +2967,17 @@ pub fn zigzag(
                     zz_swing.push(swing[i]);
                     zz_value.push(value[i]);
                     zz_dev.push(100.0 * current_dev);
-                    changes = 0;
+                    changes += 1;
                 }
+            } else if current_dev < -0.01 * deviation {
+                if zz_idx[base_index] == idx[i] {
+                    continue;
+                }
+                zz_idx.push(idx[i]);
+                zz_swing.push(swing[i]);
+                zz_value.push(value[i]);
+                zz_dev.push(100.0 * current_dev);
+                changes = 0;
             }
         }
 
@@ -3087,7 +3104,7 @@ pub fn long_run(fast: &[f64], slow: &[f64], length: usize) -> HazeResult<Vec<f64
         .zip(&dec_slow)
         .zip(&inc_slow)
         .map(|((&ifast, &dslow), &islow)| {
-            bool_to_f64((ifast > 0.0 && dslow > 0.0) || (ifast > 0.0 && islow > 0.0))
+            bool_to_f64(ifast > 0.0 && (dslow > 0.0 || islow > 0.0))
         })
         .collect();
 
@@ -3109,7 +3126,7 @@ pub fn short_run(fast: &[f64], slow: &[f64], length: usize) -> HazeResult<Vec<f6
         .zip(&inc_slow)
         .zip(&dec_slow)
         .map(|((&dfast, &islow), &dslow)| {
-            bool_to_f64((dfast > 0.0 && islow > 0.0) || (dfast > 0.0 && dslow > 0.0))
+            bool_to_f64(dfast > 0.0 && (islow > 0.0 || dslow > 0.0))
         })
         .collect();
 
@@ -3272,7 +3289,7 @@ pub fn trendflex(close: &[f64], length: usize, smooth: usize, alpha: f64) -> Haz
     validate_min_length(close, length.max(smooth) + 1)?;
 
     // pandas-ta defaults
-    let pi = 3.14159;
+    let pi = std::f64::consts::PI;
     let sqrt2 = 1.414;
 
     let n = close.len();
@@ -3694,22 +3711,16 @@ pub fn thermo(
     let mut thermo_long = vec![f64::NAN; n];
     let mut thermo_short = vec![f64::NAN; n];
 
+    // Note: asint parameter currently has no effect as bool_to_f64 always returns 0.0/1.0
+    let _ = asint;
     for i in 0..n {
         if thermo[i].is_nan() || thermo_ma[i].is_nan() {
             continue;
         }
         let l = thermo[i] < (thermo_ma[i] * long);
         let s = thermo[i] > (thermo_ma[i] * short);
-        thermo_long[i] = if asint {
-            bool_to_f64(l)
-        } else {
-            bool_to_f64(l)
-        };
-        thermo_short[i] = if asint {
-            bool_to_f64(s)
-        } else {
-            bool_to_f64(s)
-        };
+        thermo_long[i] = bool_to_f64(l);
+        thermo_short[i] = bool_to_f64(s);
     }
 
     let mut out = BTreeMap::<String, Vec<f64>>::new();

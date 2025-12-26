@@ -1495,7 +1495,7 @@ mod boundary_tests {
         ratios.insert("AB/XA".to_string(), 0.62);
         ratios.insert("BC/AB".to_string(), 0.38);
         let prob = calc_completion_probability(&ratios, PatternType::Gartley);
-        assert!(prob >= 0.0 && prob <= 1.0);
+        assert!((0.0..=1.0).contains(&prob));
     }
 
     #[test]
@@ -1507,7 +1507,7 @@ mod boundary_tests {
         ratios.insert("CD/BC".to_string(), 1.27);
         ratios.insert("AD/XA".to_string(), 0.786);
         let prob = calc_completion_probability(&ratios, PatternType::Gartley);
-        assert!(prob >= 0.0 && prob <= 1.0);
+        assert!((0.0..=1.0).contains(&prob));
     }
 
     // ==================== Target Price Tests ====================
