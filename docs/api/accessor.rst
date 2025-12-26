@@ -1,7 +1,7 @@
 DataFrame Accessor API
 ======================
 
-Haze-Library provides a ```.ta``` accessor for pandas DataFrames,
+Haze-Library provides a ```.haze``` accessor for pandas DataFrames,
 allowing you to call technical indicators directly on your data.
 
 TechnicalAnalysisAccessor
@@ -22,18 +22,18 @@ Usage
    df = pd.read_csv('ohlcv.csv')
 
    # Single return value indicators
-   df['sma_20'] = df.ta.sma(20)
-   df['rsi_14'] = df.ta.rsi(14)
-   df['atr_14'] = df.ta.atr(14)
+   df['sma_20'] = df.haze.sma(20)
+   df['rsi_14'] = df.haze.rsi(14)
+   df['atr_14'] = df.haze.atr(14)
 
    # Multiple return value indicators
-   upper, middle, lower = df.ta.bollinger_bands(20, 2.0)
+   upper, middle, lower = df.haze.bollinger_bands(20, 2.0)
    df['bb_upper'] = upper
    df['bb_middle'] = middle
    df['bb_lower'] = lower
 
    # Trend indicators
-   st, direction, ub, lb = df.ta.supertrend(10, 3.0)
+   st, direction, ub, lb = df.haze.supertrend(10, 3.0)
    df['supertrend'] = st
    df['trend_direction'] = direction
 
@@ -55,6 +55,6 @@ Usage
    close = df['close']
 
    # Apply indicators to a single Series
-   sma = close.ta.sma(20)
-   ema = close.ta.ema(12)
-   rsi = close.ta.rsi(14)
+   sma = close.haze.sma(20)
+   ema = close.haze.ema(12)
+   rsi = close.haze.rsi(14)

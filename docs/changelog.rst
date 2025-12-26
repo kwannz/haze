@@ -30,7 +30,7 @@ Initial release.
 Added
 ^^^^^
 - 200+ technical indicators
-- Pandas DataFrame accessor (``.ta``)
+- Pandas DataFrame accessor (``.haze``)
 - NumPy compatibility layer
 - High-performance Rust core
 - Python 3.9+ support

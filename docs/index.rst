@@ -49,10 +49,10 @@ DataFrame Accessor
 
    df = pd.read_csv('ohlcv.csv')
 
-   # Using the .ta accessor
-   df['sma_20'] = df.ta.sma(20)
-   df['rsi_14'] = df.ta.rsi(14)
-   upper, middle, lower = df.ta.bollinger_bands(20, 2.0)
+   # Using the .haze accessor
+   df['sma_20'] = df.haze.sma(20)
+   df['rsi_14'] = df.haze.rsi(14)
+   upper, middle, lower = df.haze.bollinger_bands(20, 2.0)
 
 Multi-Framework Support
 ^^^^^^^^^^^^^^^^^^^^^^^

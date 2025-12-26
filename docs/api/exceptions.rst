@@ -65,7 +65,7 @@ Raised when a required column is not found in the DataFrame.
    from haze_library import ColumnNotFoundError
 
    try:
-       df.ta.sma(20, column='price')  # 'price' doesn't exist
+       df.haze.sma(20, column='price')  # 'price' doesn't exist
    except ColumnNotFoundError as e:
        print(f"Column '{e.column}' not found. Available: {e.available}")
 
@@ -102,7 +102,7 @@ Error Handling Best Practices
    from haze_library import HazeError
 
    try:
-       result = df.ta.rsi(14)
+       result = df.haze.rsi(14)
    except HazeError as e:
        print(f"Calculation failed: {e}")
 
@@ -113,7 +113,7 @@ Error Handling Best Practices
    from haze_library import InvalidPeriodError, ColumnNotFoundError
 
    try:
-       result = df.ta.sma(100, column='close')
+       result = df.haze.sma(100, column='close')
    except InvalidPeriodError:
        print("Period too large for data")
    except ColumnNotFoundError:

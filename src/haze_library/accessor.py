@@ -2,7 +2,7 @@
 Haze-Library Pandas DataFrame Accessor
 ======================================
 
-Provides a Pythonic `.ta` accessor for pandas DataFrames.
+Provides a Pythonic `.haze` accessor for pandas DataFrames.
 
 Usage:
     import pandas as pd
@@ -11,12 +11,12 @@ Usage:
     df = pd.read_csv('ohlcv.csv')
 
     # Using accessor
-    df['sma_20'] = df.ta.sma(20)
-    df['rsi_14'] = df.ta.rsi(14)
-    upper, middle, lower = df.ta.bollinger_bands(20, 2.0)
+    df['sma_20'] = df.haze.sma(20)
+    df['rsi_14'] = df.haze.rsi(14)
+    upper, middle, lower = df.haze.bollinger_bands(20, 2.0)
 
     # Chain with pandas
-    df.ta.macd().assign(signal=lambda x: x[1])
+    df.haze.macd().assign(signal=lambda x: x[1])
 """
 
 from __future__ import annotations
@@ -58,9 +58,9 @@ class TechnicalAnalysisAccessor:
     Provides easy access to 200+ technical indicators.
 
     Example:
-        >>> df.ta.sma(20)
-        >>> df.ta.rsi(14)
-        >>> df.ta.macd(12, 26, 9)
+        >>> df.haze.sma(20)
+        >>> df.haze.rsi(14)
+        >>> df.haze.macd(12, 26, 9)
     """
 
     def __init__(self, pandas_obj: pd.DataFrame):
@@ -655,8 +655,8 @@ class SeriesTechnicalAnalysisAccessor:
     Technical Analysis accessor for pandas Series.
 
     Example:
-        >>> close_series.ta.sma(20)
-        >>> close_series.ta.ema(12)
+        >>> close_series.haze.sma(20)
+        >>> close_series.haze.ema(12)
     """
 
     def __init__(self, pandas_obj: pd.Series):
