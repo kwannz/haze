@@ -202,8 +202,7 @@ def macd(data: ArrayLike, fast: int = 12, slow: int = 26,
 
 
 def stochastic(high: ArrayLike, low: ArrayLike, close: ArrayLike,
-               k_period: int = 14, d_period: int = 3,
-               smooth_k: int = 3) -> Tuple[np.ndarray, np.ndarray]:
+               k_period: int = 14, d_period: int = 3) -> Tuple[np.ndarray, np.ndarray]:
     """Stochastic Oscillator. Returns (%K, %D)."""
     k, d = _lib.py_stochastic(
         _to_list_fast(high), _to_list_fast(low), _to_list_fast(close),
@@ -253,8 +252,7 @@ def fisher_transform(high: ArrayLike, low: ArrayLike, close: ArrayLike,
 
 
 def kdj(high: ArrayLike, low: ArrayLike, close: ArrayLike,
-        k_period: int = 9, d_period: int = 3,
-        j_period: int = 3) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        k_period: int = 9, d_period: int = 3) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """KDJ Indicator. Returns (K, D, J)."""
     k, d, j = _lib.py_kdj(
         _to_list_fast(high), _to_list_fast(low), _to_list_fast(close),

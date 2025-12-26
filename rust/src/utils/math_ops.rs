@@ -532,3 +532,386 @@ mod tests {
         assert_eq!(max_idx[2], 2.0); // index of max in [3,1,4] is 2
     }
 }
+
+#[cfg(test)]
+mod boundary_tests {
+    use super::*;
+
+    // ==================== Empty Input Tests ====================
+
+    #[test]
+    fn test_max_empty() {
+        let result = max(&[], 3);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_min_empty() {
+        let result = min(&[], 3);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_sum_empty() {
+        let result = sum(&[], 3);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_sqrt_empty() {
+        let result = sqrt(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_ln_empty() {
+        let result = ln(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_add_empty() {
+        let result = add(&[], &[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_sub_empty() {
+        let result = sub(&[], &[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_mult_empty() {
+        let result = mult(&[], &[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_div_empty() {
+        let result = div(&[], &[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_minmax_empty() {
+        let (mins, maxs) = minmax(&[], 3);
+        assert!(mins.is_empty());
+        assert!(maxs.is_empty());
+    }
+
+    // ==================== NaN Handling Tests ====================
+
+    #[test]
+    fn test_sqrt_nan() {
+        let values = vec![f64::NAN, 4.0, 9.0];
+        let result = sqrt(&values);
+        assert!(result[0].is_nan());
+        assert_eq!(result[1], 2.0);
+        assert_eq!(result[2], 3.0);
+    }
+
+    #[test]
+    fn test_sqrt_negative() {
+        let values = vec![-4.0, 4.0];
+        let result = sqrt(&values);
+        assert!(result[0].is_nan()); // sqrt of negative is NaN
+        assert_eq!(result[1], 2.0);
+    }
+
+    #[test]
+    fn test_ln_nan() {
+        let values = vec![f64::NAN, 1.0];
+        let result = ln(&values);
+        assert!(result[0].is_nan());
+        assert_eq!(result[1], 0.0);
+    }
+
+    #[test]
+    fn test_ln_negative() {
+        let values = vec![-1.0, 1.0];
+        let result = ln(&values);
+        assert!(result[0].is_nan()); // ln of negative is NaN
+        assert_eq!(result[1], 0.0);
+    }
+
+    #[test]
+    fn test_ln_zero() {
+        let values = vec![0.0];
+        let result = ln(&values);
+        assert!(result[0].is_infinite() && result[0] < 0.0); // ln(0) = -infinity
+    }
+
+    #[test]
+    fn test_add_nan() {
+        let a = vec![f64::NAN, 10.0];
+        let b = vec![5.0, 5.0];
+        let result = add(&a, &b);
+        assert!(result[0].is_nan());
+        assert_eq!(result[1], 15.0);
+    }
+
+    #[test]
+    fn test_div_by_nan() {
+        let a = vec![10.0];
+        let b = vec![f64::NAN];
+        let result = div(&a, &b);
+        assert!(result[0].is_nan());
+    }
+
+    // ==================== Special Value Tests ====================
+
+    #[test]
+    fn test_div_by_zero() {
+        let a = vec![10.0, 0.0];
+        let b = vec![0.0, 10.0];
+        let result = div(&a, &b);
+        // div function uses defensive NaN for division by zero
+        assert!(result[0].is_nan()); // 10/0 = NaN (defensive)
+        assert_eq!(result[1], 0.0); // 0/10 = 0
+    }
+
+    #[test]
+    fn test_exp_large() {
+        let values = vec![0.0, 1.0, 100.0];
+        let result = exp(&values);
+        assert_eq!(result[0], 1.0);
+        assert!((result[1] - std::f64::consts::E).abs() < 1e-10);
+        assert!(result[2].is_finite() || result[2].is_infinite()); // may overflow
+    }
+
+    #[test]
+    fn test_exp_negative() {
+        let values = vec![-1.0];
+        let result = exp(&values);
+        assert!((result[0] - 1.0 / std::f64::consts::E).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_abs_negative() {
+        let values = vec![-5.0, 0.0, 5.0];
+        let result = abs(&values);
+        assert_eq!(result, vec![5.0, 0.0, 5.0]);
+    }
+
+    #[test]
+    fn test_ceil_floor() {
+        let values = vec![1.1, 1.5, 1.9, -1.1, -1.9];
+        let ceil_result = ceil(&values);
+        let floor_result = floor(&values);
+
+        assert_eq!(ceil_result, vec![2.0, 2.0, 2.0, -1.0, -1.0]);
+        assert_eq!(floor_result, vec![1.0, 1.0, 1.0, -2.0, -2.0]);
+    }
+
+    // ==================== Trigonometric Edge Cases ====================
+
+    #[test]
+    fn test_asin_acos_range() {
+        let values = vec![-1.0, 0.0, 1.0];
+        let asin_result = asin(&values);
+        let acos_result = acos(&values);
+
+        assert!((asin_result[0] + std::f64::consts::FRAC_PI_2).abs() < 1e-10); // -pi/2
+        assert!((asin_result[2] - std::f64::consts::FRAC_PI_2).abs() < 1e-10); // pi/2
+        assert!((acos_result[0] - std::f64::consts::PI).abs() < 1e-10); // pi
+        assert!((acos_result[2]).abs() < 1e-10); // 0
+    }
+
+    #[test]
+    fn test_asin_out_of_range() {
+        let values = vec![2.0]; // asin(2) is undefined
+        let result = asin(&values);
+        assert!(result[0].is_nan());
+    }
+
+    #[test]
+    fn test_tan_special() {
+        let values = vec![0.0];
+        let result = tan(&values);
+        assert_eq!(result[0], 0.0);
+    }
+
+    // ==================== Hyperbolic Tests ====================
+
+    #[test]
+    fn test_sinh_cosh_tanh() {
+        let values = vec![0.0, 1.0];
+        let sinh_result = sinh(&values);
+        let cosh_result = cosh(&values);
+        let tanh_result = tanh(&values);
+
+        assert_eq!(sinh_result[0], 0.0);
+        assert_eq!(cosh_result[0], 1.0);
+        assert_eq!(tanh_result[0], 0.0);
+
+        assert!(sinh_result[1] > 0.0);
+        assert!(cosh_result[1] > 1.0);
+        assert!(tanh_result[1] > 0.0 && tanh_result[1] < 1.0);
+    }
+
+    #[test]
+    fn test_tanh_bounds() {
+        let values = vec![-100.0, 100.0];
+        let result = tanh(&values);
+        // tanh is bounded to [-1, 1]
+        assert!(result[0] >= -1.0 && result[0] <= 1.0);
+        assert!(result[1] >= -1.0 && result[1] <= 1.0);
+    }
+
+    // ==================== Rolling Window Tests ====================
+
+    #[test]
+    fn test_max_period_one() {
+        let values = vec![1.0, 2.0, 3.0];
+        let result = max(&values, 1);
+        assert_eq!(result, vec![1.0, 2.0, 3.0]);
+    }
+
+    #[test]
+    fn test_min_period_one() {
+        let values = vec![3.0, 2.0, 1.0];
+        let result = min(&values, 1);
+        assert_eq!(result, vec![3.0, 2.0, 1.0]);
+    }
+
+    #[test]
+    fn test_sum_period_larger_than_data() {
+        let values = vec![1.0, 2.0];
+        let result = sum(&values, 5);
+        assert!(result[0].is_nan());
+        assert!(result[1].is_nan());
+    }
+
+    #[test]
+    fn test_max_with_nan() {
+        let values = vec![1.0, f64::NAN, 3.0, 2.0];
+        let result = max(&values, 2);
+        // NaN handling in max may vary by implementation
+        assert_eq!(result.len(), 4);
+    }
+
+    // ==================== Binary Operation Length Mismatch ====================
+
+    #[test]
+    fn test_add_length_mismatch() {
+        let a = vec![1.0, 2.0, 3.0];
+        let b = vec![1.0, 2.0]; // shorter
+        let result = add(&a, &b);
+        // Should use shorter length
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_sub_length_mismatch() {
+        let a = vec![1.0];
+        let b = vec![1.0, 2.0, 3.0]; // longer
+        let result = sub(&a, &b);
+        assert_eq!(result.len(), 1);
+    }
+
+    #[test]
+    fn test_mult_length_mismatch() {
+        let a = vec![2.0, 3.0];
+        let b = vec![4.0, 5.0, 6.0];
+        let result = mult(&a, &b);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result, vec![8.0, 15.0]);
+    }
+
+    #[test]
+    fn test_div_length_mismatch() {
+        let a = vec![10.0, 20.0, 30.0];
+        let b = vec![2.0];
+        let result = div(&a, &b);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], 5.0);
+    }
+
+    // ==================== Infinity Handling ====================
+
+    #[test]
+    fn test_sqrt_infinity() {
+        let values = vec![f64::INFINITY];
+        let result = sqrt(&values);
+        assert!(result[0].is_infinite());
+    }
+
+    #[test]
+    fn test_ln_infinity() {
+        let values = vec![f64::INFINITY];
+        let result = ln(&values);
+        assert!(result[0].is_infinite());
+    }
+
+    #[test]
+    fn test_exp_neg_infinity() {
+        let values = vec![f64::NEG_INFINITY];
+        let result = exp(&values);
+        assert_eq!(result[0], 0.0);
+    }
+
+    #[test]
+    fn test_log10_valid() {
+        let values = vec![0.001, 1.0, 1000.0];
+        let result = log10(&values);
+        assert!((result[0] - (-3.0)).abs() < 1e-10);
+        assert_eq!(result[1], 0.0);
+        assert_eq!(result[2], 3.0);
+    }
+
+    #[test]
+    fn test_atan_special() {
+        let values = vec![0.0, 1.0, -1.0];
+        let result = atan(&values);
+        assert_eq!(result[0], 0.0);
+        assert!((result[1] - std::f64::consts::FRAC_PI_4).abs() < 1e-10);
+        assert!((result[2] + std::f64::consts::FRAC_PI_4).abs() < 1e-10);
+    }
+
+    // ==================== Zero Division Edge Cases ====================
+
+    #[test]
+    fn test_zero_div_zero() {
+        let a = vec![0.0];
+        let b = vec![0.0];
+        let result = div(&a, &b);
+        assert!(result[0].is_nan()); // 0/0 = NaN
+    }
+
+    #[test]
+    fn test_neg_div_zero() {
+        let a = vec![-10.0];
+        let b = vec![0.0];
+        let result = div(&a, &b);
+        // div function uses defensive NaN for division by zero
+        assert!(result[0].is_nan()); // -10/0 = NaN (defensive)
+    }
+
+    // ==================== MinMax Index Tests ====================
+
+    #[test]
+    fn test_minmaxindex_empty() {
+        let (min_idx, max_idx) = minmaxindex(&[], 3);
+        assert!(min_idx.is_empty());
+        assert!(max_idx.is_empty());
+    }
+
+    #[test]
+    fn test_minmaxindex_period_one() {
+        let values = vec![5.0, 3.0, 7.0];
+        let (min_idx, max_idx) = minmaxindex(&values, 1);
+        // With period 1, index is always 0 within window
+        assert_eq!(min_idx, vec![0.0, 0.0, 0.0]);
+        assert_eq!(max_idx, vec![0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_minmax_period_larger() {
+        let values = vec![1.0, 2.0];
+        let (mins, maxs) = minmax(&values, 5);
+        // All values should be NaN since period > len
+        assert!(mins.iter().all(|v| v.is_nan()));
+        assert!(maxs.iter().all(|v| v.is_nan()));
+    }
+}

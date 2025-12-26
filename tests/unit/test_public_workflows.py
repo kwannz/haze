@@ -42,6 +42,7 @@ class TestCleanAPIWorkflows:
 
         _ = haze_library.macd(close, fast=3, slow=5, signal=2)
         _ = haze_library.bollinger_bands(close=close, period=3, std_dev=2.0)
+        _ = haze_library.bollinger_bands(close=close, period=3, std=2.0)
         _ = haze_library.stochastic(high, low, close, k_period=3, d_period=2)
 
 
@@ -56,4 +57,3 @@ class TestHazeAliasPackage:
 
         result = py_sma([1.0, 2.0, 3.0], 2)
         assert isinstance(result, list)
-

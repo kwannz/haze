@@ -592,7 +592,10 @@ fn rolling_percentile_dual_heap(values: &[f64], period: usize, percentile: f64) 
     }
 
     #[inline]
-    fn pop_lower_valid(heap: &mut BinaryHeap<PercentileHeapItem>, start: usize) -> Option<PercentileHeapItem> {
+    fn pop_lower_valid(
+        heap: &mut BinaryHeap<PercentileHeapItem>,
+        start: usize,
+    ) -> Option<PercentileHeapItem> {
         while let Some(item) = heap.pop() {
             if item.index >= start {
                 return Some(item);

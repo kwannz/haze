@@ -427,7 +427,7 @@ fn merge_zones(mut zones: Vec<SRZone>, tolerance: f64) -> Vec<SRZone> {
         return zones;
     }
 
-    zones.sort_by(|a, b| a.level.partial_cmp(&b.level).unwrap());
+    zones.sort_by(|a, b| a.level.total_cmp(&b.level));
 
     let mut merged = Vec::new();
     let mut current = zones[0].clone();

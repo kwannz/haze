@@ -122,8 +122,7 @@ impl SFGModelManager {
         }
 
         if weights_path.exists() {
-            fs::remove_file(&weights_path)
-                .map_err(|e| format!("Failed to delete weights: {e}"))?;
+            fs::remove_file(&weights_path).map_err(|e| format!("Failed to delete weights: {e}"))?;
         }
 
         self.metadata_cache.remove(name);
@@ -375,7 +374,9 @@ mod tests {
         // 保存模型
         let config = SFGModelConfig::default();
         let metadata = create_metadata("linreg_test", &config, 5, 2);
-        manager.save_model("linreg_test", &model, &metadata).unwrap();
+        manager
+            .save_model("linreg_test", &model, &metadata)
+            .unwrap();
 
         // 验证文件存在
         assert!(manager.model_exists("linreg_test"));

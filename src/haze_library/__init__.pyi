@@ -65,31 +65,39 @@ class IndicatorResult:
     def add_metadata(self, key: str, value: str) -> None: ...
     @property
     def len(self) -> int: ...
+    def is_empty(self) -> bool: ...
 
 class MultiIndicatorResult:
     """Multiple indicator results container."""
-    names: List[str]
-    results: Dict[str, FloatList]
-    def __init__(self, names: List[str]) -> None: ...
-    def add_result(self, name: str, values: FloatList) -> None: ...
-    def get(self, name: str) -> Optional[FloatList]: ...
+    name: str
+    series: Dict[str, FloatList]
+    metadata: Dict[str, str]
+    def __init__(self, name: str) -> None: ...
+    def add_series(self, key: str, values: FloatList) -> None: ...
+    def add_metadata(self, key: str, value: str) -> None: ...
 
 class PyHarmonicPattern:
     """Harmonic pattern detection result."""
     pattern_type: str
-    direction: str
-    x_idx: int
-    a_idx: int
-    b_idx: int
-    c_idx: int
-    d_idx: int
+    pattern_type_zh: str
+    is_bullish: bool
+    state: str
+    x_index: int
     x_price: float
+    a_index: int
     a_price: float
+    b_index: int
     b_price: float
-    c_price: float
-    d_price: float
-    completion_ratio: float
-    potential_reversal_zone: Tuple[float, float]
+    c_index: Optional[int]
+    c_price: Optional[float]
+    d_index: Optional[int]
+    d_price: Optional[float]
+    prz_high: Optional[float]
+    prz_low: Optional[float]
+    prz_center: Optional[float]
+    probability: float
+    target_prices: FloatList
+    stop_loss: Optional[float]
 
 # ==================== Error Classes ====================
 
@@ -361,7 +369,7 @@ def cmo(close: ArrayLike, period: int = 14) -> FloatList:
     """Chande Momentum Oscillator."""
     ...
 
-def kdj(high: ArrayLike, low: ArrayLike, close: ArrayLike, k_period: int = 9, d_period: int = 3, j_period: int = 3) -> Tuple[FloatList, FloatList, FloatList]:
+def kdj(high: ArrayLike, low: ArrayLike, close: ArrayLike, k_period: int = 9, d_period: int = 3) -> Tuple[FloatList, FloatList, FloatList]:
     """KDJ Indicator."""
     ...
 

@@ -32,7 +32,7 @@ Performance:
     - High numerical precision using f64
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.2"
 __author__ = "kwannz"
 
 import inspect
@@ -55,6 +55,7 @@ except ImportError:
 _KW_ALIASES: Dict[str, str] = {
     "close": "values",
     "std_dev": "std_multiplier",
+    "std": "std_multiplier",
     "fast": "fast_period",
     "slow": "slow_period",
     "signal": "signal_period",
@@ -123,6 +124,16 @@ try:
 except ImportError:
     np_ta = None
 
+# Exception types
+from .exceptions import (
+    HazeError,
+    InvalidPeriodError,
+    InsufficientDataError,
+    ColumnNotFoundError,
+    InvalidParameterError,
+    ComputationError,
+)
+
 # Convenience re-exports for common indicators
 __all__ = [
     # Version
@@ -132,4 +143,11 @@ __all__ = [
     "SeriesTechnicalAnalysisAccessor",
     # NumPy module
     "np_ta",
+    # Exceptions
+    "HazeError",
+    "InvalidPeriodError",
+    "InsufficientDataError",
+    "ColumnNotFoundError",
+    "InvalidParameterError",
+    "ComputationError",
 ]

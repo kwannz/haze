@@ -13,6 +13,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MANIFEST.in for proper Python packaging
 - .gitignore for clean repository
 
+## [0.1.2] - 2025-12-26
+
+### Added - Python FFI Documentation 📚
+
+#### NumPy-Style Docstrings (49 functions, 47% coverage)
+
+**English**:
+Comprehensive docstrings with `#[pyo3(text_signature = "...")]` annotations for IDE autocomplete:
+
+- **Momentum Indicators (9)**: TSI, Ultimate Oscillator, MOM, ROC, KDJ, APO, PPO, CMO
+- **Trend Indicators (7)**: Vortex, Choppiness, Qstick, VHF, DX, +DI, -DI
+- **Overlap/Moving Averages (6)**: T3, KAMA, TRIMA, Midpoint, Midprice, SAR
+- **Candlestick Patterns (13)**: Hammer, Inverted Hammer, Hanging Man, Bullish/Bearish Engulfing, Bullish/Bearish Harami, Piercing Pattern, Dark Cloud Cover, Morning Star, Evening Star, Three White Soldiers, Three Black Crows
+- **Statistical Indicators (7)**: Linear Regression, Correlation, Z-Score, Covariance, Beta, Standard Error
+- **Price Transforms (3)**: AvgPrice, MedPrice, TypPrice
+- **Pandas-TA Exclusives (5)**: Entropy, Aberration, Squeeze, QQE, CTI
+
+**中文**:
+完整的 NumPy 风格文档字符串，支持 `#[pyo3(text_signature = "...")]` IDE 自动补全：
+
+- **动量指标（9 个）**：TSI、终极振荡器、MOM、ROC、KDJ、APO、PPO、CMO
+- **趋势指标（7 个）**：涡流、震荡指数、量价棒、VHF、DX、+DI、-DI
+- **移动平均线（6 个）**：T3、KAMA、TRIMA、中点、中价、SAR
+- **蜡烛图形态（13 个）**：锤子线、倒锤子线、上吊线、看涨/看跌吞没、看涨/看跌孕线、刺透形态、乌云盖顶、早晨之星、黄昏之星、三白兵、三黑鸦
+- **统计指标（7 个）**：线性回归、相关性、Z分数、协方差、贝塔系数、标准误差
+- **价格变换（3 个）**：平均价格、中间价格、典型价格
+- **Pandas-TA 独有（5 个）**：熵、偏离度、挤压、QQE、CTI
+
+### Improved
+
+**Code Quality / 代码质量**:
+- Unified error handling with `ok_or_nan!` macro (reduced ~150 lines duplication)
+- 统一错误处理宏 `ok_or_nan!`（减少约 150 行重复代码）
+
+**Test Coverage / 测试覆盖率**:
+- 759 tests passing (streaming.rs 90%, simd_ops.rs 90%)
+- 759 个测试通过（streaming.rs 90%, simd_ops.rs 90%）
+
+---
+
 ## [0.1.1] - 2025-12-26
 
 ### Added - Harmonic Patterns 🎵
@@ -162,6 +202,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
+- **v0.1.2** (2025-12-26): Python FFI Documentation - 49 docstrings, ok_or_nan! macro
 - **v0.1.1** (2025-12-26): Harmonic Pattern Detection - 215 indicators
 - **v0.1.0** (2025-12-25): 100% Implementation Complete - 212 indicators
 - **v0.0.1** (2025-12-20): Initial release - 30 indicators

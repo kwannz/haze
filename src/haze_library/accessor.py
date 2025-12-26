@@ -24,6 +24,7 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 from typing import Optional, Union, Tuple, List, Any
+from .exceptions import ColumnNotFoundError
 
 # Import Rust extension
 try:
@@ -96,7 +97,10 @@ class TechnicalAnalysisAccessor:
                 if alias in self._col_map:
                     return self._obj[self._col_map[alias]]
 
-        raise KeyError(f"Column '{name}' not found. Available: {list(self._obj.columns)}")
+        raise ColumnNotFoundError(
+            column=str(name),
+            available_columns=[str(c) for c in self._obj.columns],
+        )
 
     def _get_ohlc(self) -> Tuple[List[float], List[float], List[float], List[float]]:
         """Get OHLC data as lists."""
@@ -283,8 +287,7 @@ class TechnicalAnalysisAccessor:
             _to_series(histogram, self.index),
         )
 
-    def stochastic(self, k_period: int = 14, d_period: int = 3,
-                   smooth_k: int = 3) -> Tuple[pd.Series, pd.Series]:
+    def stochastic(self, k_period: int = 14, d_period: int = 3) -> Tuple[pd.Series, pd.Series]:
         """Stochastic Oscillator. Returns (%K, %D)."""
         high, low, close = self._get_hlc()
         k, d = _lib.py_stochastic(high, low, close, k_period, d_period)
@@ -322,8 +325,7 @@ class TechnicalAnalysisAccessor:
         fisher, signal = _lib.py_fisher_transform(high, low, close, period)
         return _to_series(fisher, self.index), _to_series(signal, self.index)
 
-    def kdj(self, k_period: int = 9, d_period: int = 3,
-            j_period: int = 3) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    def kdj(self, k_period: int = 9, d_period: int = 3) -> Tuple[pd.Series, pd.Series, pd.Series]:
         """KDJ Indicator. Returns (K, D, J)."""
         high, low, close = self._get_hlc()
         k, d, j = _lib.py_kdj(high, low, close, k_period, d_period)

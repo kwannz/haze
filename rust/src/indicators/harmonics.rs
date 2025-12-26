@@ -1217,3 +1217,525 @@ mod tests {
         assert!(signals.iter().all(|&s| s == -1.0 || s == 0.0 || s == 1.0));
     }
 }
+
+/// Comprehensive boundary tests for harmonics module
+#[cfg(test)]
+mod boundary_tests {
+    use super::*;
+
+    // ==================== Empty Input Tests ====================
+
+    #[test]
+    fn test_detect_swing_points_empty() {
+        let swings = detect_swing_points(&[], &[], 1, 1);
+        assert!(swings.is_empty());
+    }
+
+    #[test]
+    fn test_detect_gartley_empty() {
+        let patterns = detect_gartley(&[]);
+        assert!(patterns.is_empty());
+    }
+
+    #[test]
+    fn test_detect_bat_empty() {
+        let patterns = detect_bat(&[]);
+        assert!(patterns.is_empty());
+    }
+
+    #[test]
+    fn test_detect_butterfly_empty() {
+        let patterns = detect_butterfly(&[]);
+        assert!(patterns.is_empty());
+    }
+
+    #[test]
+    fn test_detect_crab_empty() {
+        let patterns = detect_crab(&[]);
+        assert!(patterns.is_empty());
+    }
+
+    #[test]
+    fn test_detect_shark_empty() {
+        let patterns = detect_shark(&[]);
+        assert!(patterns.is_empty());
+    }
+
+    #[test]
+    fn test_detect_cypher_empty() {
+        let patterns = detect_cypher(&[]);
+        assert!(patterns.is_empty());
+    }
+
+    #[test]
+    fn test_detect_all_harmonics_empty() {
+        let patterns = detect_all_harmonics(&[], &[], 3, 3);
+        assert!(patterns.is_empty());
+    }
+
+    #[test]
+    fn test_detect_forming_patterns_empty() {
+        let patterns = detect_forming_patterns(&[], &[], 3, 3, 50);
+        assert!(patterns.is_empty());
+    }
+
+    // ==================== Insufficient Data Tests ====================
+
+    #[test]
+    fn test_detect_swing_points_insufficient() {
+        // Need at least left_strength + right_strength + 1 points
+        let high = vec![10.0, 11.0];
+        let low = vec![9.0, 10.0];
+        let swings = detect_swing_points(&high, &low, 2, 2);
+        assert!(swings.is_empty());
+    }
+
+    #[test]
+    fn test_detect_patterns_few_swings() {
+        // Patterns need at least 5 points (X, A, B, C, D)
+        let swings = vec![
+            SwingPoint {
+                index: 0,
+                price: 100.0,
+                is_high: false,
+            },
+            SwingPoint {
+                index: 10,
+                price: 150.0,
+                is_high: true,
+            },
+            SwingPoint {
+                index: 20,
+                price: 120.0,
+                is_high: false,
+            },
+        ];
+
+        assert!(detect_gartley(&swings).is_empty());
+        assert!(detect_bat(&swings).is_empty());
+        assert!(detect_butterfly(&swings).is_empty());
+    }
+
+    // ==================== Length Mismatch Tests ====================
+
+    #[test]
+    fn test_detect_swing_points_length_mismatch() {
+        let high = vec![10.0, 11.0, 12.0];
+        let low = vec![9.0, 10.0]; // shorter
+                                   // Should handle gracefully without panic
+        let swings = detect_swing_points(&high, &low, 1, 1);
+        // Empty or partial result is acceptable
+        assert!(swings.len() <= 3);
+    }
+
+    // ==================== Valid Pattern Detection Tests ====================
+
+    #[test]
+    fn test_detect_swing_points_basic() {
+        // Create alternating pattern that should produce swings
+        let high = vec![10.0, 15.0, 12.0, 18.0, 14.0, 20.0, 16.0];
+        let low = vec![8.0, 13.0, 10.0, 16.0, 12.0, 18.0, 14.0];
+        let swings = detect_swing_points(&high, &low, 1, 1);
+        assert!(swings.len() >= 2);
+    }
+
+    #[test]
+    fn test_swing_point_creation() {
+        let sp = SwingPoint {
+            index: 5,
+            price: 100.0,
+            is_high: true,
+        };
+        assert_eq!(sp.index, 5);
+        assert_eq!(sp.price, 100.0);
+        assert!(sp.is_high);
+    }
+
+    #[test]
+    fn test_harmonic_pattern_structure() {
+        let mut ratios = std::collections::HashMap::new();
+        ratios.insert("XAB".to_string(), 0.618);
+        ratios.insert("ABC".to_string(), 0.786);
+        ratios.insert("BCD".to_string(), 1.27);
+        ratios.insert("XAD".to_string(), 0.786);
+
+        let pattern = HarmonicPattern {
+            pattern_type: "Gartley".to_string(),
+            x: SwingPoint {
+                index: 0,
+                price: 100.0,
+                is_high: false,
+            },
+            a: SwingPoint {
+                index: 10,
+                price: 150.0,
+                is_high: true,
+            },
+            b: SwingPoint {
+                index: 20,
+                price: 119.0,
+                is_high: false,
+            },
+            c: SwingPoint {
+                index: 30,
+                price: 140.0,
+                is_high: true,
+            },
+            d: SwingPoint {
+                index: 40,
+                price: 110.0,
+                is_high: false,
+            },
+            is_bullish: true,
+            ratios,
+        };
+        assert_eq!(pattern.pattern_type, "Gartley");
+        assert!(pattern.is_bullish);
+    }
+
+    // ==================== PRZ Calculation Tests ====================
+
+    #[test]
+    fn test_prz_zone_structure() {
+        let prz = PrzZone {
+            price_center: 110.0,
+            price_high: 115.0,
+            price_low: 105.0,
+            confluence_count: 3,
+        };
+        assert!(prz.price_high > prz.price_center);
+        assert!(prz.price_low < prz.price_center);
+        assert!(prz.confluence_count > 0);
+    }
+
+    #[test]
+    fn test_calculate_prz_bullish() {
+        let x = SwingPoint {
+            index: 0,
+            price: 100.0,
+            is_high: false,
+        };
+        let a = SwingPoint {
+            index: 10,
+            price: 150.0,
+            is_high: true,
+        };
+        let b = SwingPoint {
+            index: 20,
+            price: 119.0,
+            is_high: false,
+        };
+        let c = SwingPoint {
+            index: 30,
+            price: 140.0,
+            is_high: true,
+        };
+
+        let prz = calculate_prz(&x, &a, &b, &c, PatternType::Gartley);
+
+        // PRZ should be within pattern range
+        assert!(prz.price_center >= x.price);
+        assert!(prz.price_center <= a.price);
+        assert!(prz.price_high > prz.price_low);
+    }
+
+    // ==================== Fib Ratio Tests ====================
+
+    #[test]
+    fn test_check_fib_ratio_exact() {
+        assert!(check_fib_ratio(0.618, 0.618, 0.01));
+        assert!(check_fib_ratio(0.382, 0.382, 0.01));
+        assert!(check_fib_ratio(0.786, 0.786, 0.01));
+    }
+
+    #[test]
+    fn test_check_fib_ratio_tolerance() {
+        // Within tolerance
+        assert!(check_fib_ratio(0.620, 0.618, 0.01));
+        assert!(check_fib_ratio(0.616, 0.618, 0.01));
+
+        // Outside tolerance
+        assert!(!check_fib_ratio(0.650, 0.618, 0.01));
+        assert!(!check_fib_ratio(0.580, 0.618, 0.01));
+    }
+
+    #[test]
+    fn test_check_fib_ratio_zero_tolerance() {
+        assert!(check_fib_ratio(0.618, 0.618, 0.0));
+        assert!(!check_fib_ratio(0.619, 0.618, 0.0));
+    }
+
+    // ==================== Pattern Type Tests ====================
+
+    #[test]
+    fn test_pattern_type_all() {
+        let all = PatternType::all();
+        assert_eq!(all.len(), 9);
+        assert!(all.contains(&PatternType::Gartley));
+        assert!(all.contains(&PatternType::Bat));
+        assert!(all.contains(&PatternType::Butterfly));
+        assert!(all.contains(&PatternType::Crab));
+        assert!(all.contains(&PatternType::Shark));
+        assert!(all.contains(&PatternType::Cypher));
+    }
+
+    #[test]
+    fn test_pattern_type_names() {
+        assert!(!PatternType::Gartley.name_en().is_empty());
+        assert!(!PatternType::Gartley.name_zh().is_empty());
+        assert!(!PatternType::Bat.name_en().is_empty());
+        assert!(!PatternType::Butterfly.name_en().is_empty());
+    }
+
+    // ==================== Completion Probability Tests ====================
+
+    #[test]
+    fn test_calc_completion_probability_valid() {
+        let mut ratios = std::collections::HashMap::new();
+        ratios.insert("AB/XA".to_string(), 0.62);
+        ratios.insert("BC/AB".to_string(), 0.38);
+        let prob = calc_completion_probability(&ratios, PatternType::Gartley);
+        assert!(prob >= 0.0 && prob <= 1.0);
+    }
+
+    #[test]
+    fn test_calc_completion_probability_exact_ratios() {
+        // Perfect Gartley ratios should give higher probability
+        let mut ratios = std::collections::HashMap::new();
+        ratios.insert("AB/XA".to_string(), 0.618);
+        ratios.insert("BC/AB".to_string(), 0.786);
+        ratios.insert("CD/BC".to_string(), 1.27);
+        ratios.insert("AD/XA".to_string(), 0.786);
+        let prob = calc_completion_probability(&ratios, PatternType::Gartley);
+        assert!(prob >= 0.0 && prob <= 1.0);
+    }
+
+    // ==================== Target Price Tests ====================
+
+    #[test]
+    fn test_calc_target_prices_bullish() {
+        let pattern = HarmonicPattern {
+            pattern_type: "Gartley".to_string(),
+            x: SwingPoint {
+                index: 0,
+                price: 100.0,
+                is_high: false,
+            },
+            a: SwingPoint {
+                index: 10,
+                price: 150.0,
+                is_high: true,
+            },
+            b: SwingPoint {
+                index: 20,
+                price: 119.0,
+                is_high: false,
+            },
+            c: SwingPoint {
+                index: 30,
+                price: 140.0,
+                is_high: true,
+            },
+            d: SwingPoint {
+                index: 40,
+                price: 107.0,
+                is_high: false,
+            },
+            is_bullish: true,
+            ratios: std::collections::HashMap::new(),
+        };
+
+        let (t1, t2, t3) = calc_target_prices(&pattern, true);
+        // Bullish targets should be above D
+        assert!(t1 >= pattern.d.price);
+        assert!(t2 >= t1);
+        assert!(t3 >= t2);
+    }
+
+    #[test]
+    fn test_calc_target_prices_bearish() {
+        let pattern = HarmonicPattern {
+            pattern_type: "Gartley".to_string(),
+            x: SwingPoint {
+                index: 0,
+                price: 150.0,
+                is_high: true,
+            },
+            a: SwingPoint {
+                index: 10,
+                price: 100.0,
+                is_high: false,
+            },
+            b: SwingPoint {
+                index: 20,
+                price: 131.0,
+                is_high: true,
+            },
+            c: SwingPoint {
+                index: 30,
+                price: 110.0,
+                is_high: false,
+            },
+            d: SwingPoint {
+                index: 40,
+                price: 143.0,
+                is_high: true,
+            },
+            is_bullish: false,
+            ratios: std::collections::HashMap::new(),
+        };
+
+        let (t1, t2, t3) = calc_target_prices(&pattern, false);
+        // Bearish targets should be below D
+        assert!(t1 <= pattern.d.price);
+        assert!(t2 <= t1);
+        assert!(t3 <= t2);
+    }
+
+    // ==================== Harmonics Signal Tests ====================
+
+    #[test]
+    fn test_harmonics_signal_output_lengths() {
+        let n = 50;
+        let high: Vec<f64> = (0..n).map(|i| 100.0 + (i as f64).sin() * 10.0).collect();
+        let low: Vec<f64> = high.iter().map(|h| h - 3.0).collect();
+        let close: Vec<f64> = high.iter().zip(&low).map(|(h, l)| (h + l) / 2.0).collect();
+
+        let (signals, prz_u, prz_l, prob) = harmonics_signal(&high, &low, &close, 2, 2, 0.5);
+
+        assert_eq!(signals.len(), n);
+        assert_eq!(prz_u.len(), n);
+        assert_eq!(prz_l.len(), n);
+        assert_eq!(prob.len(), n);
+    }
+
+    #[test]
+    fn test_harmonics_signal_valid_values() {
+        let high = vec![10.0, 15.0, 12.0, 18.0, 14.0, 20.0, 16.0, 22.0, 18.0, 24.0];
+        let low: Vec<f64> = high.iter().map(|h| h - 2.0).collect();
+        let close: Vec<f64> = high.iter().zip(&low).map(|(h, l)| (h + l) / 2.0).collect();
+
+        let (signals, _, _, prob) = harmonics_signal(&high, &low, &close, 1, 1, 0.5);
+
+        // Signals should be -1, 0, or 1
+        for s in &signals {
+            assert!(*s == -1.0 || *s == 0.0 || *s == 1.0 || s.is_nan());
+        }
+
+        // Probabilities should be between 0 and 1
+        for p in &prob {
+            if !p.is_nan() {
+                assert!(*p >= 0.0 && *p <= 1.0);
+            }
+        }
+    }
+
+    // ==================== Extended Detection Tests ====================
+
+    #[test]
+    fn test_detect_all_harmonics_ext_output() {
+        // Create price data that might form patterns
+        // Alternating highs and lows to create swing points
+        let high: Vec<f64> = (0..50)
+            .map(|i| 100.0 + (i as f64 * 0.1).sin() * 30.0)
+            .collect();
+        let low: Vec<f64> = high.iter().map(|h| h - 5.0).collect();
+
+        let results = detect_all_harmonics_ext(&high, &low, 2, 2, true);
+        // May or may not find patterns, but should not panic
+        // Result length is valid if it returns
+        let _ = results.len();
+    }
+
+    // ==================== Edge Case Tests ====================
+
+    #[test]
+    fn test_detect_swing_points_flat_price() {
+        // All prices the same - function should handle gracefully
+        let high = vec![100.0; 10];
+        let low = vec![99.0; 10];
+        let swings = detect_swing_points(&high, &low, 1, 1);
+        // The key is it should not panic and produce valid SwingPoints
+        // Each swing should have valid fields
+        for s in &swings {
+            assert!(s.price.is_finite());
+            assert!(s.index < 10);
+        }
+    }
+
+    #[test]
+    fn test_detect_swing_points_monotonic_increase() {
+        // Strictly increasing - minimal swings
+        let high: Vec<f64> = (0..10).map(|i| 100.0 + i as f64).collect();
+        let low: Vec<f64> = (0..10).map(|i| 99.0 + i as f64).collect();
+        let swings = detect_swing_points(&high, &low, 1, 1);
+        // May find end points only
+        assert!(swings.len() <= 2);
+    }
+
+    #[test]
+    fn test_pattern_with_zero_prices() {
+        let swings = vec![
+            SwingPoint {
+                index: 0,
+                price: 0.0,
+                is_high: false,
+            },
+            SwingPoint {
+                index: 10,
+                price: 100.0,
+                is_high: true,
+            },
+            SwingPoint {
+                index: 20,
+                price: 50.0,
+                is_high: false,
+            },
+            SwingPoint {
+                index: 30,
+                price: 80.0,
+                is_high: true,
+            },
+            SwingPoint {
+                index: 40,
+                price: 30.0,
+                is_high: false,
+            },
+        ];
+
+        // Should handle gracefully without division by zero
+        let patterns = detect_gartley(&swings);
+        // Result may be empty, but should not panic
+        // Function returns successfully
+        let _ = patterns.len();
+    }
+
+    #[test]
+    fn test_prz_with_negative_prices() {
+        // Some assets can have negative prices (e.g., oil futures)
+        let x = SwingPoint {
+            index: 0,
+            price: -10.0,
+            is_high: false,
+        };
+        let a = SwingPoint {
+            index: 10,
+            price: 20.0,
+            is_high: true,
+        };
+        let b = SwingPoint {
+            index: 20,
+            price: 0.0,
+            is_high: false,
+        };
+        let c = SwingPoint {
+            index: 30,
+            price: 15.0,
+            is_high: true,
+        };
+
+        let prz = calculate_prz(&x, &a, &b, &c, PatternType::Gartley);
+        // Should handle gracefully
+        assert!(prz.price_high > prz.price_low);
+    }
+}

@@ -1,6 +1,6 @@
 [package]
 name = "haze-library"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 description = "Rust backend for Haze quantitative trading indicators library"
 license = "CC-BY-NC-4.0"
@@ -64,10 +64,10 @@ full = ["python", "streaming"]  # 暂时移除 polars
 
 [profile.release]
 opt-level = 3           # 最高优化级别
-lto = "fat"             # 全程序链接时优化
+lto = "thin"            # 使用thin LTO避免过度优化Python导出函数
 codegen-units = 1       # 单代码生成单元，更好优化
 panic = "abort"         # 减少二进制大小
-strip = true            # 剥离符号
+strip = false           # 保留符号表，确保Python FFI导出
 
 [profile.release-with-debug]
 inherits = "release"

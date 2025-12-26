@@ -1,5 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
+use haze_library::indicators::pandas_ta_compat as p;
 use haze_library::utils;
 
 fn bench_stats_hotspots(c: &mut Criterion) {
@@ -182,5 +183,69 @@ fn bench_stats_hotspots(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_stats_hotspots);
+fn bench_pandas_ta_compat_hotspots(c: &mut Criterion) {
+    let mut group = c.benchmark_group("pandas_ta_compat_hotspots");
+    group.sample_size(10);
+
+    let n = 100_000usize;
+    let close: Vec<f64> = (0..n)
+        .map(|i| 100.0 + (i as f64 * 0.01).sin() + (i as f64 * 0.001).cos())
+        .collect();
+    let high: Vec<f64> = close.iter().map(|&v| v + 1.0).collect();
+    let low: Vec<f64> = close.iter().map(|&v| v - 1.0).collect();
+
+    group.bench_function("ht_trendline_prenan63", |b| {
+        b.iter(|| {
+            let out = p::ht_trendline(black_box(&close), black_box(63)).unwrap();
+            black_box(out[n - 1]);
+        })
+    });
+
+    group.bench_function("jma_len7_phase0", |b| {
+        b.iter(|| {
+            let out = p::jma(black_box(&close), black_box(7), black_box(0.0)).unwrap();
+            black_box(out[n - 1]);
+        })
+    });
+
+    group.bench_function("zigzag_legs10_dev5", |b| {
+        b.iter(|| {
+            let out = p::zigzag(black_box(&high), black_box(&low), 10, 5.0, false, 0).unwrap();
+            black_box(out.len());
+        })
+    });
+
+    group.bench_function("squeeze_pro_defaultish", |b| {
+        b.iter(|| {
+            let out = p::squeeze_pro(
+                black_box(&high),
+                black_box(&low),
+                black_box(&close),
+                20,
+                2.0,
+                20,
+                1.0,
+                1.5,
+                2.0,
+                12,
+                6,
+                true,
+                "sma",
+                false,
+                true,
+                false,
+            )
+            .unwrap();
+            black_box(out.len());
+        })
+    });
+
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_stats_hotspots,
+    bench_pandas_ta_compat_hotspots
+);
 criterion_main!(benches);

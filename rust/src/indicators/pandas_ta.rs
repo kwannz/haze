@@ -7,8 +7,10 @@
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::needless_range_loop)]
 
+use crate::errors::validation::{
+    validate_lengths_match, validate_not_empty, validate_period, validate_same_length,
+};
 use crate::errors::{HazeError, HazeResult};
-use crate::errors::validation::{validate_not_empty, validate_period, validate_same_length, validate_lengths_match};
 use crate::indicators::{atr, bollinger_bands, keltner_channel, rsi};
 use crate::init_result;
 use crate::utils::math::{is_not_zero, is_zero};
@@ -31,12 +33,15 @@ pub fn entropy(close: &[f64], period: usize, bins: usize) -> HazeResult<Vec<f64>
     // [1] 入口验证
     validate_not_empty(close, "close")?;
     if period == 0 || bins == 0 {
-        return Err(HazeError::InvalidPeriod { period, data_len: close.len() });
+        return Err(HazeError::InvalidPeriod {
+            period,
+            data_len: close.len(),
+        });
     }
     if period > close.len() {
         return Err(HazeError::InsufficientData {
             required: period,
-            actual: close.len()
+            actual: close.len(),
         });
     }
 
@@ -123,11 +128,7 @@ pub fn aberration(
 ) -> HazeResult<Vec<f64>> {
     // [1] 入口验证
     validate_not_empty(high, "high")?;
-    validate_lengths_match(&[
-        (high, "high"),
-        (low, "low"),
-        (close, "close"),
-    ])?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
     validate_period(period, close.len())?;
     validate_period(atr_period, close.len())?;
 
@@ -136,7 +137,8 @@ pub fn aberration(
     let ma = sma(close, period)?;
     let atr_values = atr(high, low, close, atr_period)?;
 
-    let result = ma.iter()
+    let result = ma
+        .iter()
         .zip(&atr_values)
         .zip(close)
         .map(|((&ma_val, &atr_val), &c)| {
@@ -186,11 +188,7 @@ pub fn squeeze(
 ) -> HazeResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
     // [1] 入口验证
     validate_not_empty(high, "high")?;
-    validate_lengths_match(&[
-        (high, "high"),
-        (low, "low"),
-        (close, "close"),
-    ])?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
     validate_period(bb_period, close.len())?;
     validate_period(kc_period, close.len())?;
     validate_period(kc_atr_period, close.len())?;
@@ -202,7 +200,8 @@ pub fn squeeze(
     let (bb_upper, _, bb_lower) = bollinger_bands(close, bb_period, bb_std)?;
 
     // Keltner Channel
-    let (kc_upper, _, kc_lower) = keltner_channel(high, low, close, kc_period, kc_atr_period, kc_mult)?;
+    let (kc_upper, _, kc_lower) =
+        keltner_channel(high, low, close, kc_period, kc_atr_period, kc_mult)?;
 
     let mut squeeze_on = vec![0.0; n];
     let mut squeeze_off = vec![0.0; n];
@@ -437,7 +436,8 @@ pub fn bias(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     // [2] 计算逻辑
     let ma = sma(close, period)?;
 
-    let result = ma.iter()
+    let result = ma
+        .iter()
         .zip(close)
         .map(|(&ma_val, &c)| {
             if ma_val.is_nan() || is_zero(ma_val) {
@@ -1005,11 +1005,7 @@ pub fn smi(
 ) -> HazeResult<Vec<f64>> {
     // [1] 入口验证
     validate_not_empty(high, "high")?;
-    validate_lengths_match(&[
-        (high, "high"),
-        (low, "low"),
-        (close, "close"),
-    ])?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
     validate_period(period, high.len())?;
     validate_period(smooth1, high.len())?;
     validate_period(smooth2, high.len())?;
@@ -1076,7 +1072,12 @@ pub fn smi(
 ///
 /// # 返回
 /// - Coppock 值
-pub fn coppock(close: &[f64], period1: usize, period2: usize, wma_period: usize) -> HazeResult<Vec<f64>> {
+pub fn coppock(
+    close: &[f64],
+    period1: usize,
+    period2: usize,
+    wma_period: usize,
+) -> HazeResult<Vec<f64>> {
     // [1] 入口验证
     validate_not_empty(close, "close")?;
     let max_period = period1.max(period2);
@@ -1106,7 +1107,10 @@ pub fn coppock(close: &[f64], period1: usize, period2: usize, wma_period: usize)
 fn wma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     let n = values.len();
     if period == 0 || period > n {
-        return Err(HazeError::InvalidPeriod { period, data_len: n });
+        return Err(HazeError::InvalidPeriod {
+            period,
+            data_len: n,
+        });
     }
 
     let mut result = init_result!(n);
@@ -1149,18 +1153,15 @@ fn wma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 pub fn pgo(high: &[f64], low: &[f64], close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     // [1] 入口验证
     validate_not_empty(high, "high")?;
-    validate_lengths_match(&[
-        (high, "high"),
-        (low, "low"),
-        (close, "close"),
-    ])?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
     validate_period(period, close.len())?;
 
     // [2] 计算逻辑
     let ma = sma(close, period)?;
     let atr_values = atr(high, low, close, period)?;
 
-    let result = ma.iter()
+    let result = ma
+        .iter()
         .zip(&atr_values)
         .zip(close)
         .map(|((&ma_val, &atr_val), &c)| {
@@ -1474,7 +1475,8 @@ pub fn bop(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult
     ])?;
 
     // [2] 计算逻辑
-    let result = open.iter()
+    let result = open
+        .iter()
         .zip(high)
         .zip(low)
         .zip(close)
@@ -1514,11 +1516,7 @@ pub fn ssl_channel(
 ) -> HazeResult<(Vec<f64>, Vec<f64>)> {
     // [1] 入口验证
     validate_not_empty(high, "high")?;
-    validate_lengths_match(&[
-        (high, "high"),
-        (low, "low"),
-        (close, "close"),
-    ])?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
     validate_period(period, high.len())?;
 
     // [2] 计算逻辑
@@ -1752,5 +1750,639 @@ mod tests {
 
         // 有效值检查
         assert!(!result[2].is_nan());
+    }
+}
+
+/// Comprehensive boundary tests for pandas-ta module
+#[cfg(test)]
+mod boundary_tests {
+    use super::*;
+    use crate::errors::HazeError;
+
+    // ==================== Empty Input Tests ====================
+
+    #[test]
+    fn test_aberration_empty_input() {
+        // aberration(high, low, close, period, atr_period)
+        let result = aberration(&[], &[], &[], 10, 10);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_squeeze_empty_input() {
+        // squeeze(high, low, close, bb_period, bb_std, kc_period, kc_atr_period, kc_mult)
+        let result = squeeze(&[], &[], &[], 20, 2.0, 20, 10, 1.5);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_qqe_empty_input() {
+        // qqe(close, rsi_period, smooth: usize, multiplier: f64)
+        let result = qqe(&[], 14, 5, 4.236);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_cti_empty_input() {
+        let result = cti(&[], 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_er_empty_input() {
+        let result = er(&[], 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_rvi_empty_input() {
+        // rvi(open, high, low, close, period, signal_period)
+        let result = rvi(&[], &[], &[], &[], 10, 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_inertia_empty_input() {
+        // inertia(open, high, low, close, rvi_period, regression_period)
+        let result = inertia(&[], &[], &[], &[], 10, 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_alligator_empty_input() {
+        let result = alligator(&[], &[], 13, 8, 5);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_efi_empty_input() {
+        let result = efi(&[], &[], 13);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_kst_empty_input() {
+        // kst(close, roc1, roc2, roc3, roc4, signal_period)
+        let result = kst(&[], 10, 15, 20, 30, 9);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_stc_empty_input() {
+        let result = stc(&[], 23, 50, 10);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_tdfi_empty_input() {
+        let result = tdfi(&[], 20, 5);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_wae_empty_input() {
+        // wae(close, fast, slow, signal, bb_period, multiplier)
+        let result = wae(&[], 20, 40, 20, 20, 2.0);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_smi_empty_input() {
+        let result = smi(&[], &[], &[], 13, 25, 2);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_coppock_empty_input() {
+        let result = coppock(&[], 14, 11, 10);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_pgo_empty_input() {
+        let result = pgo(&[], &[], &[], 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_vwma_empty_input() {
+        let result = vwma(&[], &[], 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_alma_empty_input() {
+        let result = alma(&[], 9, 0.85, 6.0);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_vidya_empty_input() {
+        let result = vidya(&[], 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_pwma_empty_input() {
+        let result = pwma(&[], 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_sinwma_empty_input() {
+        let result = sinwma(&[], 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_swma_empty_input() {
+        let result = swma(&[], 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_bop_empty_input() {
+        let result = bop(&[], &[], &[], &[]);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_ssl_channel_empty_input() {
+        let result = ssl_channel(&[], &[], &[], 10);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_cfo_empty_input() {
+        let result = cfo(&[], 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_slope_empty_input() {
+        let result = slope(&[], 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_percent_rank_empty_input() {
+        let result = percent_rank(&[], 14);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    // ==================== Invalid Period Tests ====================
+
+    #[test]
+    fn test_cti_period_zero() {
+        let close = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let result = cti(&close, 0);
+        assert!(matches!(
+            result,
+            Err(HazeError::InvalidPeriod { period: 0, .. })
+        ));
+    }
+
+    #[test]
+    fn test_er_period_zero() {
+        let close = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let result = er(&close, 0);
+        assert!(matches!(
+            result,
+            Err(HazeError::InvalidPeriod { period: 0, .. })
+        ));
+    }
+
+    #[test]
+    fn test_slope_period_zero() {
+        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let result = slope(&values, 0);
+        assert!(matches!(
+            result,
+            Err(HazeError::InvalidPeriod { period: 0, .. })
+        ));
+    }
+
+    #[test]
+    fn test_pwma_period_zero() {
+        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let result = pwma(&values, 0);
+        assert!(matches!(
+            result,
+            Err(HazeError::InvalidPeriod { period: 0, .. })
+        ));
+    }
+
+    #[test]
+    fn test_sinwma_period_zero() {
+        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let result = sinwma(&values, 0);
+        assert!(matches!(
+            result,
+            Err(HazeError::InvalidPeriod { period: 0, .. })
+        ));
+    }
+
+    #[test]
+    fn test_swma_period_zero() {
+        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let result = swma(&values, 0);
+        assert!(matches!(
+            result,
+            Err(HazeError::InvalidPeriod { period: 0, .. })
+        ));
+    }
+
+    // ==================== Length Mismatch Tests ====================
+
+    #[test]
+    fn test_aberration_length_mismatch() {
+        // aberration(high, low, close, period, atr_period)
+        let high = vec![105.0, 106.0, 107.0];
+        let low = vec![95.0, 96.0]; // shorter
+        let close = vec![100.0, 101.0, 102.0];
+        let result = aberration(&high, &low, &close, 2, 2);
+        assert!(matches!(result, Err(HazeError::LengthMismatch { .. })));
+    }
+
+    #[test]
+    fn test_squeeze_length_mismatch() {
+        // squeeze(high, low, close, bb_period, bb_std, kc_period, kc_atr_period, kc_mult)
+        let high = vec![105.0, 106.0];
+        let low = vec![95.0, 96.0, 97.0]; // longer
+        let close = vec![100.0, 101.0];
+        let result = squeeze(&high, &low, &close, 2, 2.0, 2, 2, 1.5);
+        assert!(matches!(result, Err(HazeError::LengthMismatch { .. })));
+    }
+
+    #[test]
+    fn test_rvi_length_mismatch() {
+        // rvi(open, high, low, close, period, signal_period)
+        let open = vec![100.0, 101.0, 102.0];
+        let high = vec![105.0, 106.0, 107.0];
+        let low = vec![95.0, 96.0]; // shorter
+        let close = vec![100.0, 101.0, 102.0];
+        let result = rvi(&open, &high, &low, &close, 10, 14);
+        assert!(matches!(result, Err(HazeError::LengthMismatch { .. })));
+    }
+
+    #[test]
+    fn test_smi_length_mismatch() {
+        let high = vec![105.0, 106.0, 107.0];
+        let low = vec![95.0, 96.0]; // shorter
+        let close = vec![100.0, 101.0, 102.0];
+        let result = smi(&high, &low, &close, 13, 25, 2);
+        assert!(matches!(result, Err(HazeError::LengthMismatch { .. })));
+    }
+
+    #[test]
+    fn test_pgo_length_mismatch() {
+        let high = vec![105.0, 106.0, 107.0];
+        let low = vec![95.0, 96.0]; // shorter
+        let close = vec![100.0, 101.0, 102.0];
+        let result = pgo(&high, &low, &close, 14);
+        assert!(matches!(result, Err(HazeError::LengthMismatch { .. })));
+    }
+
+    #[test]
+    fn test_efi_length_mismatch() {
+        let close = vec![100.0, 101.0, 102.0];
+        let volume = vec![1000.0, 1100.0]; // shorter
+        let result = efi(&close, &volume, 13);
+        assert!(matches!(result, Err(HazeError::LengthMismatch { .. })));
+    }
+
+    #[test]
+    fn test_vwma_length_mismatch() {
+        let close = vec![100.0, 101.0, 102.0];
+        let volume = vec![1000.0, 1100.0]; // shorter
+        let result = vwma(&close, &volume, 3);
+        assert!(matches!(result, Err(HazeError::LengthMismatch { .. })));
+    }
+
+    #[test]
+    fn test_bop_length_mismatch() {
+        let open = vec![100.0, 101.0, 102.0];
+        let high = vec![105.0, 106.0]; // shorter
+        let low = vec![95.0, 96.0, 97.0];
+        let close = vec![101.0, 102.0, 103.0];
+        let result = bop(&open, &high, &low, &close);
+        assert!(matches!(result, Err(HazeError::LengthMismatch { .. })));
+    }
+
+    #[test]
+    fn test_ssl_channel_length_mismatch() {
+        let high = vec![105.0, 106.0, 107.0];
+        let low = vec![95.0, 96.0]; // shorter
+        let close = vec![100.0, 101.0, 102.0];
+        let result = ssl_channel(&high, &low, &close, 10);
+        assert!(matches!(result, Err(HazeError::LengthMismatch { .. })));
+    }
+
+    // ==================== Valid Output Tests ====================
+
+    #[test]
+    fn test_aberration_valid() {
+        // aberration(high, low, close, period, atr_period) -> Vec<f64>
+        let high = vec![
+            105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0, 113.0, 114.0, 115.0,
+        ];
+        let low = vec![
+            95.0, 96.0, 97.0, 98.0, 99.0, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0,
+        ];
+        let close = vec![
+            100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0,
+        ];
+        let result = aberration(&high, &low, &close, 5, 5).unwrap();
+        assert_eq!(result.len(), 11);
+    }
+
+    #[test]
+    fn test_squeeze_valid() {
+        // squeeze(high, low, close, bb_period, bb_std, kc_period, kc_atr_period, kc_mult) -> (Vec, Vec, Vec)
+        let data: Vec<f64> = (0..50).map(|i| 100.0 + (i as f64) * 0.5).collect();
+        let high: Vec<f64> = data.iter().map(|&x| x + 5.0).collect();
+        let low: Vec<f64> = data.iter().map(|&x| x - 5.0).collect();
+        let (sqz, sqz_on, sqz_off) = squeeze(&high, &low, &data, 20, 2.0, 20, 10, 1.5).unwrap();
+        assert_eq!(sqz.len(), 50);
+        assert_eq!(sqz_on.len(), 50);
+        assert_eq!(sqz_off.len(), 50);
+    }
+
+    #[test]
+    fn test_qqe_valid() {
+        let close: Vec<f64> = (0..30).map(|i| 100.0 + (i as f64) * 0.5).collect();
+        // qqe(close, rsi_period, smooth: usize, multiplier: f64)
+        let (qqe_line, qqe_signal, histogram) = qqe(&close, 14, 5, 4.236).unwrap();
+        assert_eq!(qqe_line.len(), 30);
+        assert_eq!(qqe_signal.len(), 30);
+        assert_eq!(histogram.len(), 30);
+    }
+
+    #[test]
+    fn test_rvi_valid() {
+        // rvi(open, high, low, close, period, signal_period)
+        let open: Vec<f64> = (0..30).map(|i| 100.0 + i as f64).collect();
+        let high: Vec<f64> = (0..30).map(|i| 105.0 + i as f64).collect();
+        let low: Vec<f64> = (0..30).map(|i| 95.0 + i as f64).collect();
+        let close: Vec<f64> = (0..30).map(|i| 102.0 + i as f64).collect();
+        let (rvi_line, signal) = rvi(&open, &high, &low, &close, 10, 14).unwrap();
+        assert_eq!(rvi_line.len(), 30);
+        assert_eq!(signal.len(), 30);
+    }
+
+    #[test]
+    fn test_inertia_valid() {
+        // inertia(open, high, low, close, rvi_period, regression_period)
+        let open: Vec<f64> = (0..30).map(|i| 100.0 + i as f64).collect();
+        let high: Vec<f64> = (0..30).map(|i| 105.0 + i as f64).collect();
+        let low: Vec<f64> = (0..30).map(|i| 95.0 + i as f64).collect();
+        let close: Vec<f64> = (0..30).map(|i| 102.0 + i as f64).collect();
+        let result = inertia(&open, &high, &low, &close, 10, 14).unwrap();
+        assert_eq!(result.len(), 30);
+    }
+
+    #[test]
+    fn test_alligator_valid() {
+        let high: Vec<f64> = (0..30).map(|i| 105.0 + i as f64).collect();
+        let low: Vec<f64> = (0..30).map(|i| 95.0 + i as f64).collect();
+        let (jaw, teeth, lips) = alligator(&high, &low, 13, 8, 5).unwrap();
+        assert_eq!(jaw.len(), 30);
+        assert_eq!(teeth.len(), 30);
+        assert_eq!(lips.len(), 30);
+    }
+
+    #[test]
+    fn test_efi_valid() {
+        let close = vec![
+            100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0,
+        ];
+        let volume = vec![
+            1000.0, 1100.0, 1050.0, 1200.0, 1150.0, 1300.0, 1250.0, 1400.0, 1350.0, 1500.0,
+        ];
+        let result = efi(&close, &volume, 5).unwrap();
+        assert_eq!(result.len(), 10);
+    }
+
+    #[test]
+    fn test_kst_valid() {
+        let close: Vec<f64> = (0..60).map(|i| 100.0 + (i as f64).sin() * 5.0).collect();
+        // kst(close, roc1, roc2, roc3, roc4, signal_period)
+        let (kst_line, signal) = kst(&close, 10, 15, 20, 30, 9).unwrap();
+        assert_eq!(kst_line.len(), 60);
+        assert_eq!(signal.len(), 60);
+    }
+
+    #[test]
+    fn test_stc_valid() {
+        let close: Vec<f64> = (0..70).map(|i| 100.0 + (i as f64).sin() * 10.0).collect();
+        let result = stc(&close, 23, 50, 10).unwrap();
+        assert_eq!(result.len(), 70);
+    }
+
+    #[test]
+    fn test_tdfi_valid() {
+        let close: Vec<f64> = (0..30).map(|i| 100.0 + i as f64).collect();
+        let result = tdfi(&close, 20, 5).unwrap();
+        assert_eq!(result.len(), 30);
+    }
+
+    #[test]
+    fn test_wae_valid() {
+        let close: Vec<f64> = (0..50).map(|i| 100.0 + (i as f64).sin() * 5.0).collect();
+        // wae(close, fast, slow, signal, bb_period, multiplier)
+        let (trend, explosion) = wae(&close, 20, 40, 20, 20, 2.0).unwrap();
+        assert_eq!(trend.len(), 50);
+        assert_eq!(explosion.len(), 50);
+    }
+
+    #[test]
+    fn test_smi_valid() {
+        let high: Vec<f64> = (0..40).map(|i| 105.0 + (i as f64).sin() * 3.0).collect();
+        let low: Vec<f64> = (0..40).map(|i| 95.0 + (i as f64).sin() * 3.0).collect();
+        let close: Vec<f64> = (0..40).map(|i| 100.0 + (i as f64).sin() * 3.0).collect();
+        // smi returns Vec<f64>, not a tuple
+        let result = smi(&high, &low, &close, 13, 25, 2).unwrap();
+        assert_eq!(result.len(), 40);
+    }
+
+    #[test]
+    fn test_coppock_valid() {
+        let close: Vec<f64> = (0..50).map(|i| 100.0 + i as f64).collect();
+        let result = coppock(&close, 14, 11, 10).unwrap();
+        assert_eq!(result.len(), 50);
+    }
+
+    #[test]
+    fn test_pgo_valid() {
+        let high: Vec<f64> = (0..20).map(|i| 105.0 + i as f64).collect();
+        let low: Vec<f64> = (0..20).map(|i| 95.0 + i as f64).collect();
+        let close: Vec<f64> = (0..20).map(|i| 100.0 + i as f64).collect();
+        let result = pgo(&high, &low, &close, 14).unwrap();
+        assert_eq!(result.len(), 20);
+    }
+
+    #[test]
+    fn test_alma_valid() {
+        let values: Vec<f64> = (0..20).map(|i| 100.0 + i as f64).collect();
+        let result = alma(&values, 9, 0.85, 6.0).unwrap();
+        assert_eq!(result.len(), 20);
+        // Check warmup period is NaN
+        assert!(result[0].is_nan());
+        // Check valid values after warmup
+        assert!(!result[9].is_nan());
+    }
+
+    #[test]
+    fn test_vidya_valid() {
+        let close: Vec<f64> = (0..30).map(|i| 100.0 + i as f64).collect();
+        let result = vidya(&close, 14).unwrap();
+        assert_eq!(result.len(), 30);
+    }
+
+    #[test]
+    fn test_pwma_valid() {
+        let values: Vec<f64> = (0..20).map(|i| 100.0 + i as f64).collect();
+        let result = pwma(&values, 5).unwrap();
+        assert_eq!(result.len(), 20);
+        // Check warmup period is NaN
+        assert!(result[0].is_nan());
+        // Check valid values after warmup
+        assert!(!result[4].is_nan());
+    }
+
+    #[test]
+    fn test_sinwma_valid() {
+        let values: Vec<f64> = (0..20).map(|i| 100.0 + i as f64).collect();
+        let result = sinwma(&values, 5).unwrap();
+        assert_eq!(result.len(), 20);
+    }
+
+    #[test]
+    fn test_swma_valid() {
+        let values: Vec<f64> = (0..20).map(|i| 100.0 + i as f64).collect();
+        let result = swma(&values, 5).unwrap();
+        assert_eq!(result.len(), 20);
+    }
+
+    #[test]
+    fn test_bop_valid() {
+        let open = vec![100.0, 101.0, 102.0, 103.0, 104.0];
+        let high = vec![105.0, 106.0, 107.0, 108.0, 109.0];
+        let low = vec![95.0, 96.0, 97.0, 98.0, 99.0];
+        let close = vec![103.0, 104.0, 105.0, 106.0, 107.0];
+        let result = bop(&open, &high, &low, &close).unwrap();
+        assert_eq!(result.len(), 5);
+        // BOP should be positive for bullish closes
+        assert!(result.iter().all(|&v| v > 0.0));
+    }
+
+    #[test]
+    fn test_ssl_channel_valid() {
+        let high: Vec<f64> = (0..20).map(|i| 105.0 + i as f64).collect();
+        let low: Vec<f64> = (0..20).map(|i| 95.0 + i as f64).collect();
+        let close: Vec<f64> = (0..20).map(|i| 100.0 + i as f64).collect();
+        let (ssl_down, ssl_up) = ssl_channel(&high, &low, &close, 10).unwrap();
+        assert_eq!(ssl_down.len(), 20);
+        assert_eq!(ssl_up.len(), 20);
+    }
+
+    #[test]
+    fn test_cfo_valid() {
+        let close: Vec<f64> = (0..20).map(|i| 100.0 + i as f64).collect();
+        let result = cfo(&close, 14).unwrap();
+        assert_eq!(result.len(), 20);
+    }
+
+    #[test]
+    fn test_slope_valid() {
+        let values: Vec<f64> = (0..20).map(|i| 100.0 + i as f64 * 2.0).collect();
+        let result = slope(&values, 10).unwrap();
+        assert_eq!(result.len(), 20);
+        // For perfect linear trend, slope should be approximately constant
+        assert!(!result[9].is_nan());
+    }
+
+    #[test]
+    fn test_percent_rank_valid() {
+        let values = vec![10.0, 20.0, 30.0, 25.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0];
+        let result = percent_rank(&values, 5).unwrap();
+        assert_eq!(result.len(), 10);
+        // Percent rank should be between 0 and 100
+        for i in 4..10 {
+            assert!(!result[i].is_nan());
+            assert!(result[i] >= 0.0 && result[i] <= 100.0);
+        }
+    }
+
+    // ==================== NaN Handling Tests ====================
+
+    #[test]
+    fn test_cti_nan_handling() {
+        let close = vec![f64::NAN, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0];
+        let result = cti(&close, 3).unwrap();
+        assert_eq!(result.len(), 7);
+        // NaN input should propagate
+        assert!(result[0].is_nan());
+    }
+
+    #[test]
+    fn test_er_nan_handling() {
+        let close = vec![100.0, f64::NAN, 102.0, 103.0, 104.0, 105.0, 106.0];
+        let result = er(&close, 3).unwrap();
+        assert_eq!(result.len(), 7);
+    }
+
+    #[test]
+    fn test_slope_nan_handling() {
+        let values = vec![100.0, 101.0, f64::NAN, 103.0, 104.0];
+        let result = slope(&values, 3).unwrap();
+        assert_eq!(result.len(), 5);
+    }
+
+    // ==================== Period 1 Tests (Edge Case) ====================
+
+    #[test]
+    fn test_cti_period_one() {
+        let close = vec![100.0, 101.0, 102.0, 103.0, 104.0];
+        let result = cti(&close, 1).unwrap();
+        assert_eq!(result.len(), 5);
+    }
+
+    #[test]
+    fn test_slope_period_one() {
+        let values = vec![100.0, 101.0, 102.0, 103.0, 104.0];
+        let result = slope(&values, 1).unwrap();
+        assert_eq!(result.len(), 5);
+    }
+
+    // ==================== Extreme Value Tests ====================
+
+    #[test]
+    fn test_bop_zero_range() {
+        // When high == low, BOP calculation should handle division by zero
+        let open = vec![100.0, 100.0];
+        let high = vec![100.0, 100.0]; // Same as low
+        let low = vec![100.0, 100.0];
+        let close = vec![100.0, 100.0];
+        let result = bop(&open, &high, &low, &close).unwrap();
+        assert_eq!(result.len(), 2);
+        // Should return 0.0 or NaN for zero range, not panic
+    }
+
+    #[test]
+    fn test_er_constant_price() {
+        // ER with constant price should be 0 or NaN (no directional change)
+        let close = vec![100.0, 100.0, 100.0, 100.0, 100.0];
+        let result = er(&close, 3).unwrap();
+        assert_eq!(result.len(), 5);
+    }
+
+    #[test]
+    fn test_cti_perfect_uptrend() {
+        // Perfect linear uptrend should give CTI near 1
+        let close: Vec<f64> = (0..10).map(|i| 100.0 + i as f64).collect();
+        let result = cti(&close, 5).unwrap();
+        // Last values should be close to 1.0 or -1.0 for perfect trend
+        assert!(!result[9].is_nan());
     }
 }

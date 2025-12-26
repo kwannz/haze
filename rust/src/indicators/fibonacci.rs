@@ -134,13 +134,13 @@ pub fn dynamic_fib_retracement(prices: &[f64], lookback: usize) -> Vec<HashMap<S
         let start_idx = window
             .iter()
             .enumerate()
-            .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .min_by(|a, b| a.1.total_cmp(b.1))
             .unwrap()
             .0;
         let end_idx = window
             .iter()
             .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.total_cmp(b.1))
             .unwrap()
             .0;
 

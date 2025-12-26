@@ -75,6 +75,7 @@ pub mod ichimoku;
 pub mod momentum;
 pub mod overlap;
 pub mod pandas_ta;
+pub mod pandas_ta_compat;
 pub mod pivots;
 pub mod price_transform;
 pub mod sfg;

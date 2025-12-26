@@ -71,6 +71,29 @@ Performs comprehensive documentation quality checks.
 
 ---
 
+### 3. `quality_gate.sh` - One-Command Quality Gate
+
+Runs the local quality gate checks for this repo:
+- Python tests (`pytest`)
+- Type stub verification (`verify_type_stubs.py`)
+- Rust tests (`cargo test`)
+
+**Usage:**
+```bash
+# Run from repo root
+bash scripts/quality_gate.sh
+
+# Or make it executable once
+chmod +x scripts/quality_gate.sh
+./scripts/quality_gate.sh
+```
+
+**Notes:**
+- Prefers `./.venv/bin/python` if present; falls back to `python3`.
+- Runs `cargo test` with default features (avoids `--all-features` to prevent PyO3 linking issues).
+
+---
+
 ## CI/CD Integration
 
 Documentation is automatically built and checked on:

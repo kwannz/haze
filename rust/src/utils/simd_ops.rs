@@ -332,3 +332,639 @@ mod tests {
         assert!((min_vector(&values) - 1.0).abs() < 1e-10);
     }
 }
+
+// ==================== 边界条件测试 ====================
+
+#[cfg(test)]
+mod boundary_tests {
+    use super::*;
+
+    // ==================== 向量运算边界测试 ====================
+
+    #[test]
+    fn test_add_vectors_empty() {
+        let a: Vec<f64> = vec![];
+        let b: Vec<f64> = vec![];
+        let result = add_vectors(&a, &b);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_add_vectors_single() {
+        let a = vec![5.0];
+        let b = vec![3.0];
+        let result = add_vectors(&a, &b);
+        assert_eq!(result, vec![8.0]);
+    }
+
+    #[test]
+    fn test_add_vectors_with_nan() {
+        let a = vec![1.0, f64::NAN, 3.0];
+        let b = vec![4.0, 5.0, 6.0];
+        let result = add_vectors(&a, &b);
+        assert!((result[0] - 5.0).abs() < 1e-10);
+        assert!(result[1].is_nan());
+        assert!((result[2] - 9.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_add_vectors_with_infinity() {
+        let a = vec![f64::INFINITY, f64::NEG_INFINITY, 1.0];
+        let b = vec![1.0, 1.0, f64::INFINITY];
+        let result = add_vectors(&a, &b);
+        assert!(result[0].is_infinite() && result[0] > 0.0);
+        assert!(result[1].is_infinite() && result[1] < 0.0);
+        assert!(result[2].is_infinite() && result[2] > 0.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "Vector lengths must match")]
+    fn test_add_vectors_length_mismatch() {
+        let a = vec![1.0, 2.0];
+        let b = vec![1.0];
+        add_vectors(&a, &b);
+    }
+
+    #[test]
+    fn test_sub_vectors_empty() {
+        let a: Vec<f64> = vec![];
+        let b: Vec<f64> = vec![];
+        let result = sub_vectors(&a, &b);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_sub_vectors_single() {
+        let a = vec![10.0];
+        let b = vec![3.0];
+        let result = sub_vectors(&a, &b);
+        assert_eq!(result, vec![7.0]);
+    }
+
+    #[test]
+    fn test_sub_vectors_with_nan() {
+        let a = vec![1.0, f64::NAN, 3.0];
+        let b = vec![0.5, 2.0, 1.0];
+        let result = sub_vectors(&a, &b);
+        assert!((result[0] - 0.5).abs() < 1e-10);
+        assert!(result[1].is_nan());
+        assert!((result[2] - 2.0).abs() < 1e-10);
+    }
+
+    #[test]
+    #[should_panic(expected = "Vector lengths must match")]
+    fn test_sub_vectors_length_mismatch() {
+        let a = vec![1.0, 2.0, 3.0];
+        let b = vec![1.0, 2.0];
+        sub_vectors(&a, &b);
+    }
+
+    #[test]
+    fn test_mul_vectors_empty() {
+        let a: Vec<f64> = vec![];
+        let b: Vec<f64> = vec![];
+        let result = mul_vectors(&a, &b);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_mul_vectors_single() {
+        let a = vec![4.0];
+        let b = vec![5.0];
+        let result = mul_vectors(&a, &b);
+        assert_eq!(result, vec![20.0]);
+    }
+
+    #[test]
+    fn test_mul_vectors_with_zero() {
+        let a = vec![1.0, 0.0, 3.0];
+        let b = vec![0.0, 5.0, 6.0];
+        let result = mul_vectors(&a, &b);
+        assert_eq!(result, vec![0.0, 0.0, 18.0]);
+    }
+
+    #[test]
+    fn test_mul_vectors_with_nan() {
+        let a = vec![1.0, f64::NAN, 3.0];
+        let b = vec![2.0, 3.0, 4.0];
+        let result = mul_vectors(&a, &b);
+        assert!((result[0] - 2.0).abs() < 1e-10);
+        assert!(result[1].is_nan());
+        assert!((result[2] - 12.0).abs() < 1e-10);
+    }
+
+    #[test]
+    #[should_panic(expected = "Vector lengths must match")]
+    fn test_mul_vectors_length_mismatch() {
+        let a = vec![1.0];
+        let b = vec![1.0, 2.0];
+        mul_vectors(&a, &b);
+    }
+
+    #[test]
+    fn test_div_vectors_empty() {
+        let a: Vec<f64> = vec![];
+        let b: Vec<f64> = vec![];
+        let result = div_vectors(&a, &b);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_div_vectors_single() {
+        let a = vec![10.0];
+        let b = vec![2.0];
+        let result = div_vectors(&a, &b);
+        assert_eq!(result, vec![5.0]);
+    }
+
+    #[test]
+    fn test_div_vectors_by_zero() {
+        let a = vec![10.0, 0.0, 5.0];
+        let b = vec![0.0, 0.0, 2.5];
+        let result = div_vectors(&a, &b);
+        assert!(result[0].is_nan()); // 10/0 = NaN (defensive)
+        assert!(result[1].is_nan()); // 0/0 = NaN
+        assert!((result[2] - 2.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_div_vectors_with_nan() {
+        let a = vec![f64::NAN, 10.0];
+        let b = vec![2.0, f64::NAN];
+        let result = div_vectors(&a, &b);
+        assert!(result[0].is_nan());
+        assert!(result[1].is_nan());
+    }
+
+    #[test]
+    #[should_panic(expected = "Vector lengths must match")]
+    fn test_div_vectors_length_mismatch() {
+        let a = vec![1.0, 2.0, 3.0];
+        let b = vec![1.0];
+        div_vectors(&a, &b);
+    }
+
+    #[test]
+    fn test_scale_vector_empty() {
+        let a: Vec<f64> = vec![];
+        let result = scale_vector(&a, 5.0);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_scale_vector_by_zero() {
+        let a = vec![1.0, 2.0, 3.0];
+        let result = scale_vector(&a, 0.0);
+        assert_eq!(result, vec![0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_scale_vector_by_nan() {
+        let a = vec![1.0, 2.0, 3.0];
+        let result = scale_vector(&a, f64::NAN);
+        assert!(result.iter().all(|v| v.is_nan()));
+    }
+
+    #[test]
+    fn test_scale_vector_with_nan() {
+        let a = vec![1.0, f64::NAN, 3.0];
+        let result = scale_vector(&a, 2.0);
+        assert!((result[0] - 2.0).abs() < 1e-10);
+        assert!(result[1].is_nan());
+        assert!((result[2] - 6.0).abs() < 1e-10);
+    }
+
+    // ==================== 聚合操作边界测试 ====================
+
+    #[test]
+    fn test_sum_vector_empty() {
+        let a: Vec<f64> = vec![];
+        let result = sum_vector(&a);
+        assert!((result - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_sum_vector_single() {
+        let a = vec![42.0];
+        let result = sum_vector(&a);
+        assert!((result - 42.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_sum_vector_with_nan() {
+        let a = vec![1.0, f64::NAN, 3.0];
+        let result = sum_vector(&a);
+        assert!(result.is_nan());
+    }
+
+    #[test]
+    fn test_sum_vector_exact_chunk_size() {
+        // Test with exactly 8 elements (one chunk)
+        let a = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        let result = sum_vector(&a);
+        assert!((result - 36.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_sum_vector_multiple_chunks_with_remainder() {
+        // Test with 17 elements (2 chunks + 1 remainder)
+        let a: Vec<f64> = (1..=17).map(|x| x as f64).collect();
+        let result = sum_vector(&a);
+        let expected = 17.0 * 18.0 / 2.0; // Sum 1..17 = n(n+1)/2
+        assert!((result - expected).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_dot_product_empty() {
+        let a: Vec<f64> = vec![];
+        let b: Vec<f64> = vec![];
+        let result = dot_product(&a, &b);
+        assert!((result - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_dot_product_single() {
+        let a = vec![3.0];
+        let b = vec![4.0];
+        let result = dot_product(&a, &b);
+        assert!((result - 12.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_dot_product_with_nan() {
+        let a = vec![1.0, f64::NAN, 3.0];
+        let b = vec![2.0, 3.0, 4.0];
+        let result = dot_product(&a, &b);
+        assert!(result.is_nan());
+    }
+
+    #[test]
+    fn test_dot_product_exact_chunk_size() {
+        let a = vec![1.0; 8];
+        let b = vec![2.0; 8];
+        let result = dot_product(&a, &b);
+        assert!((result - 16.0).abs() < 1e-10);
+    }
+
+    #[test]
+    #[should_panic(expected = "Vector lengths must match")]
+    fn test_dot_product_length_mismatch() {
+        let a = vec![1.0, 2.0];
+        let b = vec![1.0, 2.0, 3.0];
+        dot_product(&a, &b);
+    }
+
+    #[test]
+    fn test_max_vector_empty() {
+        let a: Vec<f64> = vec![];
+        let result = max_vector(&a);
+        assert!(result == f64::NEG_INFINITY);
+    }
+
+    #[test]
+    fn test_max_vector_single() {
+        let a = vec![42.0];
+        let result = max_vector(&a);
+        assert!((result - 42.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_max_vector_all_same() {
+        let a = vec![5.0, 5.0, 5.0, 5.0];
+        let result = max_vector(&a);
+        assert!((result - 5.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_max_vector_with_nan() {
+        // NaN comparisons are tricky - NaN is not > any value
+        let a = vec![1.0, f64::NAN, 3.0];
+        let result = max_vector(&a);
+        // Since NaN > 3.0 is false, result should be 3.0
+        assert!((result - 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_max_vector_with_infinity() {
+        let a = vec![1.0, f64::INFINITY, 3.0];
+        let result = max_vector(&a);
+        assert!(result.is_infinite() && result > 0.0);
+    }
+
+    #[test]
+    fn test_max_vector_with_neg_infinity() {
+        let a = vec![f64::NEG_INFINITY, -100.0, -50.0];
+        let result = max_vector(&a);
+        assert!((result - (-50.0)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_min_vector_empty() {
+        let a: Vec<f64> = vec![];
+        let result = min_vector(&a);
+        assert!(result == f64::INFINITY);
+    }
+
+    #[test]
+    fn test_min_vector_single() {
+        let a = vec![42.0];
+        let result = min_vector(&a);
+        assert!((result - 42.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_min_vector_all_same() {
+        let a = vec![5.0, 5.0, 5.0, 5.0];
+        let result = min_vector(&a);
+        assert!((result - 5.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_min_vector_with_nan() {
+        let a = vec![1.0, f64::NAN, 3.0];
+        let result = min_vector(&a);
+        // Since NaN < 1.0 is false, result should be 1.0
+        assert!((result - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_min_vector_with_neg_infinity() {
+        let a = vec![1.0, f64::NEG_INFINITY, 3.0];
+        let result = min_vector(&a);
+        assert!(result.is_infinite() && result < 0.0);
+    }
+
+    #[test]
+    fn test_mean_vector_empty() {
+        let a: Vec<f64> = vec![];
+        let result = mean_vector(&a);
+        assert!(result.is_nan());
+    }
+
+    #[test]
+    fn test_mean_vector_single() {
+        let a = vec![42.0];
+        let result = mean_vector(&a);
+        assert!((result - 42.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_mean_vector_with_nan() {
+        let a = vec![1.0, f64::NAN, 3.0];
+        let result = mean_vector(&a);
+        assert!(result.is_nan());
+    }
+
+    #[test]
+    fn test_std_vector_empty() {
+        let a: Vec<f64> = vec![];
+        let result = std_vector(&a);
+        assert!(result.is_nan());
+    }
+
+    #[test]
+    fn test_std_vector_single() {
+        let a = vec![42.0];
+        let result = std_vector(&a);
+        // Single element - not enough for std dev
+        assert!(result.is_nan());
+    }
+
+    #[test]
+    fn test_std_vector_two_elements() {
+        let a = vec![0.0, 2.0];
+        let result = std_vector(&a);
+        // Mean = 1.0, variance = ((0-1)^2 + (2-1)^2)/2 = 1, std = 1
+        assert!((result - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_std_vector_all_same() {
+        let a = vec![5.0, 5.0, 5.0, 5.0];
+        let result = std_vector(&a);
+        // All same values -> std = 0
+        assert!((result - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_std_vector_with_nan() {
+        let a = vec![1.0, f64::NAN, 3.0];
+        let result = std_vector(&a);
+        assert!(result.is_nan());
+    }
+
+    // ==================== 快速指标边界测试 ====================
+
+    #[test]
+    fn test_fast_sma_empty() {
+        let a: Vec<f64> = vec![];
+        let result = fast_sma(&a, 3);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_fast_sma_period_zero() {
+        let a = vec![1.0, 2.0, 3.0];
+        let result = fast_sma(&a, 0);
+        assert!(result.iter().all(|v| v.is_nan()));
+    }
+
+    #[test]
+    fn test_fast_sma_period_one() {
+        let a = vec![1.0, 2.0, 3.0, 4.0];
+        let result = fast_sma(&a, 1);
+        // Period=1 means each value is its own SMA
+        assert!((result[0] - 1.0).abs() < 1e-10);
+        assert!((result[1] - 2.0).abs() < 1e-10);
+        assert!((result[2] - 3.0).abs() < 1e-10);
+        assert!((result[3] - 4.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_fast_sma_period_equals_length() {
+        let a = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let result = fast_sma(&a, 5);
+        // Only last value should have SMA
+        assert!(result[0..4].iter().all(|v| v.is_nan()));
+        assert!((result[4] - 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_fast_sma_period_exceeds_length() {
+        let a = vec![1.0, 2.0, 3.0];
+        let result = fast_sma(&a, 10);
+        assert!(result.iter().all(|v| v.is_nan()));
+    }
+
+    #[test]
+    fn test_fast_sma_with_nan() {
+        let a = vec![1.0, 2.0, f64::NAN, 4.0, 5.0];
+        let result = fast_sma(&a, 3);
+        // NaN will propagate through the window
+        assert!(result[2].is_nan()); // Window contains NaN
+        assert!(result[3].is_nan()); // Window contains NaN
+        assert!(result[4].is_nan()); // Window contains NaN
+    }
+
+    #[test]
+    fn test_fast_sma_large_values() {
+        let a = vec![1e15, 2e15, 3e15, 4e15, 5e15];
+        let result = fast_sma(&a, 3);
+        assert!((result[2] - 2e15).abs() < 1e5);
+        assert!((result[3] - 3e15).abs() < 1e5);
+        assert!((result[4] - 4e15).abs() < 1e5);
+    }
+
+    #[test]
+    fn test_fast_ema_empty() {
+        let a: Vec<f64> = vec![];
+        let result = fast_ema(&a, 3);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_fast_ema_period_zero() {
+        let a = vec![1.0, 2.0, 3.0];
+        let result = fast_ema(&a, 0);
+        assert!(result.iter().all(|v| v.is_nan()));
+    }
+
+    #[test]
+    fn test_fast_ema_period_one() {
+        let a = vec![1.0, 2.0, 3.0, 4.0];
+        let result = fast_ema(&a, 1);
+        // Period=1 means alpha=1, so EMA = each value
+        assert!((result[0] - 1.0).abs() < 1e-10);
+        assert!((result[1] - 2.0).abs() < 1e-10);
+        assert!((result[2] - 3.0).abs() < 1e-10);
+        assert!((result[3] - 4.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_fast_ema_period_equals_length() {
+        let a = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let result = fast_ema(&a, 5);
+        // Only last value should have EMA (initial = SMA)
+        assert!(result[0..4].iter().all(|v| v.is_nan()));
+        assert!((result[4] - 3.0).abs() < 1e-10); // SMA of 1-5 = 3
+    }
+
+    #[test]
+    fn test_fast_ema_period_exceeds_length() {
+        let a = vec![1.0, 2.0, 3.0];
+        let result = fast_ema(&a, 10);
+        assert!(result.iter().all(|v| v.is_nan()));
+    }
+
+    #[test]
+    fn test_fast_ema_constant_values() {
+        let a = vec![100.0; 20];
+        let result = fast_ema(&a, 5);
+        // EMA of constant values should equal the constant
+        for i in 4..20 {
+            assert!((result[i] - 100.0).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn test_batch_sma_empty_values() {
+        let a: Vec<f64> = vec![];
+        let periods = vec![3, 5, 10];
+        let results = batch_sma(&a, &periods);
+        assert_eq!(results.len(), 3);
+        assert!(results.iter().all(|v| v.is_empty()));
+    }
+
+    #[test]
+    fn test_batch_sma_empty_periods() {
+        let a = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let periods: Vec<usize> = vec![];
+        let results = batch_sma(&a, &periods);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_batch_sma_with_zero_period() {
+        let a = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let periods = vec![0, 3, 5];
+        let results = batch_sma(&a, &periods);
+        assert_eq!(results.len(), 3);
+        assert!(results[0].iter().all(|v| v.is_nan())); // Period 0
+        assert!(!results[1][2].is_nan()); // Period 3
+        assert!(!results[2][4].is_nan()); // Period 5
+    }
+
+    // ==================== 数值精度测试 ====================
+
+    #[test]
+    fn test_sum_vector_precision() {
+        // Test numerical precision with many small values
+        let a: Vec<f64> = (0..10000).map(|_| 0.0001).collect();
+        let result = sum_vector(&a);
+        let expected = 1.0;
+        assert!((result - expected).abs() < 1e-8);
+    }
+
+    #[test]
+    fn test_dot_product_precision() {
+        // Test with large number of elements
+        let a: Vec<f64> = (1..=1000).map(|x| x as f64).collect();
+        let b = vec![1.0; 1000];
+        let result = dot_product(&a, &b);
+        let expected = 1000.0 * 1001.0 / 2.0; // Sum of 1 to 1000
+        assert!((result - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_fast_sma_numerical_stability() {
+        // Test with values that could cause numerical instability
+        let a: Vec<f64> = (0..100).map(|i| 1e10 + i as f64).collect();
+        let result = fast_sma(&a, 10);
+        // Verify the output is reasonable
+        for i in 9..100 {
+            assert!(!result[i].is_nan());
+            assert!(result[i] >= 1e10);
+        }
+    }
+
+    // ==================== 集成测试 ====================
+
+    #[test]
+    fn test_vector_operations_chain() {
+        let a = vec![1.0, 2.0, 3.0, 4.0];
+        let b = vec![2.0, 2.0, 2.0, 2.0];
+
+        // (a + b) * 2
+        let sum = add_vectors(&a, &b);
+        let result = scale_vector(&sum, 2.0);
+        assert_eq!(result, vec![6.0, 8.0, 10.0, 12.0]);
+    }
+
+    #[test]
+    fn test_fast_sma_vs_manual() {
+        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+        let result = fast_sma(&values, 3);
+
+        // Verify against manual calculation
+        assert!((result[2] - (1.0 + 2.0 + 3.0) / 3.0).abs() < 1e-10);
+        assert!((result[3] - (2.0 + 3.0 + 4.0) / 3.0).abs() < 1e-10);
+        assert!((result[4] - (3.0 + 4.0 + 5.0) / 3.0).abs() < 1e-10);
+        assert!((result[5] - (4.0 + 5.0 + 6.0) / 3.0).abs() < 1e-10);
+        assert!((result[6] - (5.0 + 6.0 + 7.0) / 3.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_negative_values() {
+        let a = vec![-5.0, -3.0, -1.0, 1.0, 3.0, 5.0];
+        let b = vec![1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
+
+        let sum = sum_vector(&a);
+        assert!((sum - 0.0).abs() < 1e-10);
+
+        let mean = mean_vector(&a);
+        assert!((mean - 0.0).abs() < 1e-10);
+
+        let result = add_vectors(&a, &b);
+        assert_eq!(result, vec![-4.0, -2.0, 0.0, 2.0, 4.0, 6.0]);
+    }
+}

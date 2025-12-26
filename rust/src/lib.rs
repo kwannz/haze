@@ -47,143 +47,217 @@ type Vec7F64 = (
 #[cfg(feature = "python")]
 type Pivots9F64 = (f64, f64, f64, f64, f64, f64, f64, f64, f64);
 
+/// Creates a NaN-filled vector of specified length.
+///
+/// Used as fallback for graceful degradation when indicator
+/// calculations fail due to insufficient data or invalid parameters.
 #[cfg(feature = "python")]
+#[inline]
 fn nan_vec(len: usize) -> Vec<f64> {
     vec![f64::NAN; len]
 }
 
+/// Macro for graceful error handling in Python FFI.
+///
+/// Converts `HazeResult<T>` to `PyResult<T>`, returning NaN-filled
+/// fallback values for recoverable errors (empty input, insufficient
+/// data, invalid period) and propagating other errors to Python.
+///
+/// # Design Philosophy
+/// Follows the Fail-Safe principle: instead of raising exceptions for
+/// common edge cases like insufficient data, we return NaN vectors that
+/// are compatible with downstream processing in pandas/numpy.
+///
+/// # Usage
+/// ```ignore
+/// // Single vector
+/// ok_or_nan!(result, len)
+///
+/// // Tuple of 2 vectors
+/// ok_or_nan!(result, len, 2)
+///
+/// // Tuple of 3 vectors
+/// ok_or_nan!(result, len, 3)
+/// ```
 #[cfg(feature = "python")]
+macro_rules! ok_or_nan {
+    // Single vector case: ok_or_nan!(result, len)
+    ($result:expr, $len:expr) => {
+        match $result {
+            Ok(values) => Ok(values),
+            Err(
+                HazeError::EmptyInput { .. }
+                | HazeError::InsufficientData { .. }
+                | HazeError::InvalidPeriod { .. },
+            ) => Ok(nan_vec($len)),
+            Err(err) => Err(err.into()),
+        }
+    };
+    // 2-tuple case: ok_or_nan!(result, len, 2)
+    ($result:expr, $len:expr, 2) => {
+        match $result {
+            Ok(values) => Ok(values),
+            Err(
+                HazeError::EmptyInput { .. }
+                | HazeError::InsufficientData { .. }
+                | HazeError::InvalidPeriod { .. },
+            ) => Ok((nan_vec($len), nan_vec($len))),
+            Err(err) => Err(err.into()),
+        }
+    };
+    // 3-tuple case: ok_or_nan!(result, len, 3)
+    ($result:expr, $len:expr, 3) => {
+        match $result {
+            Ok(values) => Ok(values),
+            Err(
+                HazeError::EmptyInput { .. }
+                | HazeError::InsufficientData { .. }
+                | HazeError::InvalidPeriod { .. },
+            ) => Ok((nan_vec($len), nan_vec($len), nan_vec($len))),
+            Err(err) => Err(err.into()),
+        }
+    };
+    // 4-tuple case: ok_or_nan!(result, len, 4)
+    ($result:expr, $len:expr, 4) => {
+        match $result {
+            Ok(values) => Ok(values),
+            Err(
+                HazeError::EmptyInput { .. }
+                | HazeError::InsufficientData { .. }
+                | HazeError::InvalidPeriod { .. },
+            ) => Ok((nan_vec($len), nan_vec($len), nan_vec($len), nan_vec($len))),
+            Err(err) => Err(err.into()),
+        }
+    };
+    // 5-tuple case: ok_or_nan!(result, len, 5)
+    ($result:expr, $len:expr, 5) => {
+        match $result {
+            Ok(values) => Ok(values),
+            Err(
+                HazeError::EmptyInput { .. }
+                | HazeError::InsufficientData { .. }
+                | HazeError::InvalidPeriod { .. },
+            ) => Ok((
+                nan_vec($len),
+                nan_vec($len),
+                nan_vec($len),
+                nan_vec($len),
+                nan_vec($len),
+            )),
+            Err(err) => Err(err.into()),
+        }
+    };
+    // 6-tuple case: ok_or_nan!(result, len, 6)
+    ($result:expr, $len:expr, 6) => {
+        match $result {
+            Ok(values) => Ok(values),
+            Err(
+                HazeError::EmptyInput { .. }
+                | HazeError::InsufficientData { .. }
+                | HazeError::InvalidPeriod { .. },
+            ) => Ok((
+                nan_vec($len),
+                nan_vec($len),
+                nan_vec($len),
+                nan_vec($len),
+                nan_vec($len),
+                nan_vec($len),
+            )),
+            Err(err) => Err(err.into()),
+        }
+    };
+    // 7-tuple case: ok_or_nan!(result, len, 7)
+    ($result:expr, $len:expr, 7) => {
+        match $result {
+            Ok(values) => Ok(values),
+            Err(
+                HazeError::EmptyInput { .. }
+                | HazeError::InsufficientData { .. }
+                | HazeError::InvalidPeriod { .. },
+            ) => Ok((
+                nan_vec($len),
+                nan_vec($len),
+                nan_vec($len),
+                nan_vec($len),
+                nan_vec($len),
+                nan_vec($len),
+                nan_vec($len),
+            )),
+            Err(err) => Err(err.into()),
+        }
+    };
+    // Special case: 2 vectors + 1 f64: ok_or_nan!(result, len, 2, f64)
+    ($result:expr, $len:expr, 2, f64) => {
+        match $result {
+            Ok(values) => Ok(values),
+            Err(
+                HazeError::EmptyInput { .. }
+                | HazeError::InsufficientData { .. }
+                | HazeError::InvalidPeriod { .. },
+            ) => Ok((nan_vec($len), nan_vec($len), f64::NAN)),
+            Err(err) => Err(err.into()),
+        }
+    };
+}
+
+// Legacy function wrappers for backward compatibility
+// These delegate to the ok_or_nan! macro
+
+#[cfg(feature = "python")]
+#[inline]
 fn ok_or_nan_vec(result: HazeResult<Vec<f64>>, len: usize) -> PyResult<Vec<f64>> {
-    match result {
-        Ok(values) => Ok(values),
-        Err(
-            HazeError::EmptyInput { .. }
-            | HazeError::InsufficientData { .. }
-            | HazeError::InvalidPeriod { .. },
-        ) => Ok(nan_vec(len)),
-        Err(err) => Err(err.into()),
-    }
+    ok_or_nan!(result, len)
 }
 
 #[cfg(feature = "python")]
+#[inline]
 fn ok_or_nan_vec2(
     result: HazeResult<(Vec<f64>, Vec<f64>)>,
     len: usize,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    match result {
-        Ok(values) => Ok(values),
-        Err(
-            HazeError::EmptyInput { .. }
-            | HazeError::InsufficientData { .. }
-            | HazeError::InvalidPeriod { .. },
-        ) => Ok((nan_vec(len), nan_vec(len))),
-        Err(err) => Err(err.into()),
-    }
+    ok_or_nan!(result, len, 2)
 }
 
 #[cfg(feature = "python")]
+#[inline]
 fn ok_or_nan_vec3(
     result: HazeResult<(Vec<f64>, Vec<f64>, Vec<f64>)>,
     len: usize,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
-    match result {
-        Ok(values) => Ok(values),
-        Err(
-            HazeError::EmptyInput { .. }
-            | HazeError::InsufficientData { .. }
-            | HazeError::InvalidPeriod { .. },
-        ) => Ok((nan_vec(len), nan_vec(len), nan_vec(len))),
-        Err(err) => Err(err.into()),
-    }
+    ok_or_nan!(result, len, 3)
 }
 
 #[cfg(feature = "python")]
+#[inline]
 fn ok_or_nan_vec4(result: HazeResult<Vec4F64>, len: usize) -> PyResult<Vec4F64> {
-    match result {
-        Ok(values) => Ok(values),
-        Err(
-            HazeError::EmptyInput { .. }
-            | HazeError::InsufficientData { .. }
-            | HazeError::InvalidPeriod { .. },
-        ) => Ok((nan_vec(len), nan_vec(len), nan_vec(len), nan_vec(len))),
-        Err(err) => Err(err.into()),
-    }
+    ok_or_nan!(result, len, 4)
 }
 
 #[cfg(feature = "python")]
+#[inline]
 fn ok_or_nan_vec5(result: HazeResult<Vec5F64>, len: usize) -> PyResult<Vec5F64> {
-    match result {
-        Ok(values) => Ok(values),
-        Err(
-            HazeError::EmptyInput { .. }
-            | HazeError::InsufficientData { .. }
-            | HazeError::InvalidPeriod { .. },
-        ) => Ok((
-            nan_vec(len),
-            nan_vec(len),
-            nan_vec(len),
-            nan_vec(len),
-            nan_vec(len),
-        )),
-        Err(err) => Err(err.into()),
-    }
+    ok_or_nan!(result, len, 5)
 }
 
 #[cfg(feature = "python")]
+#[inline]
 fn ok_or_nan_vec6(result: HazeResult<Vec6F64>, len: usize) -> PyResult<Vec6F64> {
-    match result {
-        Ok(values) => Ok(values),
-        Err(
-            HazeError::EmptyInput { .. }
-            | HazeError::InsufficientData { .. }
-            | HazeError::InvalidPeriod { .. },
-        ) => Ok((
-            nan_vec(len),
-            nan_vec(len),
-            nan_vec(len),
-            nan_vec(len),
-            nan_vec(len),
-            nan_vec(len),
-        )),
-        Err(err) => Err(err.into()),
-    }
+    ok_or_nan!(result, len, 6)
 }
 
 #[cfg(feature = "python")]
+#[inline]
 fn ok_or_nan_vec7(result: HazeResult<Vec7F64>, len: usize) -> PyResult<Vec7F64> {
-    match result {
-        Ok(values) => Ok(values),
-        Err(
-            HazeError::EmptyInput { .. }
-            | HazeError::InsufficientData { .. }
-            | HazeError::InvalidPeriod { .. },
-        ) => Ok((
-            nan_vec(len),
-            nan_vec(len),
-            nan_vec(len),
-            nan_vec(len),
-            nan_vec(len),
-            nan_vec(len),
-            nan_vec(len),
-        )),
-        Err(err) => Err(err.into()),
-    }
+    ok_or_nan!(result, len, 7)
 }
 
 #[cfg(feature = "python")]
+#[inline]
 fn ok_or_nan_vec2_f64(
     result: HazeResult<(Vec<f64>, Vec<f64>, f64)>,
     len: usize,
 ) -> PyResult<(Vec<f64>, Vec<f64>, f64)> {
-    match result {
-        Ok(values) => Ok(values),
-        Err(
-            HazeError::EmptyInput { .. }
-            | HazeError::InsufficientData { .. }
-            | HazeError::InvalidPeriod { .. },
-        ) => Ok((nan_vec(len), nan_vec(len), f64::NAN)),
-        Err(err) => Err(err.into()),
-    }
+    ok_or_nan!(result, len, 2, f64)
 }
 
 // ==================== PyO3 模块定义 ====================
@@ -746,7 +820,7 @@ fn py_donchian_channel(
 
 #[cfg(feature = "python")]
 #[pyfunction]
-#[pyo3(signature = (high, low, close, period=22, atr_period=22, multiplier=3.0))]
+#[pyo3(signature = (high, low, close, period=None, atr_period=None, multiplier=None))]
 #[pyo3(text_signature = "(high, low, close, period=22, atr_period=22, multiplier=3.0)")]
 /// Calculate Chandelier Exit
 ///
@@ -800,7 +874,6 @@ fn py_chandelier_exit(
 
 #[cfg(feature = "python")]
 #[pyfunction]
-#[pyo3(signature = (close, period=20))]
 #[pyo3(text_signature = "(close, period=20)")]
 /// Calculate Historical Volatility
 ///
@@ -832,7 +905,6 @@ fn py_historical_volatility(close: Vec<f64>, period: Option<usize>) -> PyResult<
 
 #[cfg(feature = "python")]
 #[pyfunction]
-#[pyo3(signature = (close, period=14))]
 #[pyo3(text_signature = "(close, period=14)")]
 /// Calculate Ulcer Index
 ///
@@ -868,7 +940,6 @@ fn py_ulcer_index(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> 
 
 #[cfg(feature = "python")]
 #[pyfunction]
-#[pyo3(signature = (high, low, period=25, ema_period=9))]
 #[pyo3(text_signature = "(high, low, period=25, ema_period=9)")]
 /// Calculate Mass Index
 ///
@@ -1434,7 +1505,6 @@ fn py_psar(
 
 #[cfg(feature = "python")]
 #[pyfunction]
-#[pyo3(signature = (close, period=15))]
 #[pyo3(text_signature = "(close, period=15)")]
 /// Calculate TRIX (Triple Exponential Average)
 ///
@@ -1470,7 +1540,6 @@ fn py_trix(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
 
 #[cfg(feature = "python")]
 #[pyfunction]
-#[pyo3(signature = (close, period=20))]
 #[pyo3(text_signature = "(close, period=20)")]
 /// Calculate Detrended Price Oscillator (DPO)
 ///
@@ -1576,7 +1645,6 @@ fn py_vwap(
 
 #[cfg(feature = "python")]
 #[pyfunction]
-#[pyo3(signature = (close, volume, period=13))]
 #[pyo3(text_signature = "(close, volume, period=13)")]
 /// Calculate Force Index (Elder's Force Index)
 ///
@@ -1614,7 +1682,6 @@ fn py_force_index(close: Vec<f64>, volume: Vec<f64>, period: Option<usize>) -> P
 
 #[cfg(feature = "python")]
 #[pyfunction]
-#[pyo3(signature = (volume, short_period=5, long_period=10))]
 #[pyo3(text_signature = "(volume, short_period=5, long_period=10)")]
 /// Calculate Volume Oscillator
 ///
@@ -2101,6 +2168,33 @@ fn py_camarilla_pivots(high: f64, low: f64, close: f64) -> PyResult<Pivots9F64> 
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, k_period=9, d_period=3)")]
+/// Calculate KDJ Indicator
+///
+/// Extension of Stochastic Oscillator popular in Asian markets.
+/// Adds J line: J = 3*K - 2*D for more sensitive signals.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// k_period : int, optional
+///     %K period (default: 9)
+/// d_period : int, optional
+///     %D period (default: 3)
+///
+/// Returns
+/// -------
+/// tuple of (list, list, list) - (K line, D line, J line)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_kdj(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -2123,6 +2217,31 @@ fn py_kdj(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, long_period=25, short_period=13, signal_period=13)")]
+/// Calculate True Strength Index (TSI)
+///
+/// Double-smoothed momentum oscillator that reduces noise.
+/// Uses two EMA passes for smoother signals than RSI.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// long_period : int, optional
+///     First EMA period (default: 25)
+/// short_period : int, optional
+///     Second EMA period (default: 13)
+/// signal_period : int, optional
+///     Signal line period (default: 13)
+///
+/// Returns
+/// -------
+/// tuple of (list, list) - (TSI line, signal line)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_tsi(
     close: Vec<f64>,
     long_period: Option<usize>,
@@ -2143,6 +2262,35 @@ fn py_tsi(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, period1=7, period2=14, period3=28)")]
+/// Calculate Ultimate Oscillator
+///
+/// Multi-timeframe momentum indicator combining three periods
+/// to reduce false signals. Values range 0-100.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period1 : int, optional
+///     Short period (default: 7)
+/// period2 : int, optional
+///     Medium period (default: 14)
+/// period3 : int, optional
+///     Long period (default: 28)
+///
+/// Returns
+/// -------
+/// list of float - Ultimate Oscillator values (0-100)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_ultimate_oscillator(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -2167,12 +2315,44 @@ fn py_ultimate_oscillator(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period=10)")]
+/// Calculate Momentum
+///
+/// Simple price difference over a lookback period.
+/// Positive = upward momentum, negative = downward.
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int, optional
+///     Lookback period (default: 10)
+///
+/// Returns
+/// -------
+/// list of float - Momentum values (price[i] - price[i-period])
 fn py_mom(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
     Ok(utils::stats::momentum(&values, period.unwrap_or(10)))
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period=10)")]
+/// Calculate Rate of Change (ROC)
+///
+/// Percentage change over a lookback period.
+/// ROC = ((price - price[n]) / price[n]) * 100
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int, optional
+///     Lookback period (default: 10)
+///
+/// Returns
+/// -------
+/// list of float - ROC values as percentages
 fn py_roc(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
     Ok(utils::stats::roc(&values, period.unwrap_or(10)))
 }
@@ -2181,6 +2361,31 @@ fn py_roc(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, period=14)")]
+/// Calculate Vortex Indicator
+///
+/// Two oscillators (+VI and -VI) capturing positive and negative
+/// trend movement. Crossovers generate trading signals.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// tuple of (list, list) - (+VI, -VI)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_vortex(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -2196,6 +2401,31 @@ fn py_vortex(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, period=14)")]
+/// Calculate Choppiness Index
+///
+/// Measures whether market is trending or range-bound.
+/// Values 0-38.2 = trending, 61.8-100 = choppy/consolidating.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// list of float - Choppiness Index values (0-100)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_choppiness(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -2211,6 +2441,29 @@ fn py_choppiness(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, close, period=14)")]
+/// Calculate Qstick Indicator
+///
+/// Moving average of open-close differences.
+/// Positive = bullish (closes > opens), negative = bearish.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     MA period (default: 14)
+///
+/// Returns
+/// -------
+/// list of float - Qstick values
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_qstick(open: Vec<f64>, close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
     let len = close.len();
     ok_or_nan_vec(indicators::qstick(&open, &close, period.unwrap_or(14)), len)
@@ -2218,6 +2471,28 @@ fn py_qstick(open: Vec<f64>, close: Vec<f64>, period: Option<usize>) -> PyResult
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, period=28)")]
+/// Calculate Vertical Horizontal Filter (VHF)
+///
+/// Measures trend strength. Higher values = stronger trend.
+/// Can be used to determine when to use trend-following vs
+/// oscillator strategies.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 28)
+///
+/// Returns
+/// -------
+/// list of float - VHF values
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_vhf(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
     let len = close.len();
     ok_or_nan_vec(indicators::vhf(&close, period.unwrap_or(28)), len)
@@ -2346,12 +2621,30 @@ fn py_doji(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, high, low, close)")]
+/// Detect Hammer candlestick pattern
+///
+/// Bullish reversal pattern with small body and long lower shadow.
+/// Appears at bottom of downtrends.
+///
+/// Returns
+/// -------
+/// list of float - 100.0 = hammer detected, 0.0 = no pattern
 fn py_hammer(open: Vec<f64>, high: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::hammer(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, high, low, close)")]
+/// Detect Inverted Hammer candlestick pattern
+///
+/// Bullish reversal with small body and long upper shadow.
+/// Appears at bottom of downtrends.
+///
+/// Returns
+/// -------
+/// list of float - 100.0 = pattern detected, 0.0 = no pattern
 fn py_inverted_hammer(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -2363,6 +2656,15 @@ fn py_inverted_hammer(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, high, low, close)")]
+/// Detect Hanging Man candlestick pattern
+///
+/// Bearish reversal pattern (hammer shape at top of uptrend).
+/// Small body with long lower shadow.
+///
+/// Returns
+/// -------
+/// list of float - -100.0 = pattern detected, 0.0 = no pattern
 fn py_hanging_man(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -2374,42 +2676,105 @@ fn py_hanging_man(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, close)")]
+/// Detect Bullish Engulfing pattern
+///
+/// Two-candle bullish reversal. Second candle's body completely
+/// engulfs the first (smaller bearish) candle.
+///
+/// Returns
+/// -------
+/// list of float - 100.0 = pattern detected, 0.0 = no pattern
 fn py_bullish_engulfing(open: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::bullish_engulfing(&open, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, close)")]
+/// Detect Bearish Engulfing pattern
+///
+/// Two-candle bearish reversal. Second candle's body completely
+/// engulfs the first (smaller bullish) candle.
+///
+/// Returns
+/// -------
+/// list of float - -100.0 = pattern detected, 0.0 = no pattern
 fn py_bearish_engulfing(open: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::bearish_engulfing(&open, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, close)")]
+/// Detect Bullish Harami pattern
+///
+/// Two-candle bullish reversal. Small bullish candle contained
+/// within prior large bearish candle.
+///
+/// Returns
+/// -------
+/// list of float - 100.0 = pattern detected, 0.0 = no pattern
 fn py_bullish_harami(open: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::bullish_harami(&open, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, close)")]
+/// Detect Bearish Harami pattern
+///
+/// Two-candle bearish reversal. Small bearish candle contained
+/// within prior large bullish candle.
+///
+/// Returns
+/// -------
+/// list of float - -100.0 = pattern detected, 0.0 = no pattern
 fn py_bearish_harami(open: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::bearish_harami(&open, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, low, close)")]
+/// Detect Piercing Pattern
+///
+/// Two-candle bullish reversal. Bearish candle followed by
+/// bullish candle that closes above midpoint of first.
+///
+/// Returns
+/// -------
+/// list of float - 100.0 = pattern detected, 0.0 = no pattern
 fn py_piercing_pattern(open: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::piercing_pattern(&open, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, high, close)")]
+/// Detect Dark Cloud Cover pattern
+///
+/// Two-candle bearish reversal. Bullish candle followed by
+/// bearish candle that closes below midpoint of first.
+///
+/// Returns
+/// -------
+/// list of float - -100.0 = pattern detected, 0.0 = no pattern
 fn py_dark_cloud_cover(open: Vec<f64>, high: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::dark_cloud_cover(&open, &high, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, high, low, close)")]
+/// Detect Morning Star pattern
+///
+/// Three-candle bullish reversal. Large bearish, small body,
+/// then large bullish candle.
+///
+/// Returns
+/// -------
+/// list of float - 100.0 = pattern detected, 0.0 = no pattern
 fn py_morning_star(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -2421,6 +2786,15 @@ fn py_morning_star(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, high, low, close)")]
+/// Detect Evening Star pattern
+///
+/// Three-candle bearish reversal. Large bullish, small body,
+/// then large bearish candle.
+///
+/// Returns
+/// -------
+/// list of float - -100.0 = pattern detected, 0.0 = no pattern
 fn py_evening_star(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -2432,12 +2806,30 @@ fn py_evening_star(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, high, close)")]
+/// Detect Three White Soldiers pattern
+///
+/// Three consecutive bullish candles with progressively higher
+/// closes. Strong bullish continuation signal.
+///
+/// Returns
+/// -------
+/// list of float - 100.0 = pattern detected, 0.0 = no pattern
 fn py_three_white_soldiers(open: Vec<f64>, high: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::three_white_soldiers(&open, &high, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, low, close)")]
+/// Detect Three Black Crows pattern
+///
+/// Three consecutive bearish candles with progressively lower
+/// closes. Strong bearish continuation signal.
+///
+/// Returns
+/// -------
+/// list of float - -100.0 = pattern detected, 0.0 = no pattern
 fn py_three_black_crows(open: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::three_black_crows(&open, &low, &close)?)
 }
@@ -2446,6 +2838,21 @@ fn py_three_black_crows(open: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyRes
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(y_values, period)")]
+/// Calculate Linear Regression
+///
+/// Returns slope, intercept, and R-squared values over rolling window.
+///
+/// Parameters
+/// ----------
+/// y_values : list of float
+///     Values to regress
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// tuple of (list, list, list) - (slope, intercept, r_squared)
 fn py_linear_regression(
     y_values: Vec<f64>,
     period: usize,
@@ -2455,24 +2862,92 @@ fn py_linear_regression(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(x, y, period)")]
+/// Calculate Correlation Coefficient
+///
+/// Pearson correlation between two series. Values -1 to +1.
+///
+/// Parameters
+/// ----------
+/// x : list of float
+///     First series
+/// y : list of float
+///     Second series
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - Correlation values (-1 to +1)
 fn py_correlation(x: Vec<f64>, y: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(utils::correlation(&x, &y, period))
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period)")]
+/// Calculate Z-Score
+///
+/// Number of standard deviations from the mean.
+/// Used for mean reversion strategies.
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - Z-score values
 fn py_zscore(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(utils::zscore(&values, period))
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(x, y, period)")]
+/// Calculate Covariance
+///
+/// Measures how two variables change together.
+///
+/// Parameters
+/// ----------
+/// x : list of float
+///     First series
+/// y : list of float
+///     Second series
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - Covariance values
 fn py_covariance(x: Vec<f64>, y: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(utils::covariance(&x, &y, period))
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(asset_returns, benchmark_returns, period)")]
+/// Calculate Beta
+///
+/// Sensitivity of asset to benchmark movements.
+/// Beta > 1 = more volatile, Beta < 1 = less volatile.
+///
+/// Parameters
+/// ----------
+/// asset_returns : list of float
+///     Asset return series
+/// benchmark_returns : list of float
+///     Benchmark return series
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - Beta values
 fn py_beta(
     asset_returns: Vec<f64>,
     benchmark_returns: Vec<f64>,
@@ -2483,12 +2958,29 @@ fn py_beta(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(y_values, period)")]
+/// Calculate Standard Error
+///
+/// Standard deviation of the regression residuals.
+///
+/// Parameters
+/// ----------
+/// y_values : list of float
+///     Values
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - Standard error values
 fn py_standard_error(y_values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(utils::standard_error(&y_values, period))
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(y_values, period)")]
+/// Calculate Standard Error (alias for standard_error)
 fn py_stderr(y_values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(utils::standard_error(&y_values, period))
 }
@@ -2497,6 +2989,14 @@ fn py_stderr(y_values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(open, high, low, close)")]
+/// Calculate Average Price (OHLC/4)
+///
+/// Simple average of open, high, low, close prices.
+///
+/// Returns
+/// -------
+/// list of float - Average prices
 fn py_avgprice(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -2509,6 +3009,14 @@ fn py_avgprice(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low)")]
+/// Calculate Median Price (HL/2)
+///
+/// Average of high and low prices.
+///
+/// Returns
+/// -------
+/// list of float - Median prices
 fn py_medprice(high: Vec<f64>, low: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = high.len();
     ok_or_nan_vec(indicators::medprice(&high, &low), len)
@@ -2516,6 +3024,14 @@ fn py_medprice(high: Vec<f64>, low: Vec<f64>) -> PyResult<Vec<f64>> {
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close)")]
+/// Calculate Typical Price (HLC/3)
+///
+/// Average of high, low, and close prices.
+///
+/// Returns
+/// -------
+/// list of float - Typical prices
 fn py_typprice(high: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = high.len();
     ok_or_nan_vec(indicators::typprice(&high, &low, &close), len)
@@ -4100,24 +4616,94 @@ fn py_breakaway(
 // ==================== Overlap Studies 指标包装 ====================
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period)")]
+/// Calculate Midpoint over Period
+///
+/// Average of highest and lowest values over the lookback period.
+/// (Highest + Lowest) / 2
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - Midpoint values
 fn py_midpoint(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(indicators::midpoint(&values, period)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, period)")]
+/// Calculate Midprice over Period
+///
+/// Average of highest high and lowest low over the lookback period.
+/// (Highest High + Lowest Low) / 2
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - Midprice values
 fn py_midprice(high: Vec<f64>, low: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(indicators::midprice(&high, &low, period)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period)")]
+/// Calculate Triangular Moving Average (TRIMA)
+///
+/// Double-smoothed SMA with triangular weighting.
+/// More weight to middle of period, smoother than SMA.
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - TRIMA values
 fn py_trima(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(indicators::trima(&values, period)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, acceleration=0.02, maximum=0.2)")]
+/// Calculate Parabolic SAR (Stop and Reverse)
+///
+/// Trailing stop system that follows price. Dots flip from
+/// below to above price on trend reversals.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// acceleration : float, optional
+///     Acceleration factor step (default: 0.02)
+/// maximum : float, optional
+///     Maximum acceleration (default: 0.2)
+///
+/// Returns
+/// -------
+/// list of float - SAR values
 fn py_sar(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -4734,6 +5320,29 @@ fn py_adosc(
 // Momentum Indicators
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, fast_period=12, slow_period=26)")]
+/// Calculate Absolute Price Oscillator (APO)
+///
+/// Difference between two EMAs. Similar to MACD but without
+/// the signal line.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// fast_period : int, optional
+///     Fast EMA period (default: 12)
+/// slow_period : int, optional
+///     Slow EMA period (default: 26)
+///
+/// Returns
+/// -------
+/// list of float - APO values (fast_ema - slow_ema)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_apo(
     close: Vec<f64>,
     fast_period: Option<usize>,
@@ -4748,6 +5357,29 @@ fn py_apo(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, fast_period=12, slow_period=26)")]
+/// Calculate Percentage Price Oscillator (PPO)
+///
+/// Percentage difference between two EMAs. Normalizes APO
+/// as percentage for comparison across different price levels.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// fast_period : int, optional
+///     Fast EMA period (default: 12)
+/// slow_period : int, optional
+///     Slow EMA period (default: 26)
+///
+/// Returns
+/// -------
+/// list of float - PPO values as percentages
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_ppo(
     close: Vec<f64>,
     fast_period: Option<usize>,
@@ -4762,6 +5394,27 @@ fn py_ppo(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, period=14)")]
+/// Calculate Chande Momentum Oscillator (CMO)
+///
+/// Similar to RSI but uses raw momentum sums instead of
+/// smoothed averages. Values range -100 to +100.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// list of float - CMO values (-100 to +100)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_cmo(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
     let len = close.len();
     ok_or_nan_vec(indicators::cmo(&close, period.unwrap_or(14)), len)
@@ -4770,6 +5423,31 @@ fn py_cmo(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
 // Trend Indicators
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, period=14)")]
+/// Calculate Directional Movement Index (DX)
+///
+/// Measures the difference between +DI and -DI.
+/// Used in ADX calculation to measure trend strength.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// list of float - DX values (0-100)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_dx(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -4785,6 +5463,31 @@ fn py_dx(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, period=14)")]
+/// Calculate Plus Directional Indicator (+DI)
+///
+/// Measures upward price movement. Part of the DMI system.
+/// Higher values indicate stronger upward momentum.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// list of float - +DI values (0-100)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_plus_di(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -4800,6 +5503,31 @@ fn py_plus_di(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, period=14)")]
+/// Calculate Minus Directional Indicator (-DI)
+///
+/// Measures downward price movement. Part of the DMI system.
+/// Higher values indicate stronger downward momentum.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// list of float - -DI values (0-100)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_minus_di(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -4816,6 +5544,29 @@ fn py_minus_di(
 // Overlap Studies (Advanced MA)
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period=5, vfactor=0.7)")]
+/// Calculate T3 Moving Average (Tilson T3)
+///
+/// Triple smoothed EMA with reduced lag. Uses volume factor
+/// to control smoothing vs responsiveness tradeoff.
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int, optional
+///     Lookback period (default: 5)
+/// vfactor : float, optional
+///     Volume factor 0-1 (default: 0.7). Higher = smoother.
+///
+/// Returns
+/// -------
+/// list of float - T3 values
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_t3(values: Vec<f64>, period: Option<usize>, vfactor: Option<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(
@@ -4826,6 +5577,31 @@ fn py_t3(values: Vec<f64>, period: Option<usize>, vfactor: Option<f64>) -> PyRes
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period=10, fast_period=2, slow_period=30)")]
+/// Calculate Kaufman Adaptive Moving Average (KAMA)
+///
+/// Self-adjusting MA that adapts to market volatility.
+/// Fast in trending markets, slow in choppy markets.
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int, optional
+///     Efficiency ratio period (default: 10)
+/// fast_period : int, optional
+///     Fast EMA period (default: 2)
+/// slow_period : int, optional
+///     Slow EMA period (default: 30)
+///
+/// Returns
+/// -------
+/// list of float - KAMA values
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_kama(
     values: Vec<f64>,
     period: Option<usize>,
@@ -4848,6 +5624,24 @@ fn py_kama(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, period=10, bins=10)")]
+/// Calculate Shannon Entropy
+///
+/// Measures price distribution randomness/unpredictability.
+/// Higher values = more random/uncertain market.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 10)
+/// bins : int, optional
+///     Histogram bins (default: 10)
+///
+/// Returns
+/// -------
+/// list of float - Entropy values
 fn py_entropy(close: Vec<f64>, period: Option<usize>, bins: Option<usize>) -> PyResult<Vec<f64>> {
     Ok(indicators::entropy(
         &close,
@@ -4858,6 +5652,28 @@ fn py_entropy(close: Vec<f64>, period: Option<usize>, bins: Option<usize>) -> Py
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, period=20, atr_period=20)")]
+/// Calculate Aberration Indicator
+///
+/// Measures deviation from expected price movement based on
+/// ATR. Identifies abnormal price behavior.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     SMA period (default: 20)
+/// atr_period : int, optional
+///     ATR period (default: 20)
+///
+/// Returns
+/// -------
+/// list of float - Aberration values
 fn py_aberration(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -4880,7 +5696,37 @@ fn py_aberration(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(
+    text_signature = "(high, low, close, bb_period=20, bb_std=2.0, kc_period=20, kc_atr_period=20, kc_mult=1.5)"
+)]
 #[allow(clippy::too_many_arguments)]
+/// Calculate Squeeze Momentum Indicator
+///
+/// Detects when BB is inside KC (squeeze on) indicating
+/// low volatility before potential breakout.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// bb_period : int, optional
+///     Bollinger Bands period (default: 20)
+/// bb_std : float, optional
+///     BB standard deviation (default: 2.0)
+/// kc_period : int, optional
+///     Keltner Channel period (default: 20)
+/// kc_atr_period : int, optional
+///     KC ATR period (default: 20)
+/// kc_mult : float, optional
+///     KC ATR multiplier (default: 1.5)
+///
+/// Returns
+/// -------
+/// tuple of (list, list, list) - (momentum, squeeze_on, squeeze_off)
 fn py_squeeze(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -4909,6 +5755,26 @@ fn py_squeeze(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, rsi_period=14, smooth=5, multiplier=4.236)")]
+/// Calculate QQE (Quantitative Qualitative Estimation)
+///
+/// Smoothed RSI with dynamic volatility-based trailing stops.
+/// Generates cleaner signals than standard RSI.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// rsi_period : int, optional
+///     RSI period (default: 14)
+/// smooth : int, optional
+///     Smoothing period (default: 5)
+/// multiplier : float, optional
+///     ATR multiplier for bands (default: 4.236)
+///
+/// Returns
+/// -------
+/// tuple of (list, list, list) - (QQE line, trailing line, histogram)
 fn py_qqe(
     close: Vec<f64>,
     rsi_period: Option<usize>,
@@ -4929,6 +5795,22 @@ fn py_qqe(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, period=12)")]
+/// Calculate Correlation Trend Indicator (CTI)
+///
+/// Measures correlation between price and linear regression.
+/// Values -1 to +1, high positive = strong uptrend.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 12)
+///
+/// Returns
+/// -------
+/// list of float - CTI values (-1 to +1)
 fn py_cti(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
     let len = close.len();
     ok_or_nan_vec(indicators::cti(&close, period.unwrap_or(12)), len)
@@ -5068,7 +5950,12 @@ fn py_stc(
 ) -> PyResult<Vec<f64>> {
     let len = close.len();
     ok_or_nan_vec(
-        indicators::stc(&close, fast.unwrap_or(23), slow.unwrap_or(50), cycle.unwrap_or(10)),
+        indicators::stc(
+            &close,
+            fast.unwrap_or(23),
+            slow.unwrap_or(50),
+            cycle.unwrap_or(10),
+        ),
         len,
     )
 }
@@ -5160,7 +6047,10 @@ fn py_pgo(
     period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
     let len = close.len();
-    ok_or_nan_vec(indicators::pgo(&high, &low, &close, period.unwrap_or(14)), len)
+    ok_or_nan_vec(
+        indicators::pgo(&high, &low, &close, period.unwrap_or(14)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]

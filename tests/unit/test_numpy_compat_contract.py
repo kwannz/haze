@@ -9,6 +9,7 @@ NumPy Compatibility Layer Contract Tests
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 import haze_library
 
@@ -19,6 +20,19 @@ def _assert_array(arr: np.ndarray, length: int) -> None:
 
 
 class TestNumpyCompatContract:
+    def test_removed_params_fail_fast(self, ohlcv_data_extended):
+        assert haze_library.np_ta is not None
+
+        high = np.array(ohlcv_data_extended["high"], dtype=np.float64)
+        low = np.array(ohlcv_data_extended["low"], dtype=np.float64)
+        close = np.array(ohlcv_data_extended["close"], dtype=np.float64)
+
+        with pytest.raises(TypeError):
+            _ = haze_library.np_ta.stochastic(high, low, close, smooth_k=3)
+
+        with pytest.raises(TypeError):
+            _ = haze_library.np_ta.kdj(high, low, close, j_period=3)
+
     def test_multi_output_indicators(self, ohlcv_data_extended):
         assert haze_library.np_ta is not None
 
@@ -27,7 +41,7 @@ class TestNumpyCompatContract:
         close = np.array(ohlcv_data_extended["close"], dtype=np.float64)
         n = len(close)
 
-        k, d = haze_library.np_ta.stochastic(high, low, close, smooth_k=3)
+        k, d = haze_library.np_ta.stochastic(high, low, close)
         _assert_array(k, n)
         _assert_array(d, n)
 
@@ -35,7 +49,7 @@ class TestNumpyCompatContract:
         _assert_array(k, n)
         _assert_array(d, n)
 
-        k, d, j = haze_library.np_ta.kdj(high, low, close, k_period=9, d_period=3, j_period=3)
+        k, d, j = haze_library.np_ta.kdj(high, low, close, k_period=9, d_period=3)
         _assert_array(k, n)
         _assert_array(d, n)
         _assert_array(j, n)

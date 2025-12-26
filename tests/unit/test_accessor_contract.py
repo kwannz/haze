@@ -9,9 +9,11 @@ Pandas Accessor Contract Tests
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 # Import haze_library to register the `.ta` accessor
 import haze_library  # noqa: F401
+from haze_library import ColumnNotFoundError
 
 
 def _assert_series(series: pd.Series, index: pd.Index) -> None:
@@ -34,11 +36,28 @@ class TestDataFrameAccessorContract:
         assert hasattr(df, "haze")
         assert hasattr(df["close"], "haze")
 
+    def test_removed_params_fail_fast(self, ohlcv_data_extended):
+        df = pd.DataFrame(ohlcv_data_extended)
+        ta = _get_df_accessor(df)
+
+        with pytest.raises(TypeError):
+            ta.stochastic(smooth_k=3)
+
+        with pytest.raises(TypeError):
+            ta.kdj(j_period=3)
+
+    def test_missing_column_raises_typed_error(self):
+        df = pd.DataFrame({"close": [1.0, 2.0, 3.0]})
+        ta = _get_df_accessor(df)
+
+        with pytest.raises(ColumnNotFoundError):
+            ta.sma(period=2, column="not_a_column")
+
     def test_multi_output_indicators(self, ohlcv_data_extended):
         df = pd.DataFrame(ohlcv_data_extended)
         ta = _get_df_accessor(df)
 
-        k, d = ta.stochastic(smooth_k=3)
+        k, d = ta.stochastic()
         _assert_series(k, df.index)
         _assert_series(d, df.index)
 
@@ -46,7 +65,7 @@ class TestDataFrameAccessorContract:
         _assert_series(k, df.index)
         _assert_series(d, df.index)
 
-        k, d, j = ta.kdj(k_period=9, d_period=3, j_period=3)
+        k, d, j = ta.kdj(k_period=9, d_period=3)
         _assert_series(k, df.index)
         _assert_series(d, df.index)
         _assert_series(j, df.index)

@@ -2019,7 +2019,8 @@ fn test_pandas_ta_edge_cases() {
     let close_flat = vec![100.0; 20];
     let high_wide = vec![110.0; 20];
     let low_wide = vec![90.0; 20];
-    let (sq_on, sq_off, _mom) = squeeze(&high_wide, &low_wide, &close_flat, 5, 2.0, 5, 5, 1.5).unwrap();
+    let (sq_on, sq_off, _mom) =
+        squeeze(&high_wide, &low_wide, &close_flat, 5, 2.0, 5, 5, 1.5).unwrap();
     assert_eq!(sq_on[10], 1.0);
     assert_eq!(sq_off[10], 0.0);
     assert!(sq_on[0].is_nan());

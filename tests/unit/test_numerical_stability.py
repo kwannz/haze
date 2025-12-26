@@ -25,6 +25,38 @@ import haze_library as haze
 class TestNumericalStability:
     """Test numerical stability of indicators under extreme conditions."""
 
+    def test_stochastic_and_kdj_flat_range(self):
+        """
+        Flat-range safety test for Stochastic/KDJ.
+
+        Scenario:
+        - high == low == close for every bar (range = 0)
+        - Challenge: division by zero in %K calculation
+
+        Expected:
+        - No crash / no infinities
+        - Finite values converge to 50.0 (midpoint fallback)
+        """
+        high = [100.0] * 50
+        low = [100.0] * 50
+        close = [100.0] * 50
+
+        k, d = haze.stochastic(high, low, close, k_period=5, d_period=3)
+        kdj_k, kdj_d, kdj_j = haze.kdj(high, low, close, k_period=5, d_period=3)
+
+        # Stochastic: finite results should be exactly 50.0 (with rounding tolerance)
+        for value in [*k, *d]:
+            if np.isfinite(value):
+                assert abs(value - 50.0) < 1e-10
+
+        # KDJ should be consistent with stochastic + J = 3K - 2D
+        for kk, dd, jj in zip(kdj_k, kdj_d, kdj_j):
+            if np.isfinite(kk) and np.isfinite(dd):
+                assert abs(kk - 50.0) < 1e-10
+                assert abs(dd - 50.0) < 1e-10
+                assert np.isfinite(jj)
+                assert abs(jj - 50.0) < 1e-10
+
     def test_large_numbers_small_increments(self):
         """
         Test SMA with large base value + small increments.
