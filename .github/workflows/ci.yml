@@ -27,7 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        rust: ['1.75.0', stable, beta]
+        rust: [stable, beta]
         exclude:
           # Reduce CI time by excluding some combinations
           - os: macos-latest
