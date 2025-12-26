@@ -482,26 +482,26 @@ pub fn rolling_percentile(values: &[f64], period: usize, percentile: f64) -> Vec
 fn rolling_percentile_select(values: &[f64], period: usize, percentile: f64) -> Vec<f64> {
     let n = values.len();
     let mut result = vec![f64::NAN; n];
-    let mut window = Vec::with_capacity(period);
+    let mut window_keys = Vec::<i64>::with_capacity(period);
 
     for i in (period - 1)..n {
-        window.clear();
-        window.extend(
-            values[i + 1 - period..=i]
-                .iter()
-                .copied()
-                .filter(|v| !v.is_nan()),
-        );
+        window_keys.clear();
+        for &v in &values[i + 1 - period..=i] {
+            if v.is_nan() {
+                continue;
+            }
+            window_keys.push(float_total_key(v));
+        }
 
-        if window.is_empty() {
+        if window_keys.is_empty() {
             continue;
         }
 
-        let valid_len = window.len();
+        let valid_len = window_keys.len();
         let index = ((percentile * (valid_len - 1) as f64).round() as usize).min(valid_len - 1);
 
-        window.select_nth_unstable_by(index, |a, b| a.total_cmp(b));
-        result[i] = window[index];
+        window_keys.select_nth_unstable(index);
+        result[i] = float_from_total_key(window_keys[index]);
     }
 
     result
@@ -519,15 +519,20 @@ fn float_total_key(value: f64) -> i64 {
     bits ^ ((((bits >> 63) as u64) >> 1) as i64)
 }
 
+#[inline]
+fn float_from_total_key(key: i64) -> f64 {
+    let bits = if key < 0 {
+        (key ^ i64::MAX) as u64
+    } else {
+        key as u64
+    };
+    f64::from_bits(bits)
+}
+
 impl PercentileHeapItem {
     #[inline]
     fn value(&self) -> f64 {
-        let bits = if self.key < 0 {
-            (self.key ^ i64::MAX) as u64
-        } else {
-            self.key as u64
-        };
-        f64::from_bits(bits)
+        float_from_total_key(self.key)
     }
 }
 
@@ -586,6 +591,29 @@ fn rolling_percentile_dual_heap(values: &[f64], period: usize, percentile: f64) 
         }
     }
 
+    #[inline]
+    fn pop_lower_valid(heap: &mut BinaryHeap<PercentileHeapItem>, start: usize) -> Option<PercentileHeapItem> {
+        while let Some(item) = heap.pop() {
+            if item.index >= start {
+                return Some(item);
+            }
+        }
+        None
+    }
+
+    #[inline]
+    fn pop_upper_valid(
+        heap: &mut BinaryHeap<Reverse<PercentileHeapItem>>,
+        start: usize,
+    ) -> Option<PercentileHeapItem> {
+        while let Some(Reverse(item)) = heap.pop() {
+            if item.index >= start {
+                return Some(item);
+            }
+        }
+        None
+    }
+
     for i in 0..n {
         let start = (i + 1).saturating_sub(period);
 
@@ -602,13 +630,12 @@ fn rolling_percentile_dual_heap(values: &[f64], period: usize, percentile: f64) 
         }
 
         prune_lower(&mut lower, start);
-        prune_upper(&mut upper, start);
 
         let new_val = values[i];
         if !new_val.is_nan() {
             let new_key = float_total_key(new_val);
             let push_to_lower = match lower.peek() {
-                None => false,
+                None => true,
                 Some(top) => new_key <= top.key,
             };
 
@@ -637,8 +664,7 @@ fn rolling_percentile_dual_heap(values: &[f64], period: usize, percentile: f64) 
         let target_lower = index + 1;
 
         while lower_size > target_lower {
-            prune_lower(&mut lower, start);
-            if let Some(item) = lower.pop() {
+            if let Some(item) = pop_lower_valid(&mut lower, start) {
                 lower_size = lower_size.saturating_sub(1);
                 upper.push(Reverse(item));
                 upper_size += 1;
@@ -649,8 +675,7 @@ fn rolling_percentile_dual_heap(values: &[f64], period: usize, percentile: f64) 
         }
 
         while lower_size < target_lower {
-            prune_upper(&mut upper, start);
-            if let Some(Reverse(item)) = upper.pop() {
+            if let Some(item) = pop_upper_valid(&mut upper, start) {
                 upper_size = upper_size.saturating_sub(1);
                 lower.push(item);
                 lower_size += 1;
