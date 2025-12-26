@@ -32,7 +32,7 @@ tokio = { version = "1.42", optional = true, features = ["rt-multi-thread", "syn
 
 # ML 框架 (linfa)
 linfa = "0.7"
-linfa-svm = "0.7"
+linfa-svm = "0.8"
 linfa-linear = "0.7"
 linfa-preprocessing = "0.7"
 
