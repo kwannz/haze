@@ -169,18 +169,18 @@ def verify_pyi_files():
         # Create a simple DataFrame
         df = pd.DataFrame({'close': [100.0, 101.0, 102.0, 103.0, 104.0]})
 
-        # Check if .ta accessor is available
-        if hasattr(df, 'ta'):
-            print(f"  ✅ DataFrame.ta accessor registered")
+        # Check if .haze accessor is available (stable even if pandas-ta is installed)
+        if hasattr(df, 'haze'):
+            print(f"  ✅ DataFrame.haze accessor registered")
 
             # Test a simple indicator
             try:
-                result = df.ta.sma(3)
-                print(f"  ✅ df.ta.sma(3) works (result length: {len(result)})")
+                result = df.haze.sma(3)
+                print(f"  ✅ df.haze.sma(3) works (result length: {len(result)})")
             except Exception as e:
-                print(f"  ⚠️  df.ta.sma(3) failed: {e}")
+                print(f"  ⚠️  df.haze.sma(3) failed: {e}")
         else:
-            print(f"  ❌ DataFrame.ta accessor not found")
+            print(f"  ❌ DataFrame.haze accessor not found")
 
     except ImportError:
         print(f"  ⚠️  Pandas not installed - skipping accessor test")

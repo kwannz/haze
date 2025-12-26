@@ -50,6 +50,36 @@ class TestNumpyCompatContract:
         _assert_array(sar, n)
         _assert_array(direction, n)
 
+    def test_candlestick_and_utilities(self, ohlcv_data_extended):
+        assert haze_library.np_ta is not None
+
+        open_ = np.array(ohlcv_data_extended["open"], dtype=np.float64)
+        high = np.array(ohlcv_data_extended["high"], dtype=np.float64)
+        low = np.array(ohlcv_data_extended["low"], dtype=np.float64)
+        close = np.array(ohlcv_data_extended["close"], dtype=np.float64)
+        n = len(close)
+
+        ha_o, ha_h, ha_l, ha_c = haze_library.np_ta.heikin_ashi(open_, high, low, close)
+        _assert_array(ha_o, n)
+        _assert_array(ha_h, n)
+        _assert_array(ha_l, n)
+        _assert_array(ha_c, n)
+
+        engulfing = haze_library.np_ta.engulfing(open_, high, low, close)
+        _assert_array(engulfing, n)
+
+        highest = haze_library.np_ta.highest(high, period=5)
+        _assert_array(highest, n)
+
+        lowest = haze_library.np_ta.lowest(low, period=5)
+        _assert_array(lowest, n)
+
+        crossover = haze_library.np_ta.crossover(close, close)
+        _assert_array(crossover, n)
+
+        crossunder = haze_library.np_ta.crossunder(close, close)
+        _assert_array(crossunder, n)
+
     def test_statistical_wrappers(self, ohlcv_data_extended):
         assert haze_library.np_ta is not None
 
@@ -73,4 +103,3 @@ class TestNumpyCompatContract:
 
         intercept = haze_library.np_ta.linreg_intercept(close, period=5)
         _assert_array(intercept, n)
-

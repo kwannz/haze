@@ -20,6 +20,7 @@ Usage:
 
 from __future__ import annotations
 
+from collections import deque
 import numpy as np
 from typing import Optional, Tuple, Union
 
@@ -514,11 +515,24 @@ def linreg_intercept(data: ArrayLike, period: int = 14) -> np.ndarray:
 def heikin_ashi(open_: ArrayLike, high: ArrayLike, low: ArrayLike,
                 close: ArrayLike) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Heikin Ashi candles. Returns (ha_open, ha_high, ha_low, ha_close)."""
-    ha_o, ha_h, ha_l, ha_c = _lib.py_heikin_ashi(
-        _to_list_fast(open_), _to_list_fast(high),
-        _to_list_fast(low), _to_list_fast(close)
-    )
-    return _to_array(ha_o), _to_array(ha_h), _to_array(ha_l), _to_array(ha_c)
+    open_arr = _ensure_float64(open_)
+    high_arr = _ensure_float64(high)
+    low_arr = _ensure_float64(low)
+    close_arr = _ensure_float64(close)
+
+    n = len(close_arr)
+    ha_close = (open_arr + high_arr + low_arr + close_arr) / 4.0
+    ha_open = np.empty(n, dtype=np.float64)
+    if n == 0:
+        return ha_open, ha_open, ha_open, ha_close
+
+    ha_open[0] = (open_arr[0] + close_arr[0]) / 2.0
+    for i in range(1, n):
+        ha_open[i] = (ha_open[i - 1] + ha_close[i - 1]) / 2.0
+
+    ha_high = np.maximum.reduce([high_arr, ha_open, ha_close])
+    ha_low = np.minimum.reduce([low_arr, ha_open, ha_close])
+    return ha_open, ha_high, ha_low, ha_close
 
 
 def doji(open_: ArrayLike, high: ArrayLike, low: ArrayLike,
@@ -542,10 +556,11 @@ def hammer(open_: ArrayLike, high: ArrayLike, low: ArrayLike,
 def engulfing(open_: ArrayLike, high: ArrayLike, low: ArrayLike,
               close: ArrayLike) -> np.ndarray:
     """Engulfing pattern detection."""
-    return _to_array(_lib.py_engulfing(
-        _to_list_fast(open_), _to_list_fast(high),
-        _to_list_fast(low), _to_list_fast(close)
-    ))
+    open_list = _to_list_fast(open_)
+    close_list = _to_list_fast(close)
+    bullish = np.array(_lib.py_bullish_engulfing(open_list, close_list), dtype=np.float64)
+    bearish = np.array(_lib.py_bearish_engulfing(open_list, close_list), dtype=np.float64)
+    return bullish - bearish
 
 
 def morning_star(open_: ArrayLike, high: ArrayLike, low: ArrayLike,
@@ -570,26 +585,76 @@ def evening_star(open_: ArrayLike, high: ArrayLike, low: ArrayLike,
 
 def crossover(series1: ArrayLike, series2: ArrayLike) -> np.ndarray:
     """Detect crossover (series1 crosses above series2)."""
-    return _to_array(_lib.py_crossover(
-        _to_list_fast(series1), _to_list_fast(series2)
-    ))
+    s1 = _ensure_float64(series1)
+    s2 = _ensure_float64(series2)
+    if len(s1) != len(s2):
+        raise ValueError("series1 and series2 must have the same length")
+    n = len(s1)
+    result = np.zeros(n, dtype=np.float64)
+    if n < 2:
+        return result
+    crossed = (s1[1:] > s2[1:]) & (s1[:-1] <= s2[:-1])
+    result[1:] = crossed.astype(np.float64)
+    return result
 
 
 def crossunder(series1: ArrayLike, series2: ArrayLike) -> np.ndarray:
     """Detect crossunder (series1 crosses below series2)."""
-    return _to_array(_lib.py_crossunder(
-        _to_list_fast(series1), _to_list_fast(series2)
-    ))
+    s1 = _ensure_float64(series1)
+    s2 = _ensure_float64(series2)
+    if len(s1) != len(s2):
+        raise ValueError("series1 and series2 must have the same length")
+    n = len(s1)
+    result = np.zeros(n, dtype=np.float64)
+    if n < 2:
+        return result
+    crossed = (s1[1:] < s2[1:]) & (s1[:-1] >= s2[:-1])
+    result[1:] = crossed.astype(np.float64)
+    return result
 
 
 def highest(data: ArrayLike, period: int = 14) -> np.ndarray:
     """Rolling highest value."""
-    return _to_array(_lib.py_highest(_to_list_fast(data), period))
+    values = _ensure_float64(data)
+    n = len(values)
+    out = np.full(n, np.nan, dtype=np.float64)
+    if period <= 0:
+        raise ValueError("period must be a positive integer")
+    if n == 0:
+        return out
+    window = int(period)
+    q: deque[int] = deque()
+    for i in range(n):
+        while q and q[0] <= i - window:
+            q.popleft()
+        while q and values[q[-1]] <= values[i]:
+            q.pop()
+        q.append(i)
+        if i >= window - 1:
+            out[i] = values[q[0]]
+    return out
 
 
 def lowest(data: ArrayLike, period: int = 14) -> np.ndarray:
     """Rolling lowest value."""
-    return _to_array(_lib.py_lowest(_to_list_fast(data), period))
+    values = _ensure_float64(data)
+    n = len(values)
+    out = np.full(n, np.nan, dtype=np.float64)
+    if period <= 0:
+        raise ValueError("period must be a positive integer")
+    if n == 0:
+        return out
+    window = int(period)
+    q: deque[int] = deque()
+    for i in range(n):
+        while q and q[0] <= i - window:
+            q.popleft()
+        while q and values[q[-1]] >= values[i]:
+            q.pop()
+        q.append(i)
+        if i >= window - 1:
+            out[i] = values[q[0]]
+    return out
 
 
 def percent_rank(data: ArrayLike, period: int = 20) -> np.ndarray:

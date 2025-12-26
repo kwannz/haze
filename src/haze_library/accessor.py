@@ -576,14 +576,25 @@ class TechnicalAnalysisAccessor:
 
     def heikin_ashi(self) -> Tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
         """Heikin Ashi candles. Returns (ha_open, ha_high, ha_low, ha_close)."""
-        open_, high, low, close = self._get_ohlc()
-        ha_o, ha_h, ha_l, ha_c = _lib.py_heikin_ashi(open_, high, low, close)
-        return (
-            _to_series(ha_o, self.index),
-            _to_series(ha_h, self.index),
-            _to_series(ha_l, self.index),
-            _to_series(ha_c, self.index),
-        )
+        open_ = self._get_column("open").astype(np.float64)
+        high = self._get_column("high").astype(np.float64)
+        low = self._get_column("low").astype(np.float64)
+        close = self._get_column("close").astype(np.float64)
+
+        if len(close) == 0:
+            empty = pd.Series([], index=self.index, dtype=np.float64)
+            return empty, empty, empty, empty
+
+        ha_close = (open_ + high + low + close) / 4.0
+        ha_open = pd.Series(index=self.index, dtype=np.float64)
+        ha_open.iloc[0] = (open_.iloc[0] + close.iloc[0]) / 2.0
+        for i in range(1, len(close)):
+            ha_open.iloc[i] = (ha_open.iloc[i - 1] + ha_close.iloc[i - 1]) / 2.0
+
+        ha_high = pd.concat([high, ha_open, ha_close], axis=1).max(axis=1)
+        ha_low = pd.concat([low, ha_open, ha_close], axis=1).min(axis=1)
+
+        return ha_open, ha_high, ha_low, ha_close
 
     def doji(self, threshold: float = 0.1) -> pd.Series:
         """Doji pattern detection."""
@@ -599,8 +610,10 @@ class TechnicalAnalysisAccessor:
 
     def engulfing(self) -> pd.Series:
         """Engulfing pattern detection."""
-        open_, high, low, close = self._get_ohlc()
-        result = _lib.py_engulfing(open_, high, low, close)
+        open_, _, _, close = self._get_ohlc()
+        bullish = _lib.py_bullish_engulfing(open_, close)
+        bearish = _lib.py_bearish_engulfing(open_, close)
+        result = [float(b) - float(s) for b, s in zip(bullish, bearish)]
         return _to_series(result, self.index)
 
     def morning_star(self) -> pd.Series:
@@ -619,29 +632,27 @@ class TechnicalAnalysisAccessor:
 
     def crossover(self, series1: pd.Series, series2: pd.Series) -> pd.Series:
         """Detect crossover (series1 crosses above series2)."""
-        s1 = _to_list(series1)
-        s2 = _to_list(series2)
-        result = _lib.py_crossover(s1, s2)
-        return _to_series(result, series1.index)
+        s1 = series1.astype(np.float64)
+        s2 = series2.astype(np.float64)
+        crossed = (s1 > s2) & (s1.shift(1) <= s2.shift(1))
+        return crossed.astype(np.float64)
 
     def crossunder(self, series1: pd.Series, series2: pd.Series) -> pd.Series:
         """Detect crossunder (series1 crosses below series2)."""
-        s1 = _to_list(series1)
-        s2 = _to_list(series2)
-        result = _lib.py_crossunder(s1, s2)
-        return _to_series(result, series1.index)
+        s1 = series1.astype(np.float64)
+        s2 = series2.astype(np.float64)
+        crossed = (s1 < s2) & (s1.shift(1) >= s2.shift(1))
+        return crossed.astype(np.float64)
 
     def highest(self, period: int = 14, column: str = 'high') -> pd.Series:
         """Rolling highest value."""
-        data = _to_list(self._get_column(column))
-        result = _lib.py_highest(data, period)
-        return _to_series(result, self.index)
+        data = self._get_column(column).astype(np.float64)
+        return data.rolling(window=period, min_periods=period).max()
 
     def lowest(self, period: int = 14, column: str = 'low') -> pd.Series:
         """Rolling lowest value."""
-        data = _to_list(self._get_column(column))
-        result = _lib.py_lowest(data, period)
-        return _to_series(result, self.index)
+        data = self._get_column(column).astype(np.float64)
+        return data.rolling(window=period, min_periods=period).min()
 
     def percent_rank(self, period: int = 20, column: str = 'close') -> pd.Series:
         """Percent Rank."""

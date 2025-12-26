@@ -2,7 +2,7 @@
 Pandas Accessor Contract Tests
 ==============================
 
-验证 pandas DataFrame/Series `.ta` accessor 与 Rust extension 的调用契约一致，
+验证 pandas DataFrame/Series `.haze` accessor 与 Rust extension 的调用契约一致，
 避免因参数/返回值不匹配导致的运行时 TypeError/ValueError。
 """
 
@@ -29,6 +29,11 @@ def _get_series_accessor(series: pd.Series):
 
 
 class TestDataFrameAccessorContract:
+    def test_accessor_is_registered(self):
+        df = pd.DataFrame({"close": [1.0, 2.0, 3.0]})
+        assert hasattr(df, "haze")
+        assert hasattr(df["close"], "haze")
+
     def test_multi_output_indicators(self, ohlcv_data_extended):
         df = pd.DataFrame(ohlcv_data_extended)
         ta = _get_df_accessor(df)
@@ -53,6 +58,31 @@ class TestDataFrameAccessorContract:
         sar, direction = ta.psar(af_start=0.02, af_increment=0.02, af_max=0.2)
         _assert_series(sar, df.index)
         _assert_series(direction, df.index)
+
+    def test_candlestick_and_utilities(self, ohlcv_data_extended):
+        df = pd.DataFrame(ohlcv_data_extended)
+        ta = _get_df_accessor(df)
+
+        ha_o, ha_h, ha_l, ha_c = ta.heikin_ashi()
+        _assert_series(ha_o, df.index)
+        _assert_series(ha_h, df.index)
+        _assert_series(ha_l, df.index)
+        _assert_series(ha_c, df.index)
+
+        engulfing = ta.engulfing()
+        _assert_series(engulfing, df.index)
+
+        highest = ta.highest(period=5, column="high")
+        _assert_series(highest, df.index)
+
+        lowest = ta.lowest(period=5, column="low")
+        _assert_series(lowest, df.index)
+
+        crossover = ta.crossover(df["close"], df["close"])
+        _assert_series(crossover, df.index)
+
+        crossunder = ta.crossunder(df["close"], df["close"])
+        _assert_series(crossunder, df.index)
 
     def test_statistical_wrappers(self, ohlcv_data_extended):
         df = pd.DataFrame(ohlcv_data_extended)
