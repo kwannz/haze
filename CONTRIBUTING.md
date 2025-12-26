@@ -61,7 +61,7 @@ cd ..
 pytest tests/
 
 # Run with coverage
-pytest tests/ --cov=_haze_rust --cov-report=html
+pytest tests/ --cov=haze_library --cov-report=html
 
 # Run precision validation
 python tests/run_precision_tests.py
@@ -88,52 +88,98 @@ If you want to add a new indicator, follow this template:
 File: `rust/src/indicators/YOUR_CATEGORY.rs`
 
 ```rust
+use crate::errors::{HazeError, HazeResult};
+use crate::errors::validation::{validate_not_empty, validate_period};
+use crate::init_result;
+
 /// YOUR_INDICATOR - Brief description
+///
+/// Algorithm:
+/// - Step 1: Description of calculation
+/// - Step 2: ...
 ///
 /// # Parameters
 /// - `values`: Input price data
 /// - `period`: Lookback period
 ///
 /// # Returns
-/// - `Vec<f64>`: Indicator values (NaN for initial period)
+/// - `Ok(Vec<f64>)`: Indicator values (NaN for warmup period)
+///
+/// # Errors
+/// - `HazeError::EmptyInput`: If values is empty
+/// - `HazeError::InvalidPeriod`: If period is 0 or > values.len()
+/// - `HazeError::InsufficientData`: If values.len() < required minimum
 ///
 /// # Example
-/// ```
+/// ```rust
 /// let close = vec![10.0, 11.0, 12.0, 13.0, 14.0];
-/// let result = your_indicator(&close, 3);
+/// let result = your_indicator(&close, 3)?;
+/// assert!(result[0].is_nan());  // Warmup period
+/// assert!(!result[2].is_nan()); // Valid value
 /// ```
-pub fn your_indicator(values: &[f64], period: usize) -> Vec<f64> {
+pub fn your_indicator(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // ✅ Step 1: Input validation (Fail-Fast principle)
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
+
     let n = values.len();
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
 
-    if n < period {
-        return result;
-    }
-
-    // Your algorithm implementation here
+    // ✅ Step 2: Calculation logic (no more errors returned)
     for i in (period - 1)..n {
         // Calculate indicator value
         result[i] = 0.0; // Replace with actual calculation
     }
 
-    result
+    Ok(result)
 }
 ```
+
+**✅ Error Handling Requirements**:
+1. Use `HazeResult<T>` as return type (not `Vec<f64>`)
+2. Validate all inputs at function entry using `validation` module
+3. Return `Err(HazeError::*)` for invalid inputs (empty, invalid period, etc.)
+4. Return `Ok(Vec<f64>)` with NaN for warmup period
+5. Document all possible errors in `# Errors` section
+6. See `docs/ERROR_HANDLING_STRATEGY.md` for detailed guidelines
 
 #### 2. Add PyO3 Wrapper
 
 File: `rust/src/lib.rs`
 
 ```rust
+/// Python wrapper for YOUR_INDICATOR
+///
+/// Args:
+///     values (List[float]): Input price data
+///     period (int): Lookback period
+///
+/// Returns:
+///     List[float]: Indicator values (NaN for warmup period)
+///
+/// Raises:
+///     ValueError: If values is empty
+///     ValueError: If period is invalid (0 or > len(values))
+///
+/// Example:
+///     >>> import haze_library as haze
+///     >>> close = [10.0, 11.0, 12.0, 13.0, 14.0]
+///     >>> result = haze.py_your_indicator(close, period=3)
 #[pyfunction]
 #[pyo3(name = "py_your_indicator")]
 fn py_your_indicator(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(indicators::your_category::your_indicator(&values, period))
+    // ✅ Use ? to automatically convert HazeError → PyErr (ValueError)
+    Ok(indicators::your_category::your_indicator(&values, period)?)
 }
 
-// Register in #[pymodule] fn _haze_rust
+// Register in #[pymodule] fn haze_library
 m.add_function(wrap_pyfunction!(py_your_indicator, m)?)?;
 ```
+
+**✅ Key Points**:
+- Use `?` operator to propagate errors (auto-converts `HazeError` → `PyErr`)
+- Document error scenarios in Python docstring (`Raises` section)
+- No manual error conversion needed (PyO3 handles it via `From<HazeError>`)
 
 #### 3. Add Unit Test
 
@@ -142,41 +188,63 @@ File: `tests/unit/test_YOUR_CATEGORY.py`
 ```python
 import pytest
 import numpy as np
-import _haze_rust as haze
+import haze_library as haze
 
 class TestYourIndicator:
     """Unit tests for YOUR_INDICATOR"""
 
+    # ✅ REQUIRED: Test empty input (must raise ValueError)
+    def test_empty_input(self):
+        """Empty input should raise ValueError"""
+        with pytest.raises(ValueError, match="Empty input"):
+            haze.py_your_indicator([], period=3)
+
+    # ✅ REQUIRED: Test invalid period (must raise ValueError)
+    def test_invalid_period_zero(self):
+        """Period = 0 should raise ValueError"""
+        values = [10.0, 11.0, 12.0]
+        with pytest.raises(ValueError, match="Invalid period"):
+            haze.py_your_indicator(values, period=0)
+
+    # ✅ REQUIRED: Test insufficient data (must raise ValueError)
+    def test_insufficient_data(self):
+        """Data length < period should raise ValueError"""
+        values = [10.0, 11.0]
+        with pytest.raises(ValueError, match="Insufficient data"):
+            haze.py_your_indicator(values, period=10)
+
+    # ✅ REQUIRED: Test basic calculation
     def test_basic_calculation(self, simple_prices):
         """Test basic calculation with hand-calculated values"""
         result = haze.py_your_indicator(simple_prices, period=3)
 
-        # Verify NaN for initial period
+        # Verify NaN for warmup period
         assert np.isnan(result[0])
         assert np.isnan(result[1])
 
         # Verify calculated values (hand-calculated)
+        assert not np.isnan(result[2])
         assert abs(result[2] - EXPECTED_VALUE) < 1e-10
 
-    def test_edge_cases(self):
-        """Test edge cases"""
-        # Empty array
-        result = haze.py_your_indicator([], period=3)
-        assert len(result) == 0
-
-        # Insufficient data
-        result = haze.py_your_indicator([10.0, 11.0], period=3)
-        assert all(np.isnan(result))
-
+    # ✅ RECOMMENDED: Test different periods
     def test_different_periods(self, simple_prices):
         """Test with different period parameters"""
         result_p2 = haze.py_your_indicator(simple_prices, period=2)
         result_p5 = haze.py_your_indicator(simple_prices, period=5)
 
-        # Verify period-specific behavior
+        # Verify period-specific warmup
         assert not np.isnan(result_p2[1])
         assert np.isnan(result_p5[4])
 ```
+
+**✅ Testing Requirements**:
+1. **MUST** test empty input (expect `ValueError`)
+2. **MUST** test invalid period (expect `ValueError`)
+3. **MUST** test insufficient data (expect `ValueError`)
+4. **MUST** test basic calculation with known values
+5. **SHOULD** test warmup period NaN behavior
+6. **SHOULD** test different period values
+7. Use `pytest.raises(ValueError)` for error cases
 
 #### 4. Add Precision Validation (Optional)
 
@@ -236,7 +304,7 @@ All contributions must include:
 ### Test Coverage
 
 - **Target**: > 80% code coverage
-- **Command**: `pytest tests/unit/ --cov=_haze_rust --cov-report=html`
+- **Command**: `pytest tests/unit/ --cov=haze_library --cov-report=html`
 
 ### Precision Validation
 
@@ -249,6 +317,67 @@ python tests/run_precision_tests.py
 **Expected**:
 - Max Error < 1e-9
 - Correlation > 0.9999
+
+## Documentation Requirements
+
+All code contributions must include proper documentation:
+
+### Rust Documentation
+
+1. **Public API Documentation**: All public functions, structs, traits, and modules must have doc comments (`///`)
+2. **Private Item Documentation**: Document private items when their purpose is not immediately obvious
+3. **Include Examples**: Add code examples in doc comments using `# Example` sections
+4. **Document Parameters**: Use `# Parameters` section to describe all function parameters
+5. **Document Return Values**: Use `# Returns` section to describe return values
+6. **Document Safety**: Use `# Safety` section for unsafe code
+7. **Document Panics**: Use `# Panics` section if function can panic
+
+Example:
+```rust
+/// Calculates the Simple Moving Average (SMA) over a specified period.
+///
+/// # Parameters
+/// - `values`: Slice of input price data
+/// - `period`: Number of periods for the moving average
+///
+/// # Returns
+/// Vector of SMA values (NaN for initial period where data is insufficient)
+///
+/// # Example
+/// ```
+/// let prices = vec![10.0, 11.0, 12.0, 13.0, 14.0];
+/// let sma = simple_moving_average(&prices, 3);
+/// assert!(sma[2].is_finite());  // First valid SMA at index 2
+/// ```
+///
+/// # Panics
+/// Panics if `period` is 0.
+pub fn simple_moving_average(values: &[f64], period: usize) -> Vec<f64> {
+    // Implementation...
+}
+```
+
+### Documentation Tools
+
+Use the provided scripts to check documentation quality:
+
+```bash
+# Generate documentation and open in browser
+./scripts/generate_docs.sh --open
+
+# Check documentation coverage and quality
+./scripts/check_docs.sh
+
+# View documentation coverage report
+cat doc-coverage-report.md
+```
+
+### Documentation Coverage Standards
+
+- **Minimum Coverage**: All new public items must be documented
+- **Coverage Target**: Maintain or improve overall documentation coverage
+- **Quality**: Documentation should be clear, accurate, and helpful
+- **Examples**: Include at least one example for complex functions
 
 ## Pull Request Process
 
@@ -266,7 +395,12 @@ python tests/run_precision_tests.py
    python tests/run_precision_tests.py
    ```
 
-3. **Format code**:
+3. **Check documentation**:
+   ```bash
+   ./scripts/check_docs.sh
+   ```
+
+4. **Format code**:
    ```bash
    cd rust
    cargo fmt
@@ -275,10 +409,11 @@ python tests/run_precision_tests.py
    black tests/
    ```
 
-4. **Update documentation**:
+5. **Update documentation**:
    - README.md (if adding new indicator)
    - IMPLEMENTED_INDICATORS.md
    - CHANGELOG.md (under "Unreleased")
+   - Add/update doc comments for new/modified code
 
 ### Submitting the PR
 
@@ -295,6 +430,7 @@ python tests/run_precision_tests.py
    - Add PyO3 wrapper py_awesome_oscillator
    - Add unit tests with hand-calculated values
    - Add precision validation vs TA-Lib
+   - Add documentation with examples
    - Update IMPLEMENTED_INDICATORS.md (17 → 18 momentum indicators)
    "
    ```
@@ -310,7 +446,22 @@ python tests/run_precision_tests.py
      - What does this PR do?
      - Why is this change needed?
      - How was it tested?
+     - Documentation coverage status
      - Any breaking changes?
+
+### PR Checklist
+
+Before submitting your PR, ensure you have completed the following:
+
+- [ ] All tests pass (`pytest tests/ -v`)
+- [ ] Code is formatted (`cargo fmt`, `black tests/`)
+- [ ] No clippy warnings (`cargo clippy`)
+- [ ] Documentation is complete (all public items documented)
+- [ ] Documentation quality check passes (`./scripts/check_docs.sh`)
+- [ ] Examples included in doc comments
+- [ ] CHANGELOG.md updated
+- [ ] README.md updated (if adding new features)
+- [ ] No decrease in documentation coverage
 
 ### PR Review Process
 

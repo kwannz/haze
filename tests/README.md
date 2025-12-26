@@ -73,6 +73,31 @@ pip install numpy pandas tqdm
 
 测试会自动启用 numba stub（无 JIT，仅用于对比）。
 
+**pandas-ta-kw（可选补齐 tdfi/wae/ssl 对比）**
+
+仓库已内置 `vendor/pandas-ta-kw`（git submodule，自动检测）。首次拉取后执行：
+
+```bash
+git submodule update --init --recursive
+```
+
+如需更新可用源码路径覆盖：
+
+```bash
+git clone https://github.com/kwannz/pandas-ta-kw.git /tmp/pandas-ta-kw
+export PANDAS_TA_KW_PATH=/tmp/pandas-ta-kw
+```
+
+如需加载自定义指标目录（例如自定义实现 tdfi/wae/ssl），设置：
+
+```bash
+export PANDAS_TA_KW_CUSTOM_DIR=/path/to/custom-indicators
+```
+
+自定义目录需符合 pandas_ta_classic 的分类结构（参考 `pandas_ta_classic/custom.py`）。
+
+仓库内置 `tests/pandas_ta_kw_custom`（tdfi/wae/ssl）会在检测到 pandas-ta-kw 时自动加载。
+
 ### 2. 编译 Rust 库
 
 ```bash

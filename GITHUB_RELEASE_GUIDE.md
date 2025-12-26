@@ -125,7 +125,7 @@ pip install haze-library
 ## 🚀 Quick Start
 
 ```python
-import _haze_rust as haze
+import haze_library as haze
 
 close_prices = [100.0, 101.0, 102.0, 101.5, 103.0, 102.5, 104.0]
 
@@ -218,7 +218,7 @@ MIT License - See [LICENSE](LICENSE) for details.
 5. **验证安装**:
    ```bash
    pip install haze-library
-   python -c "import _haze_rust as haze; print(haze.py_sma([1,2,3,4,5], 3))"
+   python -c "import haze_library as haze; print(haze.py_sma([1,2,3,4,5], 3))"
    ```
 
 ## 📝 快速命令参考

@@ -147,5 +147,182 @@
 1. 请求方案对比。  
 ...（基于文档）。
 
+## 错误处理最佳实践
+
+### Haze项目错误处理原则
+
+基于SOLID原则和奥卡姆剃刀，Haze项目采用统一的错误处理策略：
+
+#### 核心决策
+1. **使用HazeResult<T>而非NaN掩盖错误**
+   - 错误场景：参数无效、数据不足 → `Err(HazeError::*)`
+   - 缺失值场景：Warmup期、局部计算失败 → `Ok(Vec<f64>)` with NaN
+   - 理由：类型安全，强制错误处理，符合Rust最佳实践（SOLID的单一职责原则）
+
+2. **Fail-Fast原则**
+   - 所有输入验证集中在函数入口
+   - 避免在计算中途返回错误
+   - 理由：提高调试效率，符合KISS原则（保持简单）
+
+3. **上下文丰富的错误信息**
+   ```rust
+   // ✅ 良好：包含诊断上下文
+   Err(HazeError::InvalidPeriod { period: 0, data_len: 100 })
+
+   // ❌ 不良：信息不足
+   Err(HazeError::GenericError)
+   ```
+
+#### 标准实现模板
+
+##### 单输入指标
+```rust
+pub fn indicator(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // 1. 入口验证（Fail-Fast）
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
+
+    // 2. 计算逻辑（不再返回错误）
+    let mut result = init_result!(values.len());
+    for i in (period - 1)..values.len() {
+        result[i] = compute(values, i, period);
+    }
+
+    Ok(result)
+}
+```
+
+##### 多输入指标（OHLC）
+```rust
+pub fn indicator(
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    period: usize,
+) -> HazeResult<Vec<f64>> {
+    // 验证非空 + 长度一致
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
+    validate_period(period, high.len())?;
+
+    let mut result = init_result!(high.len());
+    // ...
+    Ok(result)
+}
+```
+
+##### Python FFI包装器
+```rust
+#[pyfunction]
+#[pyo3(name = "py_indicator")]
+fn py_indicator(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    // 直接调用Rust函数，?自动转换HazeError→PyErr
+    Ok(indicators::module::indicator(&values, period)?)
+}
+```
+
+#### 错误处理DO's ✅
+
+1. **使用validation模块标准函数**
+   ```rust
+   use crate::errors::validation::*;
+
+   validate_not_empty(values, "values")?;
+   validate_period(period, values.len())?;
+   validate_range("alpha", 0.5, 0.0, 1.0)?;
+   ```
+
+2. **Warmup期使用NaN**
+   ```rust
+   let mut result = init_result!(n);  // vec![f64::NAN; n]
+   for i in (period - 1)..n {
+       result[i] = calculate(...);  // 仅填充有效区间
+   }
+   Ok(result)
+   ```
+
+3. **传播错误而非吞噬**
+   ```rust
+   let sub_result = sub_indicator(values, period)?;  // ✅ 使用?传播
+   ```
+
+#### 错误处理DON'Ts ❌
+
+1. **不要用NaN掩盖输入错误**
+   ```rust
+   // ❌ 错误
+   if period == 0 { return vec![f64::NAN; n]; }
+
+   // ✅ 正确
+   if period == 0 {
+       return Err(HazeError::InvalidPeriod { period, data_len: n });
+   }
+   ```
+
+2. **不要在计算中途返回错误**
+   ```rust
+   // ❌ 错误：违反Fail-Fast
+   for i in 0..n {
+       if values[i] < 0.0 { return Err(...); }
+   }
+
+   // ✅ 正确：入口处验证
+   validate_all_positive(values)?;
+   ```
+
+3. **不要吞噬错误**
+   ```rust
+   // ❌ 错误
+   let result = sub_indicator(...).unwrap_or_else(|_| vec![]);
+
+   // ✅ 正确
+   let result = sub_indicator(...)?;
+   ```
+
+#### 必需测试用例
+
+每个新指标必须包含以下测试：
+
+```rust
+#[test]
+fn test_indicator_empty_input() {
+    let result = indicator(&[], 10);
+    assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+}
+
+#[test]
+fn test_indicator_invalid_period() {
+    let values = vec![1.0, 2.0, 3.0];
+    assert!(matches!(
+        indicator(&values, 0),
+        Err(HazeError::InvalidPeriod { .. })
+    ));
+}
+
+#[test]
+fn test_indicator_valid() {
+    let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+    let result = indicator(&values, 3).unwrap();
+
+    // Warmup期为NaN
+    assert!(result[0].is_nan());
+    assert!(result[1].is_nan());
+
+    // 有效值检查
+    assert!(!result[2].is_nan());
+}
+```
+
+#### 参考文档
+- 详细策略：`docs/ERROR_HANDLING_STRATEGY.md`
+- 良好示例：`src/indicators/momentum.rs`
+- 验证工具：`src/errors.rs::validation`
+
+---
+
 ## 初始化
 作为<角色>，遵守<约束>，使用默认<语言>交流。在方案前完成基于原则的反思。

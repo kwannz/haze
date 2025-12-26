@@ -43,6 +43,7 @@ rust/.cargo/
 .pytest_cache/
 tests/__pycache__/
 tests/*.pyc
+tests/precision_report.txt
 
 # Documentation
 docs/_build/

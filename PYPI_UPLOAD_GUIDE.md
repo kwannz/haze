@@ -125,7 +125,7 @@ source test_env/bin/activate
 pip install haze-library
 
 # 测试导入
-python -c "import _haze_rust as haze; print(haze.py_sma([1,2,3,4,5], period=3))"
+python -c "import haze_library as haze; print(haze.py_sma([1,2,3,4,5], period=3))"
 
 # 清理
 deactivate

@@ -1,9 +1,11 @@
 # 🌫️ Haze-Library
 
+[![CI](https://github.com/your-org/haze-library/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/haze-library/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/your-org/haze-library/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/haze-library)
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange)](https://www.rust-lang.org/)
-[![PyO3](https://img.shields.io/badge/PyO3-0.21-green)](https://pyo3.rs/)
+[![PyO3](https://img.shields.io/badge/PyO3-0.27-green)](https://pyo3.rs/)
 
 **High-performance quantitative trading indicators library with Rust backend**
 
@@ -89,6 +91,111 @@ for p in patterns:
     print(f"{p.pattern_type_zh}: {p.state}, PRZ={p.prz_center:.2f}, Prob={p.completion_probability:.1%}")
 ```
 
+### ⚠️ Error Handling
+
+Haze-Library uses Python exceptions for error handling. Most indicator functions will raise `ValueError` when given invalid inputs:
+
+```python
+import haze_library as haze
+
+# Example 1: Invalid period (too large)
+try:
+    prices = [100.0, 101.0, 102.0]
+    rsi = haze.py_rsi(prices, period=14)  # Period > data length
+except ValueError as e:
+    print(f"Error: {e}")
+    # Output: Error: Invalid period: 14 (must be > 0 and <= data length 3)
+
+# Example 2: Mismatched array lengths
+try:
+    high = [101.0, 102.0, 103.0]
+    low = [99.0, 100.0]  # Different length
+    close = [100.0, 101.0, 102.0]
+    atr = haze.py_atr(high, low, close, period=2)
+except ValueError as e:
+    print(f"Error: {e}")
+    # Output: Error: Length mismatch: high=3, low=2
+
+# Example 3: Empty input data
+try:
+    rsi = haze.py_rsi([], period=14)
+except ValueError as e:
+    print(f"Error: {e}")
+    # Output: Error: Empty input: close cannot be empty
+
+# Best Practice: Validate inputs before calling indicators
+def calculate_rsi_safe(prices, period=14):
+    """Calculate RSI with proper error handling."""
+    if not prices:
+        return None
+    if period > len(prices):
+        period = len(prices)  # Adjust period to data size
+
+    try:
+        return haze.py_rsi(prices, period=period)
+    except ValueError as e:
+        print(f"Failed to calculate RSI: {e}")
+        return None
+```
+
+**Common Error Types:**
+- `ValueError`: Raised for invalid inputs (wrong period, mismatched lengths, empty data, etc.)
+- All error messages are descriptive and include details about what went wrong
+
+**When Errors Are Raised:**
+- Period is 0 or larger than the data length
+- Input arrays have mismatched lengths (for multi-array indicators)
+- Input data is empty
+- Parameter values are out of valid range
+- Data contains insufficient points for calculation
+
+### 🔧 Multi-Framework Support
+
+Haze supports multiple data frameworks for seamless integration:
+
+#### Polars DataFrame
+```python
+import polars as pl
+from haze_library import polars_ta
+
+df = pl.read_csv('ohlcv.csv')
+
+# Add indicators to DataFrame
+df = polars_ta.sma(df, 'close', period=20)
+df = polars_ta.rsi(df, 'close', period=14)
+df = polars_ta.macd(df, 'close')  # Adds macd, macd_signal, macd_histogram columns
+df = polars_ta.bollinger_bands(df, 'close')  # Adds bb_upper, bb_middle, bb_lower
+```
+
+#### PyTorch Tensors
+```python
+import torch
+from haze_library import torch_ta
+
+close = torch.tensor([100.0, 101.0, 102.0, ...])
+high = torch.tensor([101.0, 102.0, 103.0, ...])
+low = torch.tensor([99.0, 100.0, 101.0, ...])
+
+# Calculate indicators (returns torch.Tensor)
+sma = torch_ta.sma(close, period=20)
+rsi = torch_ta.rsi(close, period=14)
+macd, signal, hist = torch_ta.macd(close)
+upper, middle, lower = torch_ta.bollinger_bands(close)
+trend, direction = torch_ta.supertrend(high, low, close)
+```
+
+#### NumPy Arrays
+```python
+import numpy as np
+from haze_library import np_ta
+
+close = np.array([100.0, 101.0, 102.0, ...])
+
+# Calculate indicators (returns np.ndarray)
+sma = np_ta.sma(close, period=20)
+rsi = np_ta.rsi(close, period=14)
+```
+
 ### 📊 Indicator Categories (215 Total)
 
 <details>
@@ -147,6 +254,8 @@ for p in patterns:
 </details>
 
 For complete indicator list with parameters, see [IMPLEMENTED_INDICATORS.md](IMPLEMENTED_INDICATORS.md).
+
+**📚 Full API Documentation**: For comprehensive API reference with detailed parameter descriptions, algorithms, examples, and cross-references, see [API_REFERENCE.md](docs/API_REFERENCE.md).
 
 ### 🎯 Performance Benchmarks
 
@@ -293,6 +402,64 @@ for p in patterns:
     print(f"{p.pattern_type_zh}: {p.state}, PRZ={p.prz_center:.2f}, 概率={p.completion_probability:.1%}")
 ```
 
+### ⚠️ 错误处理
+
+Haze-Library 使用 Python 异常进行错误处理。当输入无效时，大多数指标函数会抛出 `ValueError` 异常：
+
+```python
+import haze_library as haze
+
+# 示例 1：无效的周期（过大）
+try:
+    prices = [100.0, 101.0, 102.0]
+    rsi = haze.py_rsi(prices, period=14)  # 周期 > 数据长度
+except ValueError as e:
+    print(f"错误: {e}")
+    # 输出: 错误: Invalid period: 14 (must be > 0 and <= data length 3)
+
+# 示例 2：数组长度不匹配
+try:
+    high = [101.0, 102.0, 103.0]
+    low = [99.0, 100.0]  # 长度不同
+    close = [100.0, 101.0, 102.0]
+    atr = haze.py_atr(high, low, close, period=2)
+except ValueError as e:
+    print(f"错误: {e}")
+    # 输出: 错误: Length mismatch: high=3, low=2
+
+# 示例 3：空输入数据
+try:
+    rsi = haze.py_rsi([], period=14)
+except ValueError as e:
+    print(f"错误: {e}")
+    # 输出: 错误: Empty input: close cannot be empty
+
+# 最佳实践：在调用指标前验证输入
+def calculate_rsi_safe(prices, period=14):
+    """安全地计算 RSI，带有错误处理。"""
+    if not prices:
+        return None
+    if period > len(prices):
+        period = len(prices)  # 调整周期以适应数据大小
+
+    try:
+        return haze.py_rsi(prices, period=period)
+    except ValueError as e:
+        print(f"计算 RSI 失败: {e}")
+        return None
+```
+
+**常见错误类型：**
+- `ValueError`：输入无效时抛出（错误的周期、长度不匹配、空数据等）
+- 所有错误消息都具有描述性，包含错误详情
+
+**何时会抛出错误：**
+- 周期为 0 或大于数据长度
+- 输入数组长度不匹配（对于多数组指标）
+- 输入数据为空
+- 参数值超出有效范围
+- 数据点不足以进行计算
+
 ### 📊 指标分类（共 215 个）
 
 <details>
@@ -351,6 +518,8 @@ for p in patterns:
 </details>
 
 完整指标列表及参数请参阅 [IMPLEMENTED_INDICATORS.md](IMPLEMENTED_INDICATORS.md)。
+
+**📚 完整 API 文档**：详细的参数说明、算法解析、使用示例及交叉引用，请参阅 [API_REFERENCE.md](docs/API_REFERENCE.md)。
 
 ### 🎯 性能基准
 

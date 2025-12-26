@@ -1,0 +1,206 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'rust/**'
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'rust/**'
+      - 'docs/**'
+      - '.github/workflows/docs.yml'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-docs:
+    name: Build and Check Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: rust/target
+          key: ${{ runner.os }}-cargo-target-docs-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-docs-
+
+      - name: Install cargo-deadlinks
+        run: cargo install cargo-deadlinks --locked
+
+      - name: Build documentation
+        working-directory: ./rust
+        run: |
+          cargo doc --no-deps --document-private-items --features "python streaming"
+        env:
+          RUSTDOCFLAGS: "--cfg docsrs -D warnings"
+
+      - name: Check for broken documentation links
+        working-directory: ./rust
+        run: |
+          cargo deadlinks --check-http --dir target/doc
+
+      - name: Generate documentation coverage report
+        working-directory: ./rust
+        run: |
+          echo "# Documentation Coverage Report" > doc-coverage.md
+          echo "" >> doc-coverage.md
+          echo "## Missing Documentation" >> doc-coverage.md
+          echo '```' >> doc-coverage.md
+          cargo rustdoc --features "python streaming" -- -W missing_docs 2>&1 | tee -a doc-coverage.md || true
+          echo '```' >> doc-coverage.md
+
+      - name: Upload documentation coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: doc-coverage-report
+          path: rust/doc-coverage.md
+          retention-days: 7
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-docs
+          path: rust/target/doc
+          retention-days: 7
+
+  deploy-docs:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build-docs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: rust/target
+          key: ${{ runner.os }}-cargo-target-docs-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build documentation
+        working-directory: ./rust
+        run: |
+          cargo doc --no-deps --document-private-items --features "python streaming"
+        env:
+          RUSTDOCFLAGS: "--cfg docsrs"
+
+      - name: Add index redirect
+        run: |
+          echo '<meta http-equiv="refresh" content="0; url=haze_library/index.html">' > rust/target/doc/index.html
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./rust/target/doc
+          publish_branch: gh-pages
+          force_orphan: true
+
+  check-coverage:
+    name: Documentation Coverage Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Check documentation coverage
+        working-directory: ./rust
+        run: |
+          # Check for missing docs warnings
+          echo "Checking for missing documentation..."
+          cargo rustdoc --features "python streaming" -- -W missing_docs 2>&1 | tee missing_docs.log || true
+
+          # Count missing docs
+          MISSING_COUNT=$(grep -c "warning: missing documentation" missing_docs.log || echo "0")
+          echo "Missing documentation items: $MISSING_COUNT"
+
+          # Fail if coverage is too low (currently warning only)
+          if [ "$MISSING_COUNT" -gt 100 ]; then
+            echo "⚠️ Warning: High number of missing documentation items ($MISSING_COUNT)"
+            echo "Please add documentation to improve coverage"
+          fi
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const logContent = fs.readFileSync('rust/missing_docs.log', 'utf8');
+            const missingCount = (logContent.match(/warning: missing documentation/g) || []).length;
+
+            const body = `## 📚 Documentation Coverage Report
+
+            **Missing documentation items:** ${missingCount}
+
+            ${missingCount > 0 ? '⚠️ Please add documentation for new public items.' : '✅ All public items are documented!'}
+
+            <details>
+            <summary>View missing documentation details</summary>
+
+            \`\`\`
+            ${logContent.slice(0, 2000)}
+            \`\`\`
+            </details>`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });

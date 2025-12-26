@@ -1,0 +1,315 @@
+# Numerical Precision & Stability Testing Pipeline
+# Runs numerical stability tests and benchmarks to ensure indicator accuracy
+
+name: Precision Tests
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # Run daily at 2 AM UTC to catch precision regressions
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ============================================================
+  # Python Numerical Stability Tests
+  # ============================================================
+  python-precision-tests:
+    name: Python Numerical Stability Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ['3.10', '3.11', '3.12']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-precision-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-precision-
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install maturin pytest pytest-cov numpy pandas
+
+      - name: Build Rust extension
+        working-directory: ./rust
+        run: maturin develop --release --features python
+
+      - name: Run numerical stability tests
+        run: |
+          pytest tests/unit/test_numerical_stability.py -v \
+            --cov=haze_library \
+            --cov-report=xml \
+            --cov-report=term-missing
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          flags: precision-tests
+          fail_ci_if_error: false
+
+      - name: Generate precision report
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        run: |
+          python -c "
+          import numpy as np
+          import haze_library as haze
+
+          print('=' * 60)
+          print('NUMERICAL PRECISION VALIDATION REPORT')
+          print('=' * 60)
+
+          # Test 1: Large numbers with small increments
+          print('\n1. Large Numbers + Small Increments Test')
+          base = 1e10
+          data = [base + i * 1e-5 for i in range(10000)]
+          result = haze.sma(data, period=100)
+          valid = [r for r in result if not np.isnan(r)]
+          max_error = max(abs(r - base) / base for r in valid)
+          print(f'   Max relative error: {max_error:.2e}')
+          print(f'   Status: {'PASS' if max_error < 1e-8 else 'FAIL'}')
+
+          # Test 2: Long sequence precision
+          print('\n2. Long Sequence Precision Test (100k points)')
+          data = [100.0 + np.sin(i * 0.01) for i in range(100000)]
+          result = haze.ema(data, period=20)
+          print(f'   Final value finite: {np.isfinite(result[-1])}')
+          print(f'   Status: {'PASS' if np.isfinite(result[-1]) else 'FAIL'}')
+
+          # Test 3: Extreme volatility
+          print('\n3. Extreme Volatility Test')
+          data = [100.0]
+          for i in range(1000):
+              data.append(data[-1] * (2.0 if i % 2 == 0 else 0.5))
+          result = haze.sma(data, period=50)
+          valid = [r for r in result if not np.isnan(r)]
+          all_finite = all(np.isfinite(r) for r in valid)
+          print(f'   All values finite: {all_finite}')
+          print(f'   Status: {'PASS' if all_finite else 'FAIL'}')
+
+          print('\n' + '=' * 60)
+          " > precision_report.txt
+
+      - name: Upload precision report
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
+        uses: actions/upload-artifact@v4
+        with:
+          name: precision-report
+          path: precision_report.txt
+
+  # ============================================================
+  # Rust Numerical Precision Benchmarks
+  # ============================================================
+  rust-precision-benchmarks:
+    name: Rust Precision Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-bench-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-bench-
+
+      - name: Run precision benchmarks
+        working-directory: ./rust
+        run: |
+          cargo bench --bench numerical_precision -- --output-format bencher | tee bench_output.txt
+
+      - name: Parse benchmark results
+        working-directory: ./rust
+        run: |
+          echo "# Benchmark Results" > benchmark_summary.md
+          echo "" >> benchmark_summary.md
+          echo "## Numerical Precision Benchmarks" >> benchmark_summary.md
+          echo "" >> benchmark_summary.md
+          echo '```' >> benchmark_summary.md
+          cat bench_output.txt >> benchmark_summary.md
+          echo '```' >> benchmark_summary.md
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: rust/benchmark_summary.md
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        if: github.event_name != 'pull_request'
+        with:
+          name: Rust Numerical Precision Benchmarks
+          tool: 'cargo'
+          output-file-path: rust/bench_output.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          alert-threshold: '150%'
+          comment-on-alert: true
+          fail-on-alert: false
+
+  # ============================================================
+  # Compare Precision with Previous Runs
+  # ============================================================
+  precision-comparison:
+    name: Precision Regression Check
+    runs-on: ubuntu-latest
+    needs: [python-precision-tests]
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install maturin pytest numpy pandas
+
+      - name: Build Rust extension
+        working-directory: ./rust
+        run: maturin develop --release --features python
+
+      - name: Run precision validation
+        run: |
+          python -c "
+          import numpy as np
+          import haze_library as haze
+
+          # Define precision thresholds
+          THRESHOLDS = {
+              'large_numbers_error': 1e-8,
+              'long_sequence_valid': True,
+              'extreme_volatility_finite': True,
+          }
+
+          failures = []
+
+          # Test 1: Large numbers
+          base = 1e10
+          data = [base + i * 1e-5 for i in range(10000)]
+          result = haze.sma(data, period=100)
+          valid = [r for r in result if not np.isnan(r)]
+          max_error = max(abs(r - base) / base for r in valid)
+          if max_error >= THRESHOLDS['large_numbers_error']:
+              failures.append(f'Large numbers error too high: {max_error:.2e}')
+
+          # Test 2: Long sequence
+          data = [100.0 + np.sin(i * 0.01) for i in range(100000)]
+          result = haze.ema(data, period=20)
+          if not np.isfinite(result[-1]):
+              failures.append('Long sequence produced non-finite value')
+
+          # Test 3: Extreme volatility
+          data = [100.0]
+          for i in range(1000):
+              data.append(data[-1] * (2.0 if i % 2 == 0 else 0.5))
+          result = haze.sma(data, period=50)
+          valid = [r for r in result if not np.isnan(r)]
+          if not all(np.isfinite(r) for r in valid):
+              failures.append('Extreme volatility produced non-finite values')
+
+          if failures:
+              print('PRECISION REGRESSION DETECTED:')
+              for f in failures:
+                  print(f'  - {f}')
+              exit(1)
+          else:
+              print('All precision tests passed!')
+          "
+
+  # ============================================================
+  # Generate Precision Documentation
+  # ============================================================
+  precision-documentation:
+    name: Generate Precision Report
+    runs-on: ubuntu-latest
+    needs: [python-precision-tests, rust-precision-benchmarks]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download precision report
+        uses: actions/download-artifact@v4
+        with:
+          name: precision-report
+          path: reports
+
+      - name: Download benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results
+          path: reports
+
+      - name: Create combined report
+        run: |
+          cat > reports/PRECISION_SUMMARY.md << 'EOF'
+          # Numerical Precision Test Summary
+
+          Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          Commit: ${{ github.sha }}
+
+          ## Python Precision Tests
+
+          EOF
+
+          cat reports/precision_report.txt >> reports/PRECISION_SUMMARY.md
+
+          cat >> reports/PRECISION_SUMMARY.md << 'EOF'
+
+          ## Rust Benchmark Results
+
+          EOF
+
+          cat reports/benchmark_summary.md >> reports/PRECISION_SUMMARY.md
+
+      - name: Upload combined report
+        uses: actions/upload-artifact@v4
+        with:
+          name: precision-summary
+          path: reports/PRECISION_SUMMARY.md
+          retention-days: 90
