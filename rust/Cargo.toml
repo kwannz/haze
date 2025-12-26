@@ -9,15 +9,26 @@ repository = "https://github.com/kwannz/haze"
 
 [lib]
 name = "haze_library"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 # PyO3 0.27+ 支持 Python 3.8-3.14
-pyo3 = { version = "0.27", optional = true, features = ["extension-module"] }
+# 注意：不要在依赖上直接启用 `extension-module`，否则 `cargo test` / `cargo test --all-features`
+# 会在本地环境（尤其是 macOS）遇到链接问题。maturin 会通过 `PYO3_BUILD_EXTENSION_MODULE`
+# 等方式为扩展模块构建提供正确行为。
+pyo3 = { version = "0.27", optional = true }
 numpy = { version = "0.27", optional = true }
 rayon = "1.8"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
+
+# Polars 集成（可选）
+# 注意：pyo3-polars 0.23+ 需要 pyo3 0.26，暂时禁用以避免版本冲突
+# pyo3-polars = { version = "0.23", optional = true }
+# polars = { version = "0.50", optional = true, default-features = false, features = ["lazy"] }
+
+# 流式计算（tokio 异步运行时）
+tokio = { version = "1.42", optional = true, features = ["rt-multi-thread", "sync"] }
 
 # ML 框架 (linfa)
 linfa = "0.7"
@@ -36,10 +47,16 @@ serde_json = "1.0"
 version = "0.15"
 features = ["rayon"]
 
+[build-dependencies]
+pyo3-build-config = { version = "0.27", features = ["resolve-config"] }
+
 [features]
 default = []
 python = ["pyo3", "numpy"]
+polars = ["python"] # 预留开关：当前为 stub，确保 all-features 可编译
+streaming = ["dep:tokio"]
 simd = []  # 可选 SIMD 优化
+full = ["python", "streaming"]  # 暂时移除 polars
 
 # ============================================================================
 # 构建优化配置
@@ -60,3 +77,32 @@ strip = false
 [profile.bench]
 inherits = "release"
 debug = true            # 基准测试保留调试信息
+
+# ============================================================================
+# Benchmarks
+# ============================================================================
+
+[[bench]]
+name = "kahan_benchmark"
+harness = false
+
+[[bench]]
+name = "numerical_precision"
+harness = false
+
+[[bench]]
+name = "hotspots"
+harness = false
+
+[dev-dependencies]
+criterion = "0.5"
+
+# ============================================================================
+# Documentation Configuration
+# ============================================================================
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+default-target = "x86_64-unknown-linux-gnu"
+targets = ["x86_64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-pc-windows-msvc"]

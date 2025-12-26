@@ -14,15 +14,15 @@ use std::collections::HashMap;
 /// Pivot 计算结果结构体
 #[derive(Debug, Clone)]
 pub struct PivotLevels {
-    pub pivot: f64,        // 枢轴点（PP）
-    pub r1: f64,           // 阻力位 1
-    pub r2: f64,           // 阻力位 2
-    pub r3: f64,           // 阻力位 3
-    pub r4: Option<f64>,   // 阻力位 4（Camarilla 专用）
-    pub s1: f64,           // 支撑位 1
-    pub s2: f64,           // 支撑位 2
-    pub s3: f64,           // 支撑位 3
-    pub s4: Option<f64>,   // 支撑位 4（Camarilla 专用）
+    pub pivot: f64,      // 枢轴点（PP）
+    pub r1: f64,         // 阻力位 1
+    pub r2: f64,         // 阻力位 2
+    pub r3: f64,         // 阻力位 3
+    pub r4: Option<f64>, // 阻力位 4（Camarilla 专用）
+    pub s1: f64,         // 支撑位 1
+    pub s2: f64,         // 支撑位 2
+    pub s3: f64,         // 支撑位 3
+    pub s4: Option<f64>, // 支撑位 4（Camarilla 专用）
 }
 
 /// 标准枢轴点（Standard/Classic Pivots）
@@ -34,7 +34,7 @@ pub struct PivotLevels {
 /// 返回：PivotLevels 结构体
 ///
 /// # 算法
-/// ```
+/// ```text
 /// PP = (H + L + C) / 3
 /// R1 = 2*PP - L
 /// R2 = PP + (H - L)
@@ -77,7 +77,7 @@ pub fn standard_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
 /// 返回：PivotLevels 结构体
 ///
 /// # 算法
-/// ```
+/// ```text
 /// PP = (H + L + C) / 3
 /// R1 = PP + 0.382 * (H - L)
 /// R2 = PP + 0.618 * (H - L)
@@ -120,7 +120,7 @@ pub fn fibonacci_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
 /// 返回：PivotLevels 结构体
 ///
 /// # 算法
-/// ```
+/// ```text
 /// PP = (H + L + 2*C) / 4  （更重视收盘价）
 /// R1 = 2*PP - L
 /// R2 = PP + (H - L)
@@ -133,11 +133,11 @@ pub fn woodie_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
 
     let r1 = 2.0 * pp - low;
     let r2 = pp + range;
-    let r3 = high + 2.0 * (pp - low);  // R3 同标准计算
+    let r3 = high + 2.0 * (pp - low); // R3 同标准计算
 
     let s1 = 2.0 * pp - high;
     let s2 = pp - range;
-    let s3 = low - 2.0 * (high - pp);  // S3 同标准计算
+    let s3 = low - 2.0 * (high - pp); // S3 同标准计算
 
     PivotLevels {
         pivot: pp,
@@ -161,7 +161,7 @@ pub fn woodie_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
 /// 返回：PivotLevels 结构体
 ///
 /// # 算法
-/// ```
+/// ```text
 /// PP = (H + L + C) / 3
 /// R1 = C + 1.1/12 * (H - L)
 /// R2 = C + 1.1/6 * (H - L)
@@ -209,7 +209,7 @@ pub fn camarilla_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
 /// 返回：PivotLevels 结构体
 ///
 /// # 算法
-/// ```
+/// ```text
 /// 如果 Close < Open: X = H + 2*L + C
 /// 如果 Close > Open: X = 2*H + L + C
 /// 如果 Close = Open: X = H + L + 2*C
@@ -268,10 +268,18 @@ pub fn calc_pivot_series(
     for i in 0..n {
         if i == 0 {
             // 第一个周期没有前一周期数据，使用当前数据
-            pivots.push(calc_single_pivot(open[i], high[i], low[i], close[i], method));
+            pivots.push(calc_single_pivot(
+                open[i], high[i], low[i], close[i], method,
+            ));
         } else {
             // 使用前一周期的数据计算当前枢轴点
-            pivots.push(calc_single_pivot(open[i - 1], high[i - 1], low[i - 1], close[i - 1], method));
+            pivots.push(calc_single_pivot(
+                open[i - 1],
+                high[i - 1],
+                low[i - 1],
+                close[i - 1],
+                method,
+            ));
         }
     }
 

@@ -3,9 +3,16 @@
 // 包含：Entropy, Aberration, Squeeze, QQE, CTI, ER, Bias, PSL, RVI, Inertia
 
 #![allow(unused_variables)]
+// 指标函数需要 OHLCV + 多个参数是行业标准
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::needless_range_loop)]
 
-use crate::utils::{ema, sma, stdev, rma, rolling_max, rolling_min, tsf};
+use crate::errors::{HazeError, HazeResult};
+use crate::errors::validation::{validate_not_empty, validate_period, validate_same_length, validate_lengths_match};
 use crate::indicators::{atr, bollinger_bands, keltner_channel, rsi};
+use crate::init_result;
+use crate::utils::math::{is_not_zero, is_zero};
+use crate::utils::{ema, rma, rolling_max, rolling_min, sma, stdev, tsf};
 
 /// Entropy - 信息熵指标（价格不确定性度量）
 ///
@@ -20,21 +27,37 @@ use crate::indicators::{atr, bollinger_bands, keltner_channel, rsi};
 ///
 /// # 返回
 /// - 信息熵值（越高表示价格越不确定）
-pub fn entropy(close: &[f64], period: usize, bins: usize) -> Vec<f64> {
-    let n = close.len();
-    if period == 0 || period >= n || bins == 0 {
-        return vec![f64::NAN; n];
+pub fn entropy(close: &[f64], period: usize, bins: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    if period == 0 || bins == 0 {
+        return Err(HazeError::InvalidPeriod { period, data_len: close.len() });
+    }
+    if period > close.len() {
+        return Err(HazeError::InsufficientData {
+            required: period,
+            actual: close.len()
+        });
     }
 
-    let mut result = vec![f64::NAN; n];
+    // [2] 原始计算逻辑
+    let n = close.len();
+    let mut result = init_result!(n);
 
     for i in period..n {
         let window = &close[i + 1 - period..=i];
 
-        // 计算收益率
+        // 计算收益率（跳过除零情况）
         let mut returns = Vec::with_capacity(window.len() - 1);
         for j in 1..window.len() {
-            returns.push((window[j] - window[j - 1]) / window[j - 1]);
+            let prev = window[j - 1];
+            // 除零保护：跳过前值为 0 或非有限值的情况
+            if is_not_zero(prev) && prev.is_finite() {
+                let ret = (window[j] - prev) / prev;
+                if ret.is_finite() {
+                    returns.push(ret);
+                }
+            }
         }
 
         if returns.is_empty() {
@@ -74,7 +97,7 @@ pub fn entropy(close: &[f64], period: usize, bins: usize) -> Vec<f64> {
         result[i] = entropy_val;
     }
 
-    result
+    Ok(result)
 }
 
 /// Aberration - 偏离度（Keltner Channel 变体）
@@ -97,26 +120,35 @@ pub fn aberration(
     close: &[f64],
     period: usize,
     atr_period: usize,
-) -> Vec<f64> {
+) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
+    validate_period(period, close.len())?;
+    validate_period(atr_period, close.len())?;
+
+    // [2] 计算逻辑 - 使用?传播错误
     let n = close.len();
-    if period == 0 || period >= n {
-        return vec![f64::NAN; n];
-    }
+    let ma = sma(close, period)?;
+    let atr_values = atr(high, low, close, atr_period)?;
 
-    let ma = sma(close, period);
-    let atr_values = atr(high, low, close, atr_period);
-
-    ma.iter()
+    let result = ma.iter()
         .zip(&atr_values)
         .zip(close)
         .map(|((&ma_val, &atr_val), &c)| {
-            if ma_val.is_nan() || atr_val.is_nan() || atr_val == 0.0 {
+            if ma_val.is_nan() || atr_val.is_nan() || is_zero(atr_val) {
                 f64::NAN
             } else {
                 (c - ma_val) / atr_val
             }
         })
-        .collect()
+        .collect();
+
+    Ok(result)
 }
 
 /// Squeeze - TTM 挤压指标（Bollinger Bands + Keltner Channel）
@@ -151,14 +183,26 @@ pub fn squeeze(
     kc_period: usize,
     kc_atr_period: usize,
     kc_mult: f64,
-) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+) -> HazeResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+    // [1] 入口验证
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
+    validate_period(bb_period, close.len())?;
+    validate_period(kc_period, close.len())?;
+    validate_period(kc_atr_period, close.len())?;
+
+    // [2] 计算逻辑
     let n = close.len();
 
     // Bollinger Bands
-    let (bb_upper, _, bb_lower) = bollinger_bands(close, bb_period, bb_std);
+    let (bb_upper, _, bb_lower) = bollinger_bands(close, bb_period, bb_std)?;
 
     // Keltner Channel
-    let (kc_upper, _, kc_lower) = keltner_channel(high, low, close, kc_period, kc_atr_period, kc_mult);
+    let (kc_upper, _, kc_lower) = keltner_channel(high, low, close, kc_period, kc_atr_period, kc_mult)?;
 
     let mut squeeze_on = vec![0.0; n];
     let mut squeeze_off = vec![0.0; n];
@@ -182,7 +226,7 @@ pub fn squeeze(
     let period = bb_period;
     let highest = rolling_max(close, period);
     let lowest = rolling_min(close, period);
-    let basis = sma(close, period);
+    let basis = sma(close, period)?;
 
     let momentum: Vec<f64> = highest
         .iter()
@@ -197,7 +241,7 @@ pub fn squeeze(
         })
         .collect();
 
-    (squeeze_on, squeeze_off, momentum)
+    Ok((squeeze_on, squeeze_off, momentum))
 }
 
 /// QQE - Quantitative Qualitative Estimation（定量定性估计）
@@ -225,27 +269,33 @@ pub fn qqe(
     rsi_period: usize,
     smooth: usize,
     multiplier: f64,
-) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+) -> HazeResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    validate_period(rsi_period, close.len())?;
+    validate_period(smooth, close.len())?;
+
+    // [2] 计算逻辑
     let n = close.len();
 
     // 1. 计算 RSI
-    let rsi_values = rsi(close, rsi_period);
+    let rsi_values = rsi(close, rsi_period)?;
 
     // 2. EMA 平滑 RSI
-    let rsi_ema = ema(&rsi_values, smooth);
+    let rsi_ema = ema(&rsi_values, smooth)?;
 
     // 3. 计算 RSI 差值的 EMA
-    let mut rsi_diff = vec![f64::NAN; n];
+    let mut rsi_diff = init_result!(n);
     for i in 1..n {
         if !rsi_ema[i].is_nan() && !rsi_ema[i - 1].is_nan() {
             rsi_diff[i] = (rsi_ema[i] - rsi_ema[i - 1]).abs();
         }
     }
-    let tr_rsi = ema(&rsi_diff, smooth);
+    let tr_rsi = ema(&rsi_diff, smooth)?;
 
     // 4. 计算 Fast/Slow Lines
     let fast_line = rsi_ema.clone();
-    let mut slow_line = vec![f64::NAN; n];
+    let mut slow_line = init_result!(n);
     let mut signal = vec![0.0; n];
 
     for i in 1..n {
@@ -271,7 +321,7 @@ pub fn qqe(
         }
     }
 
-    (fast_line, slow_line, signal)
+    Ok((fast_line, slow_line, signal))
 }
 
 /// CTI - Correlation Trend Indicator（相关趋势指标）
@@ -285,13 +335,14 @@ pub fn qqe(
 ///
 /// # 返回
 /// - 相关系数（-1 到 1，接近 1 表示强上升趋势，接近 -1 表示强下降趋势）
-pub fn cti(close: &[f64], period: usize) -> Vec<f64> {
-    let n = close.len();
-    if period == 0 || period >= n {
-        return vec![f64::NAN; n];
-    }
+pub fn cti(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    validate_period(period, close.len())?;
 
-    let mut result = vec![f64::NAN; n];
+    // [2] 计算逻辑
+    let n = close.len();
+    let mut result = init_result!(n);
 
     for i in period..n {
         let window = &close[i + 1 - period..=i];
@@ -325,7 +376,7 @@ pub fn cti(close: &[f64], period: usize) -> Vec<f64> {
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// ER - Efficiency Ratio（效率比）
@@ -341,13 +392,14 @@ pub fn cti(close: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - 效率比（0 到 1，越接近 1 表示价格变化越有效率）
-pub fn er(close: &[f64], period: usize) -> Vec<f64> {
-    let n = close.len();
-    if period == 0 || period >= n {
-        return vec![f64::NAN; n];
-    }
+pub fn er(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    validate_period(period, close.len())?;
 
-    let mut result = vec![f64::NAN; n];
+    // [2] 计算逻辑
+    let n = close.len();
+    let mut result = init_result!(n);
 
     for i in period..n {
         let change = (close[i] - close[i - period]).abs();
@@ -364,7 +416,7 @@ pub fn er(close: &[f64], period: usize) -> Vec<f64> {
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Bias - 乖离率（价格偏离移动平均线的百分比）
@@ -377,19 +429,26 @@ pub fn er(close: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - 乖离率（百分比，正值表示高于均线，负值表示低于均线）
-pub fn bias(close: &[f64], period: usize) -> Vec<f64> {
-    let ma = sma(close, period);
+pub fn bias(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    validate_period(period, close.len())?;
 
-    ma.iter()
+    // [2] 计算逻辑
+    let ma = sma(close, period)?;
+
+    let result = ma.iter()
         .zip(close)
         .map(|(&ma_val, &c)| {
-            if ma_val.is_nan() || ma_val == 0.0 {
+            if ma_val.is_nan() || is_zero(ma_val) {
                 f64::NAN
             } else {
                 ((c - ma_val) / ma_val) * 100.0
             }
         })
-        .collect()
+        .collect();
+
+    Ok(result)
 }
 
 /// PSL - Psychological Line（心理线）
@@ -403,13 +462,14 @@ pub fn bias(close: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - 心理线值（0 到 100，>75 超买，<25 超卖）
-pub fn psl(close: &[f64], period: usize) -> Vec<f64> {
-    let n = close.len();
-    if period == 0 || period >= n {
-        return vec![f64::NAN; n];
-    }
+pub fn psl(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    validate_period(period, close.len())?;
 
-    let mut result = vec![f64::NAN; n];
+    // [2] 计算逻辑
+    let n = close.len();
+    let mut result = init_result!(n);
 
     for i in period..n {
         let mut up_days = 0;
@@ -422,7 +482,7 @@ pub fn psl(close: &[f64], period: usize) -> Vec<f64> {
         result[i] = (up_days as f64 / period as f64) * 100.0;
     }
 
-    result
+    Ok(result)
 }
 
 /// RVI - Relative Vigor Index（相对活力指数）
@@ -450,14 +510,22 @@ pub fn rvi(
     close: &[f64],
     period: usize,
     signal_period: usize,
-) -> (Vec<f64>, Vec<f64>) {
-    let n = close.len();
-    if period == 0 || period >= n {
-        return (vec![f64::NAN; n], vec![f64::NAN; n]);
-    }
+) -> HazeResult<(Vec<f64>, Vec<f64>)> {
+    // [1] 入口验证
+    validate_not_empty(open, "open")?;
+    validate_lengths_match(&[
+        (open, "open"),
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
+    validate_period(period, close.len())?;
+    validate_period(signal_period, close.len())?;
 
-    let mut numerator = vec![f64::NAN; n];
-    let mut denominator = vec![f64::NAN; n];
+    // [2] 计算逻辑
+    let n = close.len();
+    let mut numerator = init_result!(n);
+    let mut denominator = init_result!(n);
 
     // 加权平滑（4 个周期）
     for i in 3..n {
@@ -475,14 +543,14 @@ pub fn rvi(
         denominator[i] = denom / 6.0;
     }
 
-    let num_sma = sma(&numerator, period);
-    let denom_sma = sma(&denominator, period);
+    let num_sma = sma(&numerator, period)?;
+    let denom_sma = sma(&denominator, period)?;
 
     let rvi_values: Vec<f64> = num_sma
         .iter()
         .zip(&denom_sma)
         .map(|(&num, &denom)| {
-            if num.is_nan() || denom.is_nan() || denom == 0.0 {
+            if num.is_nan() || denom.is_nan() || is_zero(denom) {
                 f64::NAN
             } else {
                 num / denom
@@ -490,9 +558,9 @@ pub fn rvi(
         })
         .collect();
 
-    let signal = sma(&rvi_values, signal_period);
+    let signal = sma(&rvi_values, signal_period)?;
 
-    (rvi_values, signal)
+    Ok((rvi_values, signal))
 }
 
 /// Inertia - 惯性指标（RVI 变体 + 线性回归）
@@ -519,15 +587,23 @@ pub fn inertia(
     close: &[f64],
     rvi_period: usize,
     regression_period: usize,
-) -> Vec<f64> {
-    let (rvi_values, _) = rvi(open, high, low, close, rvi_period, 4);
+) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(open, "open")?;
+    validate_lengths_match(&[
+        (open, "open"),
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
+    validate_period(rvi_period, close.len())?;
+    validate_period(regression_period, close.len())?;
+
+    // [2] 计算逻辑
+    let (rvi_values, _) = rvi(open, high, low, close, rvi_period, 4)?;
     let n = rvi_values.len();
 
-    if regression_period == 0 || regression_period >= n {
-        return vec![f64::NAN; n];
-    }
-
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
 
     for i in regression_period..n {
         let window = &rvi_values[i + 1 - regression_period..=i];
@@ -557,7 +633,7 @@ pub fn inertia(
         }
     }
 
-    result
+    Ok(result)
 }
 
 // ==================== Batch 9: pandas-ta 独有指标（第二批）====================
@@ -584,34 +660,39 @@ pub fn alligator(
     jaw_period: usize,
     teeth_period: usize,
     lips_period: usize,
-) -> (Vec<f64>, Vec<f64>, Vec<f64>) {
+) -> HazeResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+    // [1] 入口验证
+    validate_not_empty(high, "high")?;
+    validate_same_length(high, "high", low, "low")?;
+    validate_period(jaw_period, high.len())?;
+    validate_period(teeth_period, high.len())?;
+    validate_period(lips_period, high.len())?;
+
+    // [2] 计算逻辑
     let n = high.len();
 
     // 计算 HL/2
     let hl2: Vec<f64> = high.iter().zip(low).map(|(&h, &l)| (h + l) / 2.0).collect();
 
     // 使用 RMA (Wilder's SMMA)
-    let jaw = rma(&hl2, jaw_period);
-    let teeth = rma(&hl2, teeth_period);
-    let lips = rma(&hl2, lips_period);
+    let jaw = rma(&hl2, jaw_period)?;
+    let teeth = rma(&hl2, teeth_period)?;
+    let lips = rma(&hl2, lips_period)?;
 
     // 未来偏移（向右移动）
     let jaw_shifted = shift_forward(&jaw, 8);
     let teeth_shifted = shift_forward(&teeth, 5);
     let lips_shifted = shift_forward(&lips, 3);
 
-    (jaw_shifted, teeth_shifted, lips_shifted)
+    Ok((jaw_shifted, teeth_shifted, lips_shifted))
 }
 
 /// 向前偏移（未来偏移）
 fn shift_forward(values: &[f64], offset: usize) -> Vec<f64> {
     let n = values.len();
-    let mut result = vec![f64::NAN; n];
-
-    for i in 0..(n.saturating_sub(offset)) {
-        result[i + offset] = values[i];
-    }
-
+    let mut result = init_result!(n);
+    let count = n.saturating_sub(offset);
+    result[offset..(offset + count)].copy_from_slice(&values[..count]);
     result
 }
 
@@ -627,9 +708,15 @@ fn shift_forward(values: &[f64], offset: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - EFI 值
-pub fn efi(close: &[f64], volume: &[f64], period: usize) -> Vec<f64> {
+pub fn efi(close: &[f64], volume: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    validate_same_length(close, "close", volume, "volume")?;
+    validate_period(period, close.len())?;
+
+    // [2] 计算逻辑
     let n = close.len();
-    let mut force = vec![f64::NAN; n];
+    let mut force = init_result!(n);
 
     for i in 1..n {
         force[i] = (close[i] - close[i - 1]) * volume[i];
@@ -664,7 +751,15 @@ pub fn kst(
     roc3: usize,
     roc4: usize,
     signal_period: usize,
-) -> (Vec<f64>, Vec<f64>) {
+) -> HazeResult<(Vec<f64>, Vec<f64>)> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    let max_roc = roc1.max(roc2).max(roc3).max(roc4);
+    validate_period(max_roc, close.len())?;
+    validate_period(signal_period, close.len())?;
+
+    // [2] 计算逻辑
+    let n = close.len();
     // 计算 4 个 ROC
     let roc_1 = roc_helper(close, roc1);
     let roc_2 = roc_helper(close, roc2);
@@ -672,10 +767,10 @@ pub fn kst(
     let roc_4 = roc_helper(close, roc4);
 
     // SMA 平滑
-    let rcma1 = sma(&roc_1, 10);
-    let rcma2 = sma(&roc_2, 10);
-    let rcma3 = sma(&roc_3, 10);
-    let rcma4 = sma(&roc_4, 15);
+    let rcma1 = sma(&roc_1, 10)?;
+    let rcma2 = sma(&roc_2, 10)?;
+    let rcma3 = sma(&roc_3, 10)?;
+    let rcma4 = sma(&roc_4, 15)?;
 
     // 加权求和
     let kst_values: Vec<f64> = rcma1
@@ -692,18 +787,18 @@ pub fn kst(
         })
         .collect();
 
-    let signal = sma(&kst_values, signal_period);
+    let signal = sma(&kst_values, signal_period)?;
 
-    (kst_values, signal)
+    Ok((kst_values, signal))
 }
 
 /// ROC 辅助函数
 fn roc_helper(values: &[f64], period: usize) -> Vec<f64> {
     let n = values.len();
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
 
     for i in period..n {
-        if values[i - period] != 0.0 {
+        if is_not_zero(values[i - period]) {
             result[i] = ((values[i] - values[i - period]) / values[i - period]) * 100.0;
         }
     }
@@ -726,32 +821,43 @@ fn roc_helper(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - STC 值（0-100）
-pub fn stc(close: &[f64], fast: usize, slow: usize, cycle: usize) -> Vec<f64> {
+pub fn stc(close: &[f64], fast: usize, slow: usize, cycle: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    validate_period(fast, close.len())?;
+    validate_period(slow, close.len())?;
+    validate_period(cycle, close.len())?;
+
+    // [2] 计算逻辑
     let n = close.len();
 
     // 1. 计算 MACD
-    let ema_fast = ema(close, fast);
-    let ema_slow = ema(close, slow);
+    let ema_fast = ema(close, fast)?;
+    let ema_slow = ema(close, slow)?;
 
     let macd: Vec<f64> = ema_fast
         .iter()
         .zip(&ema_slow)
-        .map(|(&f, &s)| if f.is_nan() || s.is_nan() { f64::NAN } else { f - s })
+        .map(|(&f, &s)| {
+            if f.is_nan() || s.is_nan() {
+                f64::NAN
+            } else {
+                f - s
+            }
+        })
         .collect();
 
     // 2. 第一次随机化
     let stoch1 = stochastic_raw(&macd, cycle);
 
     // 3. 第二次随机化
-    let stoch2 = stochastic_raw(&stoch1, cycle);
-
-    stoch2
+    Ok(stochastic_raw(&stoch1, cycle))
 }
 
 /// 随机振荡器原始计算（返回 %K）
 fn stochastic_raw(values: &[f64], period: usize) -> Vec<f64> {
     let n = values.len();
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
 
     for i in period..n {
         let window = &values[i + 1 - period..=i];
@@ -781,9 +887,15 @@ fn stochastic_raw(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - TDFI 值
-pub fn tdfi(close: &[f64], period: usize, smooth: usize) -> Vec<f64> {
+pub fn tdfi(close: &[f64], period: usize, smooth: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    validate_period(period, close.len())?;
+    validate_period(smooth, close.len())?;
+
+    // [2] 计算逻辑
     let n = close.len();
-    let mut tdf = vec![f64::NAN; n];
+    let mut tdf = init_result!(n);
 
     for i in period..n {
         tdf[i] = (close[i] - close[i - period]).abs();
@@ -817,32 +929,53 @@ pub fn wae(
     signal: usize,
     bb_period: usize,
     multiplier: f64,
-) -> (Vec<f64>, Vec<f64>) {
+) -> HazeResult<(Vec<f64>, Vec<f64>)> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    validate_period(fast, close.len())?;
+    validate_period(slow, close.len())?;
+    validate_period(signal, close.len())?;
+    validate_period(bb_period, close.len())?;
+
+    // [2] 计算逻辑
+    let n = close.len();
     // 1. 计算 MACD
-    let ema_fast = ema(close, fast);
-    let ema_slow = ema(close, slow);
+    let ema_fast = ema(close, fast)?;
+    let ema_slow = ema(close, slow)?;
 
     let macd: Vec<f64> = ema_fast
         .iter()
         .zip(&ema_slow)
-        .map(|(&f, &s)| if f.is_nan() || s.is_nan() { f64::NAN } else { f - s })
+        .map(|(&f, &s)| {
+            if f.is_nan() || s.is_nan() {
+                f64::NAN
+            } else {
+                f - s
+            }
+        })
         .collect();
 
     // 2. 信号线
-    let signal_line = sma(&macd, signal);
+    let signal_line = sma(&macd, signal)?;
 
     // 3. Explosion
     let explosion: Vec<f64> = macd
         .iter()
         .zip(&signal_line)
-        .map(|(&m, &s)| if m.is_nan() || s.is_nan() { f64::NAN } else { (m - s).abs() })
+        .map(|(&m, &s)| {
+            if m.is_nan() || s.is_nan() {
+                f64::NAN
+            } else {
+                (m - s).abs()
+            }
+        })
         .collect();
 
     // 4. Dead Zone（BB 带宽）
     let std = stdev(close, bb_period);
     let dead_zone: Vec<f64> = std.iter().map(|&s| s * multiplier * 2.0).collect();
 
-    (explosion, dead_zone)
+    Ok((explosion, dead_zone))
 }
 
 /// SMI - Stochastic Momentum Index（随机动量指数）
@@ -869,7 +1002,19 @@ pub fn smi(
     period: usize,
     smooth1: usize,
     smooth2: usize,
-) -> Vec<f64> {
+) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
+    validate_period(period, high.len())?;
+    validate_period(smooth1, high.len())?;
+    validate_period(smooth2, high.len())?;
+
+    // [2] 计算逻辑
     let n = close.len();
 
     let highest = rolling_max(high, period);
@@ -894,24 +1039,26 @@ pub fn smi(
         .collect();
 
     // 双重 EMA
-    let distance_ema1 = ema(&distance, smooth1);
-    let distance_ema2 = ema(&distance_ema1, smooth2);
+    let distance_ema1 = ema(&distance, smooth1)?;
+    let distance_ema2 = ema(&distance_ema1, smooth2)?;
 
-    let diff_ema1 = ema(&hl_diff, smooth1);
-    let diff_ema2 = ema(&diff_ema1, smooth2);
+    let diff_ema1 = ema(&hl_diff, smooth1)?;
+    let diff_ema2 = ema(&diff_ema1, smooth2)?;
 
     // SMI
-    distance_ema2
+    let result = distance_ema2
         .iter()
         .zip(&diff_ema2)
         .map(|(&num, &denom)| {
-            if num.is_nan() || denom.is_nan() || denom == 0.0 {
+            if num.is_nan() || denom.is_nan() || is_zero(denom) {
                 f64::NAN
             } else {
                 (num / denom) * 100.0
             }
         })
-        .collect()
+        .collect();
+
+    Ok(result)
 }
 
 /// Coppock Curve - 库波克曲线（长期趋势指标）
@@ -929,7 +1076,14 @@ pub fn smi(
 ///
 /// # 返回
 /// - Coppock 值
-pub fn coppock(close: &[f64], period1: usize, period2: usize, wma_period: usize) -> Vec<f64> {
+pub fn coppock(close: &[f64], period1: usize, period2: usize, wma_period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    let max_period = period1.max(period2);
+    validate_period(max_period, close.len())?;
+    validate_period(wma_period, close.len())?;
+
+    // [2] 计算逻辑
     let roc1 = roc_helper(close, period1);
     let roc2 = roc_helper(close, period2);
 
@@ -949,13 +1103,13 @@ pub fn coppock(close: &[f64], period1: usize, period2: usize, wma_period: usize)
 }
 
 /// WMA - Weighted Moving Average（加权移动平均）
-fn wma(values: &[f64], period: usize) -> Vec<f64> {
+fn wma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     let n = values.len();
     if period == 0 || period > n {
-        return vec![f64::NAN; n];
+        return Err(HazeError::InvalidPeriod { period, data_len: n });
     }
 
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
     let weight_sum: usize = (1..=period).sum();
 
     for i in (period - 1)..n {
@@ -976,7 +1130,7 @@ fn wma(values: &[f64], period: usize) -> Vec<f64> {
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// PGO - Pretty Good Oscillator（优良振荡器）
@@ -992,21 +1146,33 @@ fn wma(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - PGO 值
-pub fn pgo(high: &[f64], low: &[f64], close: &[f64], period: usize) -> Vec<f64> {
-    let ma = sma(close, period);
-    let atr_values = atr(high, low, close, period);
+pub fn pgo(high: &[f64], low: &[f64], close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
+    validate_period(period, close.len())?;
 
-    ma.iter()
+    // [2] 计算逻辑
+    let ma = sma(close, period)?;
+    let atr_values = atr(high, low, close, period)?;
+
+    let result = ma.iter()
         .zip(&atr_values)
         .zip(close)
         .map(|((&ma_val, &atr_val), &c)| {
-            if ma_val.is_nan() || atr_val.is_nan() || atr_val == 0.0 {
+            if ma_val.is_nan() || atr_val.is_nan() || is_zero(atr_val) {
                 f64::NAN
             } else {
                 (c - ma_val) / atr_val
             }
         })
-        .collect()
+        .collect();
+
+    Ok(result)
 }
 
 /// VWMA - Volume Weighted Moving Average（成交量加权移动平均）
@@ -1021,13 +1187,15 @@ pub fn pgo(high: &[f64], low: &[f64], close: &[f64], period: usize) -> Vec<f64> 
 ///
 /// # 返回
 /// - VWMA 值
-pub fn vwma(close: &[f64], volume: &[f64], period: usize) -> Vec<f64> {
-    let n = close.len();
-    if period == 0 || period > n {
-        return vec![f64::NAN; n];
-    }
+pub fn vwma(close: &[f64], volume: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    validate_same_length(close, "close", volume, "volume")?;
+    validate_period(period, close.len())?;
 
-    let mut result = vec![f64::NAN; n];
+    // [2] 计算逻辑
+    let n = close.len();
+    let mut result = init_result!(n);
 
     for i in (period - 1)..n {
         let mut pv_sum = 0.0;
@@ -1043,7 +1211,7 @@ pub fn vwma(close: &[f64], volume: &[f64], period: usize) -> Vec<f64> {
         }
     }
 
-    result
+    Ok(result)
 }
 
 // ========== Batch 10: 最终批次（202 → 212 指标，达成 100%）==========
@@ -1061,12 +1229,13 @@ pub fn vwma(close: &[f64], volume: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - ALMA 值
-pub fn alma(values: &[f64], period: usize, offset: f64, sigma: f64) -> Vec<f64> {
-    let n = values.len();
-    if period == 0 || period > n {
-        return vec![f64::NAN; n];
-    }
+pub fn alma(values: &[f64], period: usize, offset: f64, sigma: f64) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
 
+    // [2] 计算逻辑
+    let n = values.len();
     let m = (period as f64 - 1.0) * offset;
     let s = period as f64 / sigma;
 
@@ -1084,7 +1253,7 @@ pub fn alma(values: &[f64], period: usize, offset: f64, sigma: f64) -> Vec<f64> 
         *w /= weight_sum;
     }
 
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
 
     for i in (period - 1)..n {
         let mut alma_val = 0.0;
@@ -1094,7 +1263,7 @@ pub fn alma(values: &[f64], period: usize, offset: f64, sigma: f64) -> Vec<f64> 
         result[i] = alma_val;
     }
 
-    result
+    Ok(result)
 }
 
 /// VIDYA - Variable Index Dynamic Average（可变指数动态平均）
@@ -1111,29 +1280,28 @@ pub fn alma(values: &[f64], period: usize, offset: f64, sigma: f64) -> Vec<f64> 
 ///
 /// # 返回
 /// - VIDYA 值
-pub fn vidya(close: &[f64], period: usize) -> Vec<f64> {
-    use crate::utils::stdev;
+pub fn vidya(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    validate_period(period, close.len())?;
 
+    // [2] 计算逻辑
     let n = close.len();
-    if period == 0 || period > n {
-        return vec![f64::NAN; n];
-    }
-
     let alpha = 2.0 / (period as f64 + 1.0);
     let std_values = stdev(close, period);
 
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
     result[period - 1] = close[period - 1];
 
     for i in period..n {
-        if !std_values[i].is_nan() && close[i] != 0.0 {
+        if !std_values[i].is_nan() && is_not_zero(close[i]) {
             let volatility_ratio = (std_values[i] / close[i]).abs();
             let adaptive_alpha = alpha * volatility_ratio;
             result[i] = close[i] * adaptive_alpha + result[i - 1] * (1.0 - adaptive_alpha);
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// PWMA - Pascal's Weighted Moving Average（帕斯卡加权移动平均）
@@ -1147,11 +1315,13 @@ pub fn vidya(close: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - PWMA 值
-pub fn pwma(values: &[f64], period: usize) -> Vec<f64> {
+pub fn pwma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
+
+    // [2] 计算逻辑
     let n = values.len();
-    if period == 0 || period > n {
-        return vec![f64::NAN; n];
-    }
 
     // 生成帕斯卡三角形权重
     let mut weights = vec![1.0];
@@ -1170,7 +1340,7 @@ pub fn pwma(values: &[f64], period: usize) -> Vec<f64> {
         *w /= weight_sum;
     }
 
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
 
     for i in (period - 1)..n {
         let mut pwma_val = 0.0;
@@ -1180,7 +1350,7 @@ pub fn pwma(values: &[f64], period: usize) -> Vec<f64> {
         result[i] = pwma_val;
     }
 
-    result
+    Ok(result)
 }
 
 /// SINWMA - Sine Weighted Moving Average（正弦加权移动平均）
@@ -1194,13 +1364,15 @@ pub fn pwma(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - SINWMA 值
-pub fn sinwma(values: &[f64], period: usize) -> Vec<f64> {
+pub fn sinwma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     use std::f64::consts::PI;
 
+    // [1] 入口验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
+
+    // [2] 计算逻辑
     let n = values.len();
-    if period == 0 || period > n {
-        return vec![f64::NAN; n];
-    }
 
     // 计算正弦权重
     let mut weights = vec![0.0; period];
@@ -1215,7 +1387,7 @@ pub fn sinwma(values: &[f64], period: usize) -> Vec<f64> {
         *w /= weight_sum;
     }
 
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
 
     for i in (period - 1)..n {
         let mut sinwma_val = 0.0;
@@ -1225,7 +1397,7 @@ pub fn sinwma(values: &[f64], period: usize) -> Vec<f64> {
         result[i] = sinwma_val;
     }
 
-    result
+    Ok(result)
 }
 
 /// SWMA - Symmetric Weighted Moving Average（对称加权移动平均）
@@ -1235,29 +1407,25 @@ pub fn sinwma(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 参数
 /// - `values`: 价格序列
-/// - `period`: 计算周期（默认 7，必须为奇数）
+/// - `period`: 计算周期（默认 7）
 ///
 /// # 返回
 /// - SWMA 值
-pub fn swma(values: &[f64], period: usize) -> Vec<f64> {
+pub fn swma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
+
+    // [2] 计算逻辑
     let n = values.len();
-    let adj_period = if period % 2 == 0 { period + 1 } else { period };
+    let mid = (period - 1) / 2;
 
-    if adj_period == 0 || adj_period > n {
-        return vec![f64::NAN; n];
-    }
-
-    let mid = adj_period / 2;
-
-    // 生成对称三角形权重
-    let mut weights = vec![0.0; adj_period];
+    // 生成对称权重（支持偶数周期）
+    let mut weights = vec![0.0; period];
     let mut weight_sum = 0.0;
-    for i in 0..adj_period {
-        weights[i] = if i <= mid {
-            (i + 1) as f64
-        } else {
-            (adj_period - i) as f64
-        };
+    for i in 0..period {
+        let dist = if i <= mid { i } else { period - 1 - i };
+        weights[i] = (dist + 1) as f64;
         weight_sum += weights[i];
     }
 
@@ -1266,17 +1434,17 @@ pub fn swma(values: &[f64], period: usize) -> Vec<f64> {
         *w /= weight_sum;
     }
 
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
 
-    for i in (adj_period - 1)..n {
+    for i in period..n {
         let mut swma_val = 0.0;
-        for j in 0..adj_period {
-            swma_val += values[i + 1 - adj_period + j] * weights[j];
+        for j in 0..period {
+            swma_val += values[i + 1 - period + j] * weights[j];
         }
         result[i] = swma_val;
     }
 
-    result
+    Ok(result)
 }
 
 /// BOP - Balance of Power（价格力量平衡）
@@ -1285,7 +1453,7 @@ pub fn swma(values: &[f64], period: usize) -> Vec<f64> {
 /// BOP = (close - open) / (high - low)
 /// 范围：-1 到 1
 /// > 0: 买方力量占优
-/// < 0: 卖方力量占优
+/// > < 0: 卖方力量占优
 ///
 /// # 参数
 /// - `open`: 开盘价序列
@@ -1295,13 +1463,18 @@ pub fn swma(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - BOP 值
-pub fn bop(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
-    let n = open.len();
-    if n != high.len() || n != low.len() || n != close.len() {
-        return vec![f64::NAN; n];
-    }
+pub fn bop(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(open, "open")?;
+    validate_lengths_match(&[
+        (open, "open"),
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
 
-    open.iter()
+    // [2] 计算逻辑
+    let result = open.iter()
         .zip(high)
         .zip(low)
         .zip(close)
@@ -1313,7 +1486,9 @@ pub fn bop(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
                 0.0
             }
         })
-        .collect()
+        .collect();
+
+    Ok(result)
 }
 
 /// SSL - SSL Channel（SSL 通道）
@@ -1331,27 +1506,46 @@ pub fn bop(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
 ///
 /// # 返回
 /// - (ssl_up, ssl_down) 元组
-pub fn ssl_channel(high: &[f64], low: &[f64], close: &[f64], period: usize) -> (Vec<f64>, Vec<f64>) {
-    use crate::utils::sma;
+pub fn ssl_channel(
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    period: usize,
+) -> HazeResult<(Vec<f64>, Vec<f64>)> {
+    // [1] 入口验证
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
+    validate_period(period, high.len())?;
 
+    // [2] 计算逻辑
     let n = high.len();
-    let sma_high = sma(high, period);
-    let sma_low = sma(low, period);
+    let sma_high = sma(high, period)?;
+    let sma_low = sma(low, period)?;
 
-    let mut ssl_up = vec![f64::NAN; n];
-    let mut ssl_down = vec![f64::NAN; n];
+    let mut ssl_up = init_result!(n);
+    let mut ssl_down = init_result!(n);
 
     for i in (period - 1)..n {
-        if close[i] > sma_high[i] {
-            ssl_up[i] = sma_low[i];
-            ssl_down[i] = sma_high[i];
+        let h = sma_high[i];
+        let l = sma_low[i];
+        let c = close[i];
+        if h.is_nan() || l.is_nan() || c.is_nan() {
+            continue;
+        }
+        if c > h {
+            ssl_up[i] = l;
+            ssl_down[i] = h;
         } else {
-            ssl_up[i] = sma_high[i];
-            ssl_down[i] = sma_low[i];
+            ssl_up[i] = h;
+            ssl_down[i] = l;
         }
     }
 
-    (ssl_up, ssl_down)
+    Ok((ssl_up, ssl_down))
 }
 
 /// CFO - Chande Forecast Oscillator（钱德预测振荡器）
@@ -1366,24 +1560,26 @@ pub fn ssl_channel(high: &[f64], low: &[f64], close: &[f64], period: usize) -> (
 ///
 /// # 返回
 /// - CFO 值（百分比）
-pub fn cfo(close: &[f64], period: usize) -> Vec<f64> {
-    let n = close.len();
-    if period == 0 || period > n {
-        return vec![f64::NAN; n];
-    }
+pub fn cfo(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(close, "close")?;
+    validate_period(period, close.len())?;
 
+    // [2] 计算逻辑
     let forecast = tsf(close, period);
-    forecast
+    let result = forecast
         .iter()
         .zip(close)
         .map(|(&f, &c)| {
-            if f.is_nan() || c == 0.0 {
+            if f.is_nan() || is_zero(c) {
                 f64::NAN
             } else {
                 ((c - f) / c) * 100.0
             }
         })
-        .collect()
+        .collect();
+
+    Ok(result)
 }
 
 /// Slope - Linear Slope Indicator（线性斜率指标）
@@ -1396,13 +1592,14 @@ pub fn cfo(close: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - 斜率值
-pub fn slope(values: &[f64], period: usize) -> Vec<f64> {
-    let n = values.len();
-    if period == 0 || period > n {
-        return vec![f64::NAN; n];
-    }
+pub fn slope(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
 
-    let mut result = vec![f64::NAN; n];
+    // [2] 计算逻辑
+    let n = values.len();
+    let mut result = init_result!(n);
 
     for i in (period - 1)..n {
         let window = &values[i + 1 - period..=i];
@@ -1424,7 +1621,7 @@ pub fn slope(values: &[f64], period: usize) -> Vec<f64> {
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Percent Rank - Percentile Rank（百分位排名）
@@ -1438,13 +1635,14 @@ pub fn slope(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - 百分位排名（0-100）
-pub fn percent_rank(values: &[f64], period: usize) -> Vec<f64> {
-    let n = values.len();
-    if period == 0 || period > n {
-        return vec![f64::NAN; n];
-    }
+pub fn percent_rank(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // [1] 入口验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
 
-    let mut result = vec![f64::NAN; n];
+    // [2] 计算逻辑
+    let n = values.len();
+    let mut result = init_result!(n);
 
     for i in (period - 1)..n {
         let window = &values[i + 1 - period..=i];
@@ -1455,7 +1653,7 @@ pub fn percent_rank(values: &[f64], period: usize) -> Vec<f64> {
         result[i] = (count_less as f64 / (period - 1) as f64) * 100.0;
     }
 
-    result
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -1464,8 +1662,10 @@ mod tests {
 
     #[test]
     fn test_entropy_basic() {
-        let close = vec![100.0, 101.0, 102.0, 101.5, 103.0, 102.0, 104.0, 103.5, 105.0, 104.0, 106.0];
-        let result = entropy(&close, 10, 5);
+        let close = vec![
+            100.0, 101.0, 102.0, 101.5, 103.0, 102.0, 104.0, 103.5, 105.0, 104.0, 106.0,
+        ];
+        let result = entropy(&close, 10, 5).unwrap();
 
         // 验证前 10 个值为 NAN
         for i in 0..10 {
@@ -1480,7 +1680,7 @@ mod tests {
     #[test]
     fn test_bias_basic() {
         let close = vec![100.0, 102.0, 104.0, 103.0, 105.0];
-        let result = bias(&close, 3);
+        let result = bias(&close, 3).unwrap();
 
         // bias[2] = ((104 - (100+102+104)/3) / ((100+102+104)/3)) * 100
         // = ((104 - 102) / 102) * 100 = 1.96
@@ -1490,8 +1690,10 @@ mod tests {
 
     #[test]
     fn test_psl_basic() {
-        let close = vec![100.0, 101.0, 102.0, 101.0, 103.0, 104.0, 103.0, 105.0, 106.0, 105.0];
-        let result = psl(&close, 5);
+        let close = vec![
+            100.0, 101.0, 102.0, 101.0, 103.0, 104.0, 103.0, 105.0, 106.0, 105.0,
+        ];
+        let result = psl(&close, 5).unwrap();
 
         // psl[5] = (上涨天数 / 5) * 100
         // [101-100=+, 102-101=+, 101-102=-, 103-101=+, 104-103=+] = 4/5 = 80%
@@ -1502,8 +1704,10 @@ mod tests {
     #[test]
     fn test_cti_basic() {
         // 完美上升趋势
-        let close = vec![100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0];
-        let result = cti(&close, 5);
+        let close = vec![
+            100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0,
+        ];
+        let result = cti(&close, 5).unwrap();
 
         // 完美线性上升应该接近 1.0
         assert!(!result[5].is_nan());
@@ -1513,11 +1717,40 @@ mod tests {
     #[test]
     fn test_er_basic() {
         let close = vec![100.0, 102.0, 104.0, 106.0, 108.0, 110.0];
-        let result = er(&close, 5);
+        let result = er(&close, 5).unwrap();
 
         // ER[5] = |110-100| / (|102-100|+|104-102|+|106-104|+|108-106|+|110-108|)
         // = 10 / 10 = 1.0 (完美效率)
         assert!(!result[5].is_nan());
         assert!((result[5] - 1.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_entropy_empty_input() {
+        let result = entropy(&[], 10, 5);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_bias_invalid_period() {
+        let close = vec![1.0, 2.0, 3.0];
+        assert!(matches!(
+            bias(&close, 0),
+            Err(HazeError::InvalidPeriod { .. })
+        ));
+    }
+
+    #[test]
+    fn test_vwma_valid() {
+        let close = vec![100.0, 101.0, 102.0, 103.0, 104.0];
+        let volume = vec![1000.0, 1100.0, 1200.0, 1300.0, 1400.0];
+        let result = vwma(&close, &volume, 3).unwrap();
+
+        // Warmup期为NaN
+        assert!(result[0].is_nan());
+        assert!(result[1].is_nan());
+
+        // 有效值检查
+        assert!(!result[2].is_nan());
     }
 }

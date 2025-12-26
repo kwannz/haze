@@ -1,11 +1,73 @@
-// utils/ma.rs - 移动平均工具函数
+//! Moving Average Utilities Module
+//!
+//! # Overview
+//! This module provides fundamental moving average calculations that serve as
+//! building blocks for other technical indicators. All MA functions are optimized
+//! for performance with incremental updates and NaN-safe computations.
+//!
+//! # Available Functions
+//! - [`sma`] - Simple Moving Average (arithmetic mean)
+//! - [`ema`] - Exponential Moving Average (weighted recent values)
+//! - [`rma`] - Wilder's Moving Average / Running Moving Average
+//! - [`wma`] - Weighted Moving Average (linear weights)
+//! - [`dema`] - Double Exponential Moving Average (reduced lag)
+//! - [`tema`] - Triple Exponential Moving Average (further lag reduction)
+//! - [`kama`] - Kaufman Adaptive Moving Average (volatility-adjusted)
+//! - [`zlema`] - Zero-Lag Exponential Moving Average (lag compensation)
+//! - [`hma`] - Hull Moving Average (smoothness with reduced lag)
+//! - [`vwma`] - Volume Weighted Moving Average
+//! - [`vwap`] - Volume Weighted Average Price
+//!
+//! # Usage Patterns
+//! These functions are typically used:
+//! - Directly for trend identification (crossover signals)
+//! - As components in composite indicators (MACD uses EMA, ATR uses RMA)
+//! - For smoothing noisy price data
+//!
+//! # Examples
+//! ```rust
+//! use haze_library::utils::ma::{sma, ema, rma};
+//!
+//! let prices = vec![100.0, 101.0, 102.0, 103.0, 104.0, 105.0];
+//!
+//! // Simple Moving Average (3-period)
+//! let sma_values = sma(&prices, 3);
+//!
+//! // Exponential Moving Average (more weight on recent prices)
+//! let ema_values = ema(&prices, 3);
+//!
+//! // Wilder's RMA (used in ATR, RSI calculations)
+//! let rma_values = rma(&prices, 3);
+//! ```
+//!
+//! # Performance Characteristics
+//! - SMA: O(n) with incremental sum updates
+//! - EMA/RMA: O(n) single pass with exponential decay
+//! - WMA: O(n * period) due to weighted summation
+//! - DEMA/TEMA: O(n) with chained EMA calculations
+//!
+//! # NaN Handling
+//! - All functions return NaN for warmup periods (first period-1 values)
+//! - NaN values in input reset the calculation window
+//! - Output maintains same length as input array
+//!
+//! # Cross-References
+//! - [`crate::indicators::momentum`] - MACD uses EMA
+//! - [`crate::indicators::volatility`] - ATR uses RMA
+//! - [`crate::indicators::trend`] - SuperTrend uses ATR (via RMA)
+
 #![allow(dead_code)]
-//
-// 所有 MA 函数均为其他指标的构建块（ATR 使用 RMA，MACD 使用 EMA 等）
+
+use crate::errors::validation::{validate_not_empty, validate_period, validate_same_length};
+use crate::errors::{HazeError, HazeResult};
+use crate::init_result;
+use crate::utils::math::{is_zero, kahan_sum};
 
 /// SMA - Simple Moving Average（简单移动平均）
 ///
 /// 算法：sum(values[i-period+1 .. i+1]) / period
+///
+/// 使用 Kahan 补偿求和的增量更新并定期重新计算以防止浮点误差累积。
 ///
 /// # 参数
 /// - `values`: 输入序列
@@ -13,29 +75,57 @@
 ///
 /// # 返回
 /// - 与输入等长的向量，前 period-1 个值为 NaN
-pub fn sma(values: &[f64], period: usize) -> Vec<f64> {
-    if period == 0 || period > values.len() {
-        return vec![f64::NAN; values.len()];
-    }
+///
+/// # 错误
+/// - 如果输入为空，返回 `HazeError::EmptyInput`
+/// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
+pub fn sma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    /// 重新计算间隔：每 1000 次迭代重新计算一次以重置累积误差
+    const RECALC_INTERVAL: usize = 1000;
+
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
 
     let n = values.len();
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
     let mut sum = 0.0;
+    let mut compensation = 0.0; // Kahan 补偿项
     let mut count = 0usize;
+    let mut steps_since_recalc = 0usize;
 
     for i in 0..n {
         if values[i].is_nan() {
             sum = 0.0;
+            compensation = 0.0;
             count = 0;
+            steps_since_recalc = 0;
             continue;
         }
 
-        sum += values[i];
+        // 使用 Kahan 求和添加新值
+        let y = values[i] - compensation;
+        let t = sum + y;
+        compensation = (t - sum) - y;
+        sum = t;
         count += 1;
 
         if count > period {
-            sum -= values[i - period];
+            // 使用 Kahan 求和减去旧值
+            let old_val = values[i - period];
+            let y = -old_val - compensation;
+            let t = sum + y;
+            compensation = (t - sum) - y;
+            sum = t;
             count = period;
+            steps_since_recalc += 1;
+
+            // 定期完整重新计算以消除累积浮点误差
+            if steps_since_recalc >= RECALC_INTERVAL {
+                sum = kahan_sum(&values[i + 1 - period..=i]);
+                compensation = 0.0;
+                steps_since_recalc = 0;
+            }
         }
 
         if count == period {
@@ -43,7 +133,7 @@ pub fn sma(values: &[f64], period: usize) -> Vec<f64> {
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// EMA - Exponential Moving Average（指数移动平均）
@@ -59,14 +149,18 @@ pub fn sma(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - 与输入等长的向量，前 period-1 个值为 NaN
-pub fn ema(values: &[f64], period: usize) -> Vec<f64> {
-    if period == 0 || period > values.len() {
-        return vec![f64::NAN; values.len()];
-    }
+///
+/// # 错误
+/// - 如果输入为空，返回 `HazeError::EmptyInput`
+/// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
+pub fn ema(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
 
     let n = values.len();
     let alpha = 2.0 / (period as f64 + 1.0);
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
 
     // 支持输入中存在前导 NaN 的情况
     let mut sum = 0.0;
@@ -100,7 +194,7 @@ pub fn ema(values: &[f64], period: usize) -> Vec<f64> {
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// RMA - Wilder's Moving Average（威尔德移动平均）
@@ -116,30 +210,72 @@ pub fn ema(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - 与输入等长的向量，前 period-1 个值为 NaN
-pub fn rma(values: &[f64], period: usize) -> Vec<f64> {
-    if period == 0 || period > values.len() {
-        return vec![f64::NAN; values.len()];
-    }
+///
+/// # 错误
+/// - 如果输入为空，返回 `HazeError::EmptyInput`
+/// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
+pub fn rma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
+
+    let n = values.len();
 
     let alpha = 1.0 / period as f64;
-    let mut result = vec![f64::NAN; values.len()];
+    let mut result = vec![f64::NAN; n];
 
-    // 初始值使用 SMA
-    let first_sum: f64 = values[..period].iter().sum();
-    result[period - 1] = first_sum / period as f64;
+    // 支持输入中存在前导 NaN 的情况（与 EMA 保持一致）
+    let mut sum = 0.0;
+    let mut count = 0usize;
+    let mut start_idx = None;
 
-    // Wilder's smoothing
-    for i in period..values.len() {
-        result[i] = alpha * values[i] + (1.0 - alpha) * result[i - 1];
+    // 寻找第一个有效的 period 窗口
+    for i in 0..n {
+        if values[i].is_nan() {
+            sum = 0.0;
+            count = 0;
+            continue;
+        }
+
+        count += 1;
+        sum += values[i];
+
+        if count == period {
+            result[i] = sum / period as f64;
+            start_idx = Some(i);
+            break;
+        }
     }
 
-    result
+    // Wilder's smoothing（处理后续 NaN）
+    if let Some(start) = start_idx {
+        for i in (start + 1)..n {
+            if values[i].is_nan() {
+                // 遇到 NaN 时保持前一个值（与 EMA 行为一致）
+                result[i] = result[i - 1];
+            } else {
+                result[i] = alpha * values[i] + (1.0 - alpha) * result[i - 1];
+            }
+        }
+    }
+
+    Ok(result)
 }
 
 /// WMA - Weighted Moving Average（加权移动平均）
 ///
+/// 使用 O(n) 增量算法实现。
+///
 /// 算法：WMA = sum(value[i] * weight[i]) / sum(weight)
 /// 其中 weight[i] = i + 1（线性递增权重）
+///
+/// # 增量更新原理
+/// 当窗口从 [v0, v1, ..., v_{n-1}] 滑动到 [v1, v2, ..., v_n] 时：
+/// - 所有现有值的权重都减 1（等于减去 simple_sum）
+/// - 旧值 v0（权重 1）被移除
+/// - 新值 v_n（权重 period）被添加
+///
+/// 公式：new_weighted_sum = old_weighted_sum - simple_sum + period * new_value
 ///
 /// # 参数
 /// - `values`: 输入序列
@@ -147,24 +283,106 @@ pub fn rma(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - 与输入等长的向量，前 period-1 个值为 NaN
-pub fn wma(values: &[f64], period: usize) -> Vec<f64> {
-    if period == 0 || period > values.len() {
-        return vec![f64::NAN; values.len()];
+///
+/// # 性能
+/// - 时间复杂度: O(n)
+/// - 空间复杂度: O(n)
+///
+/// # 错误
+/// - 如果输入为空，返回 `HazeError::EmptyInput`
+/// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
+pub fn wma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    const RECALC_INTERVAL: usize = 1000;
+
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
+
+    let n = values.len();
+
+    let period_f = period as f64;
+    let weight_sum = period_f * (period_f + 1.0) / 2.0;
+    let mut result = vec![f64::NAN; n];
+
+    // Kahan 补偿求和：提升增量更新的数值稳定性
+    #[inline]
+    fn kahan_add(sum: &mut f64, compensation: &mut f64, value: f64) {
+        let y = value - *compensation;
+        let t = *sum + y;
+        *compensation = (t - *sum) - y;
+        *sum = t;
     }
 
-    let mut result = vec![f64::NAN; values.len()];
-    let weight_sum: f64 = (1..=period).map(|x| x as f64).sum();
+    let mut simple_sum = 0.0;
+    let mut simple_comp = 0.0;
+    let mut weighted_sum = 0.0;
+    let mut weighted_comp = 0.0;
+    let mut count = 0usize;
+    let mut steps_since_recalc = 0usize;
 
-    for i in (period - 1)..values.len() {
-        let weighted_sum: f64 = values[i + 1 - period..=i]
-            .iter()
-            .enumerate()
-            .map(|(idx, &val)| val * (idx + 1) as f64)
-            .sum();
+    // 单次遍历：
+    // - NaN 出现时重置窗口
+    // - 累积到 period 后使用 O(n) 增量更新
+    for i in 0..n {
+        let v = values[i];
+
+        if v.is_nan() {
+            simple_sum = 0.0;
+            simple_comp = 0.0;
+            weighted_sum = 0.0;
+            weighted_comp = 0.0;
+            count = 0;
+            steps_since_recalc = 0;
+            continue;
+        }
+
+        if count < period {
+            count += 1;
+            kahan_add(&mut simple_sum, &mut simple_comp, v);
+            kahan_add(&mut weighted_sum, &mut weighted_comp, (count as f64) * v);
+
+            if count == period {
+                result[i] = weighted_sum / weight_sum;
+            }
+            continue;
+        }
+
+        // count == period: 增量更新当前窗口
+        if steps_since_recalc >= RECALC_INTERVAL {
+            // 定期重新计算以防止浮点误差累积（同时保证遇到历史 NaN 后可恢复）
+            simple_sum = 0.0;
+            simple_comp = 0.0;
+            weighted_sum = 0.0;
+            weighted_comp = 0.0;
+
+            let window = &values[i + 1 - period..=i];
+            for (j, &val) in window.iter().enumerate() {
+                kahan_add(&mut simple_sum, &mut simple_comp, val);
+                kahan_add(
+                    &mut weighted_sum,
+                    &mut weighted_comp,
+                    (j as f64 + 1.0) * val,
+                );
+            }
+            steps_since_recalc = 0;
+        } else {
+            let prev_simple_sum = simple_sum;
+
+            // new_weighted_sum = old_weighted_sum - simple_sum + period * new_value
+            kahan_add(&mut weighted_sum, &mut weighted_comp, -prev_simple_sum);
+            kahan_add(&mut weighted_sum, &mut weighted_comp, period_f * v);
+
+            // new_simple_sum = old_simple_sum - old_value + new_value
+            let old = values[i - period];
+            kahan_add(&mut simple_sum, &mut simple_comp, -old);
+            kahan_add(&mut simple_sum, &mut simple_comp, v);
+        }
+
         result[i] = weighted_sum / weight_sum;
+        steps_since_recalc += 1;
     }
 
-    result
+    Ok(result)
 }
 
 /// HMA - Hull Moving Average（赫尔移动平均，低延迟）
@@ -182,16 +400,20 @@ pub fn wma(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - 与输入等长的向量
-pub fn hma(values: &[f64], period: usize) -> Vec<f64> {
-    if period == 0 || period > values.len() {
-        return vec![f64::NAN; values.len()];
-    }
+///
+/// # 错误
+/// - 如果输入为空，返回 `HazeError::EmptyInput`
+/// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
+pub fn hma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
 
     let half_period = period / 2;
     let sqrt_period = (period as f64).sqrt() as usize;
 
-    let wma_half = wma(values, half_period);
-    let wma_full = wma(values, period);
+    let wma_half = wma(values, half_period)?;
+    let wma_full = wma(values, period)?;
 
     // 2 * WMA(half) - WMA(full)
     let diff: Vec<f64> = wma_half
@@ -206,7 +428,12 @@ pub fn hma(values: &[f64], period: usize) -> Vec<f64> {
         })
         .collect();
 
-    wma(&diff, sqrt_period)
+    let result = wma(&diff, sqrt_period)?;
+    if result.iter().all(|v| v.is_nan()) {
+        Ok(diff)
+    } else {
+        Ok(result)
+    }
 }
 
 /// DEMA - Double Exponential Moving Average（双重指数移动平均）
@@ -219,11 +446,20 @@ pub fn hma(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - 与输入等长的向量
-pub fn dema(values: &[f64], period: usize) -> Vec<f64> {
-    let ema1 = ema(values, period);
-    let ema2 = ema(&ema1, period);
+///
+/// # 错误
+/// - 如果输入为空，返回 `HazeError::EmptyInput`
+/// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
+pub fn dema(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
 
-    ema1.iter()
+    let ema1 = ema(values, period)?;
+    let ema2 = ema(&ema1, period)?;
+
+    Ok(ema1
+        .iter()
         .zip(&ema2)
         .map(|(&e1, &e2)| {
             if e1.is_nan() || e2.is_nan() {
@@ -232,7 +468,7 @@ pub fn dema(values: &[f64], period: usize) -> Vec<f64> {
                 2.0 * e1 - e2
             }
         })
-        .collect()
+        .collect())
 }
 
 /// TEMA - Triple Exponential Moving Average（三重指数移动平均）
@@ -245,12 +481,25 @@ pub fn dema(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - 与输入等长的向量
-pub fn tema(values: &[f64], period: usize) -> Vec<f64> {
-    let ema1 = ema(values, period);
-    let ema2 = ema(&ema1, period);
-    let ema3 = ema(&ema2, period);
+///
+/// # 错误
+/// - 如果输入为空，返回 `HazeError::EmptyInput`
+/// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
+pub fn tema(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
 
-    ema1.iter()
+    let ema1 = ema(values, period)?;
+    let ema2 = ema(&ema1, period)?;
+    let ema3 = ema(&ema2, period)?;
+
+    if !ema3.iter().any(|v| !v.is_nan()) {
+        return dema(values, period);
+    }
+
+    Ok(ema1
+        .iter()
         .zip(&ema2)
         .zip(&ema3)
         .map(|((&e1, &e2), &e3)| {
@@ -260,12 +509,14 @@ pub fn tema(values: &[f64], period: usize) -> Vec<f64> {
                 3.0 * e1 - 3.0 * e2 + e3
             }
         })
-        .collect()
+        .collect())
 }
 
 /// VWAP - Volume Weighted Average Price（成交量加权平均价）
 ///
 /// 算法：VWAP = sum(typical_price * volume) / sum(volume)
+///
+/// 使用 Kahan 补偿求和的增量更新并定期重新计算以防止浮点误差累积。
 ///
 /// # 参数
 /// - `typical_prices`: 典型价格序列 (H+L+C)/3
@@ -274,51 +525,140 @@ pub fn tema(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 返回
 /// - 与输入等长的向量
-pub fn vwap(typical_prices: &[f64], volumes: &[f64], period: usize) -> Vec<f64> {
-    if typical_prices.len() != volumes.len() {
-        return vec![f64::NAN; typical_prices.len()];
-    }
+///
+/// # 错误
+/// - 如果输入为空，返回 `HazeError::EmptyInput`
+/// - 如果两个输入数组长度不匹配，返回 `HazeError::LengthMismatch`
+/// - 如果 period 超过数据长度，返回 `HazeError::InvalidPeriod`
+pub fn vwap(typical_prices: &[f64], volumes: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    /// 重新计算间隔：每 1000 次迭代重新计算一次以重置累积误差
+    const RECALC_INTERVAL: usize = 1000;
+
+    // Fail-Fast 验证
+    validate_not_empty(typical_prices, "typical_prices")?;
+    validate_same_length(typical_prices, "typical_prices", volumes, "volumes")?;
 
     let n = typical_prices.len();
-    let mut result = vec![f64::NAN; n];
-
-    if n == 0 {
-        return result;
-    }
+    let mut result = init_result!(n);
 
     if period == 0 {
-        // 累积 VWAP
+        // 累积 VWAP（使用 Kahan 求和算法减少浮点误差）
         let mut cum_pv = 0.0;
         let mut cum_v = 0.0;
+        let mut pv_comp = 0.0; // Kahan 补偿项
+        let mut v_comp = 0.0; // Kahan 补偿项
         for i in 0..n {
-            cum_pv += typical_prices[i] * volumes[i];
-            cum_v += volumes[i];
-            result[i] = if cum_v == 0.0 { f64::NAN } else { cum_pv / cum_v };
+            // Kahan 求和 for pv
+            let pv = typical_prices[i] * volumes[i];
+            let pv_y = pv - pv_comp;
+            let pv_t = cum_pv + pv_y;
+            pv_comp = (pv_t - cum_pv) - pv_y;
+            cum_pv = pv_t;
+
+            // Kahan 求和 for v
+            let v = volumes[i];
+            let v_y = v - v_comp;
+            let v_t = cum_v + v_y;
+            v_comp = (v_t - cum_v) - v_y;
+            cum_v = v_t;
+
+            result[i] = if is_zero(cum_v) {
+                f64::NAN
+            } else {
+                cum_pv / cum_v
+            };
         }
-        return result;
+        return Ok(result);
     }
 
+    // 验证滚动 VWAP 的周期
     if period > n {
-        return result;
+        validate_period(period, n)?;
     }
 
-    // 滚动 VWAP（增量更新）
-    let mut pv_sum: f64 = typical_prices[..period]
-        .iter()
-        .zip(&volumes[..period])
-        .map(|(&p, &v)| p * v)
-        .sum();
-    let mut v_sum: f64 = volumes[..period].iter().sum();
+    // 滚动 VWAP（使用 Kahan 补偿的增量更新）
+    // 初始窗口使用 Kahan 求和
+    let mut pv_sum = 0.0;
+    let mut v_sum = 0.0;
+    let mut pv_comp = 0.0;
+    let mut v_comp = 0.0;
 
-    result[period - 1] = if v_sum == 0.0 { f64::NAN } else { pv_sum / v_sum };
+    for i in 0..period {
+        let pv = typical_prices[i] * volumes[i];
+        let y = pv - pv_comp;
+        let t = pv_sum + y;
+        pv_comp = (t - pv_sum) - y;
+        pv_sum = t;
+
+        let y = volumes[i] - v_comp;
+        let t = v_sum + y;
+        v_comp = (t - v_sum) - y;
+        v_sum = t;
+    }
+
+    result[period - 1] = if is_zero(v_sum) {
+        f64::NAN
+    } else {
+        pv_sum / v_sum
+    };
 
     for i in period..n {
-        pv_sum += typical_prices[i] * volumes[i] - typical_prices[i - period] * volumes[i - period];
-        v_sum += volumes[i] - volumes[i - period];
-        result[i] = if v_sum == 0.0 { f64::NAN } else { pv_sum / v_sum };
+        // 定期完整重新计算以消除累积浮点误差
+        if (i - period + 1) % RECALC_INTERVAL == 0 {
+            pv_sum = 0.0;
+            v_sum = 0.0;
+            pv_comp = 0.0;
+            v_comp = 0.0;
+
+            for j in (i + 1 - period)..=i {
+                let pv = typical_prices[j] * volumes[j];
+                let y = pv - pv_comp;
+                let t = pv_sum + y;
+                pv_comp = (t - pv_sum) - y;
+                pv_sum = t;
+
+                let y = volumes[j] - v_comp;
+                let t = v_sum + y;
+                v_comp = (t - v_sum) - y;
+                v_sum = t;
+            }
+        } else {
+            // 使用 Kahan 补偿进行增量更新
+            // 添加新的 pv
+            let new_pv = typical_prices[i] * volumes[i];
+            let y = new_pv - pv_comp;
+            let t = pv_sum + y;
+            pv_comp = (t - pv_sum) - y;
+            pv_sum = t;
+
+            // 减去旧的 pv
+            let old_pv = typical_prices[i - period] * volumes[i - period];
+            let y = -old_pv - pv_comp;
+            let t = pv_sum + y;
+            pv_comp = (t - pv_sum) - y;
+            pv_sum = t;
+
+            // 添加新的 volume
+            let y = volumes[i] - v_comp;
+            let t = v_sum + y;
+            v_comp = (t - v_sum) - y;
+            v_sum = t;
+
+            // 减去旧的 volume
+            let y = -volumes[i - period] - v_comp;
+            let t = v_sum + y;
+            v_comp = (t - v_sum) - y;
+            v_sum = t;
+        }
+
+        result[i] = if is_zero(v_sum) {
+            f64::NAN
+        } else {
+            pv_sum / v_sum
+        };
     }
 
-    result
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -328,39 +668,55 @@ mod tests {
     #[test]
     fn test_sma() {
         let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let result = sma(&values, 3);
+        let result = sma(&values, 3).unwrap();
         assert!(result[0].is_nan());
         assert!(result[1].is_nan());
-        assert_eq!(result[2], 2.0);  // (1+2+3)/3
-        assert_eq!(result[3], 3.0);  // (2+3+4)/3
-        assert_eq!(result[4], 4.0);  // (3+4+5)/3
+        assert_eq!(result[2], 2.0); // (1+2+3)/3
+        assert_eq!(result[3], 3.0); // (2+3+4)/3
+        assert_eq!(result[4], 4.0); // (3+4+5)/3
     }
 
     #[test]
     fn test_ema() {
         let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let result = ema(&values, 3);
+        let result = ema(&values, 3).unwrap();
         assert!(result[0].is_nan());
         assert!(result[1].is_nan());
-        assert_eq!(result[2], 2.0);  // 初始值 = SMA
-        // EMA[3] = 0.5 * 4 + 0.5 * 2 = 3.0
+        assert_eq!(result[2], 2.0); // 初始值 = SMA
+                                    // EMA[3] = 0.5 * 4 + 0.5 * 2 = 3.0
         assert!((result[3] - 3.0).abs() < 1e-10);
     }
 
     #[test]
     fn test_rma() {
         let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
-        let result = rma(&values, 3);
+        let result = rma(&values, 3).unwrap();
         assert!(result[0].is_nan());
         assert!(result[1].is_nan());
-        assert_eq!(result[2], 2.0);  // 初始值 = SMA
+        assert_eq!(result[2], 2.0); // 初始值 = SMA
+    }
+
+    #[test]
+    fn test_wma_nan_reset() {
+        let values = vec![1.0, 2.0, f64::NAN, 4.0, 5.0, 6.0];
+        let result = wma(&values, 3).unwrap();
+
+        // NaN 会重置窗口，直到凑齐 period 个有效值才会输出
+        assert!(result[0].is_nan());
+        assert!(result[1].is_nan());
+        assert!(result[2].is_nan());
+        assert!(result[3].is_nan());
+        assert!(result[4].is_nan());
+
+        // 窗口 [4,5,6]，权重 [1,2,3] => (4 + 10 + 18) / 6 = 32/6
+        assert!((result[5] - 32.0 / 6.0).abs() < 1e-10);
     }
 
     #[test]
     fn test_vwap() {
         let prices = vec![100.0, 101.0, 102.0];
         let volumes = vec![1000.0, 1100.0, 1200.0];
-        let result = vwap(&prices, &volumes, 0);  // 累积 VWAP
+        let result = vwap(&prices, &volumes, 0).unwrap(); // 累积 VWAP
         assert_eq!(result[0], 100.0);
         // (100*1000 + 101*1100) / (1000+1100) = 211100 / 2100 ≈ 100.52
         assert!((result[1] - 100.52380952380952).abs() < 1e-10);
@@ -370,7 +726,7 @@ mod tests {
     fn test_vwap_rolling() {
         let prices = vec![100.0, 101.0, 102.0, 103.0];
         let volumes = vec![10.0, 10.0, 10.0, 10.0];
-        let result = vwap(&prices, &volumes, 2);
+        let result = vwap(&prices, &volumes, 2).unwrap();
         assert!(result[0].is_nan());
         assert!((result[1] - 100.5).abs() < 1e-10);
         assert!((result[2] - 101.5).abs() < 1e-10);
@@ -381,7 +737,7 @@ mod tests {
     fn test_vwap_zero_volume() {
         let prices = vec![100.0, 101.0];
         let volumes = vec![0.0, 0.0];
-        let result = vwap(&prices, &volumes, 0);
+        let result = vwap(&prices, &volumes, 0).unwrap();
         assert!(result[0].is_nan());
         assert!(result[1].is_nan());
     }
@@ -400,14 +756,18 @@ mod tests {
 /// 1. Lag = (period - 1) / 2
 /// 2. EMA_Data = 2 * values - values[lag_ago]
 /// 3. ZLMA = EMA(EMA_Data, period)
-pub fn zlma(values: &[f64], period: usize) -> Vec<f64> {
-    let n = values.len();
-    if period == 0 || period > n {
-        return vec![f64::NAN; n];
-    }
+///
+/// # 错误
+/// - 如果输入为空，返回 `HazeError::EmptyInput`
+/// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
+pub fn zlma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
 
+    let n = values.len();
     let lag = (period - 1) / 2;
-    let mut ema_data = vec![f64::NAN; n];
+    let mut ema_data = init_result!(n);
 
     for i in lag..n {
         ema_data[i] = 2.0 * values[i] - values[i - lag];
@@ -428,11 +788,16 @@ pub fn zlma(values: &[f64], period: usize) -> Vec<f64> {
 ///
 /// # 算法
 /// 使用 6 层 EMA 和特殊系数
-pub fn t3(values: &[f64], period: usize, v_factor: f64) -> Vec<f64> {
+///
+/// # 错误
+/// - 如果输入为空，返回 `HazeError::EmptyInput`
+/// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
+pub fn t3(values: &[f64], period: usize, v_factor: f64) -> HazeResult<Vec<f64>> {
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
+
     let n = values.len();
-    if period == 0 || n == 0 {
-        return vec![f64::NAN; n];
-    }
 
     // 计算系数
     let c1 = -v_factor * v_factor * v_factor;
@@ -441,22 +806,26 @@ pub fn t3(values: &[f64], period: usize, v_factor: f64) -> Vec<f64> {
     let c4 = 1.0 + 3.0 * v_factor + v_factor * v_factor * v_factor + 3.0 * v_factor * v_factor;
 
     // 6 层 EMA
-    let e1 = ema(values, period);
-    let e2 = ema(&e1, period);
-    let e3 = ema(&e2, period);
-    let e4 = ema(&e3, period);
-    let e5 = ema(&e4, period);
-    let e6 = ema(&e5, period);
+    let e1 = ema(values, period)?;
+    let e2 = ema(&e1, period)?;
+    let e3 = ema(&e2, period)?;
+    let e4 = ema(&e3, period)?;
+    let e5 = ema(&e4, period)?;
+    let e6 = ema(&e5, period)?;
 
     // 加权组合
-    let mut t3_values = vec![f64::NAN; n];
+    let mut t3_values = init_result!(n);
     for i in 0..n {
         if !e3[i].is_nan() && !e4[i].is_nan() && !e5[i].is_nan() && !e6[i].is_nan() {
             t3_values[i] = c1 * e6[i] + c2 * e5[i] + c3 * e4[i] + c4 * e3[i];
         }
     }
 
-    t3_values
+    if t3_values.iter().all(|v| v.is_nan()) {
+        ema(values, period)
+    } else {
+        Ok(t3_values)
+    }
 }
 
 /// KAMA (Kaufman's Adaptive Moving Average) 考夫曼自适应移动平均
@@ -476,23 +845,28 @@ pub fn t3(values: &[f64], period: usize, v_factor: f64) -> Vec<f64> {
 /// 3. ER (Efficiency Ratio) = Change / Volatility
 /// 4. SC (Smoothing Constant) = [ER * (Fast_SC - Slow_SC) + Slow_SC]^2
 /// 5. KAMA[i] = KAMA[i-1] + SC * (Price[i] - KAMA[i-1])
+///
+/// # 错误
+/// - 如果输入为空，返回 `HazeError::EmptyInput`
+/// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
 pub fn kama(
     values: &[f64],
     period: usize,
     fast_period: usize,
     slow_period: usize,
-) -> Vec<f64> {
+) -> HazeResult<Vec<f64>> {
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
+
     let n = values.len();
-    if period == 0 || period >= n {
-        return vec![f64::NAN; n];
-    }
 
     // 计算 EMA 平滑常数
     let fast_sc = 2.0 / (fast_period + 1) as f64;
     let slow_sc = 2.0 / (slow_period + 1) as f64;
 
-    let mut kama_values = vec![f64::NAN; n];
-    kama_values[period - 1] = values[period - 1];  // 初始值
+    let mut kama_values = init_result!(n);
+    kama_values[period - 1] = values[period - 1]; // 初始值
 
     for i in period..n {
         // 1. 计算价格变化
@@ -519,7 +893,7 @@ pub fn kama(
         kama_values[i] = kama_values[i - 1] + sc * (values[i] - kama_values[i - 1]);
     }
 
-    kama_values
+    Ok(kama_values)
 }
 
 /// FRAMA (Fractal Adaptive Moving Average) 分形自适应移动平均
@@ -533,19 +907,27 @@ pub fn kama(
 ///
 /// # 算法
 /// 使用分形维度计算自适应 alpha
-pub fn frama(values: &[f64], period: usize) -> Vec<f64> {
+///
+/// # 错误
+/// - 如果输入为空，返回 `HazeError::EmptyInput`
+/// - 如果 period < 2 或非偶数或超过数据长度，返回 `HazeError::InvalidPeriod`
+pub fn frama(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+
     let n = values.len();
     if period < 2 || period % 2 != 0 || period > n {
-        return vec![f64::NAN; n];
+        return Err(HazeError::InvalidPeriod {
+            period,
+            data_len: n,
+        });
     }
 
     let half = period / 2;
-    let mut frama_values = vec![f64::NAN; n];
+    let mut frama_values = init_result!(n);
 
     // 初始值
-    if n > period {
-        frama_values[period - 1] = values[period - 1];
-    }
+    frama_values[period - 1] = values[period - 1];
 
     for i in period..n {
         // 计算前半周期和后半周期的最高最低价
@@ -591,7 +973,7 @@ pub fn frama(values: &[f64], period: usize) -> Vec<f64> {
         frama_values[i] = alpha_clamped * values[i] + (1.0 - alpha_clamped) * frama_values[i - 1];
     }
 
-    frama_values
+    Ok(frama_values)
 }
 
 #[cfg(test)]
@@ -602,7 +984,7 @@ mod advanced_ma_tests {
     fn test_zlma_basic() {
         let values: Vec<f64> = (100..120).map(|x| x as f64).collect();
 
-        let zlma_values = zlma(&values, 10);
+        let zlma_values = zlma(&values, 10).unwrap();
 
         // 上升趋势中，ZLMA 应跟随价格上升
         let valid_idx = zlma_values.iter().position(|v| !v.is_nan()).unwrap();
@@ -613,7 +995,7 @@ mod advanced_ma_tests {
     fn test_t3_basic() {
         let values: Vec<f64> = (100..130).map(|x| x as f64).collect();
 
-        let t3_values = t3(&values, 5, 0.7);
+        let t3_values = t3(&values, 5, 0.7).unwrap();
 
         // T3 应该平滑趋势
         let valid_idx = t3_values.iter().position(|v| !v.is_nan()).unwrap();
@@ -624,7 +1006,7 @@ mod advanced_ma_tests {
     fn test_kama_basic() {
         let values: Vec<f64> = (100..150).map(|x| x as f64).collect();
 
-        let kama_values = kama(&values, 10, 2, 30);
+        let kama_values = kama(&values, 10, 2, 30).unwrap();
 
         // KAMA 应该跟随趋势
         let valid_idx = kama_values.iter().position(|v| !v.is_nan()).unwrap();
@@ -636,10 +1018,130 @@ mod advanced_ma_tests {
     fn test_frama_basic() {
         let values: Vec<f64> = (100..132).map(|x| x as f64).collect();
 
-        let frama_values = frama(&values, 16);
+        let frama_values = frama(&values, 16).unwrap();
 
         // FRAMA 应该有效
         let valid_idx = frama_values.iter().position(|v| !v.is_nan()).unwrap();
         assert!(frama_values[valid_idx] > 100.0);
+    }
+}
+
+// ==================== 浮点误差校准测试 ====================
+
+#[cfg(test)]
+mod floating_point_error_tests {
+    use super::*;
+
+    /// 测试 SMA 在大数据集上的数值精度
+    #[test]
+    fn test_sma_large_dataset_precision() {
+        const N: usize = 100_000;
+        const PERIOD: usize = 20;
+
+        // 生成测试数据
+        let values: Vec<f64> = (0..N)
+            .map(|i| 1000.0 + (i as f64) * 0.001 + 0.0001 * ((i * 7) % 11) as f64)
+            .collect();
+
+        let result = sma(&values, PERIOD).unwrap();
+
+        // 在多个点验证精度
+        let test_indices = [PERIOD - 1, 1000, 2000, 50_000, N - 1];
+
+        for &i in &test_indices {
+            if (PERIOD - 1..N).contains(&i) {
+                let expected: f64 = values[i + 1 - PERIOD..=i].iter().sum::<f64>() / PERIOD as f64;
+                let actual = result[i];
+
+                let relative_error = (actual - expected).abs() / expected.abs();
+                assert!(
+                    relative_error < 1e-10,
+                    "SMA 在索引 {i} 处精度不足: expected={expected}, actual={actual}, relative_error={relative_error}",
+                );
+            }
+        }
+    }
+
+    /// 测试滚动 VWAP 在大数据集上的数值精度
+    #[test]
+    fn test_vwap_rolling_large_dataset_precision() {
+        const N: usize = 100_000;
+        const PERIOD: usize = 20;
+
+        // 生成测试数据
+        let prices: Vec<f64> = (0..N).map(|i| 100.0 + (i as f64) * 0.001).collect();
+        let volumes: Vec<f64> = (0..N).map(|i| 1000.0 + ((i * 3) % 100) as f64).collect();
+
+        let result = vwap(&prices, &volumes, PERIOD).unwrap();
+
+        // 在多个点验证精度
+        let test_indices = [PERIOD - 1, 1000, 2000, 50_000, N - 1];
+
+        for &i in &test_indices {
+            if (PERIOD - 1..N).contains(&i) {
+                let pv_sum: f64 = prices[i + 1 - PERIOD..=i]
+                    .iter()
+                    .zip(&volumes[i + 1 - PERIOD..=i])
+                    .map(|(&p, &v)| p * v)
+                    .sum();
+                let v_sum: f64 = volumes[i + 1 - PERIOD..=i].iter().sum();
+                let expected = pv_sum / v_sum;
+                let actual = result[i];
+
+                let relative_error = (actual - expected).abs() / expected.abs();
+                assert!(
+                    relative_error < 1e-10,
+                    "VWAP 在索引 {i} 处精度不足: expected={expected}, actual={actual}, relative_error={relative_error}",
+                );
+            }
+        }
+    }
+
+    /// 测试累积 VWAP（使用 Kahan 求和）的精度
+    #[test]
+    fn test_vwap_cumulative_precision() {
+        const N: usize = 100_000;
+
+        // 使用容易产生浮点误差的小数值
+        let prices: Vec<f64> = (0..N).map(|i| 0.001 + (i as f64) * 0.0001).collect();
+        let volumes: Vec<f64> = (0..N)
+            .map(|i| 0.1 + ((i * 3) % 100) as f64 * 0.01)
+            .collect();
+
+        let result = vwap(&prices, &volumes, 0).unwrap(); // 累积模式
+
+        // 验证最终结果精度
+        let pv_sum: f64 = prices.iter().zip(&volumes).map(|(&p, &v)| p * v).sum();
+        let v_sum: f64 = volumes.iter().sum();
+        let expected = pv_sum / v_sum;
+        let actual = result[N - 1];
+
+        let relative_error = (actual - expected).abs() / expected.abs();
+        // Kahan 求和应保持更高精度
+        assert!(
+            relative_error < 1e-12,
+            "累积 VWAP 精度不足: expected={expected}, actual={actual}, relative_error={relative_error}",
+        );
+    }
+
+    /// 测试 SMA 处理 NaN 后恢复的精度
+    #[test]
+    fn test_sma_nan_recovery_precision() {
+        const PERIOD: usize = 10;
+
+        // 构造带有 NaN 中断的数据
+        let mut values: Vec<f64> = (0..1000).map(|i| i as f64 + 0.5).collect();
+        values[500] = f64::NAN; // 在中间插入 NaN
+
+        let result = sma(&values, PERIOD).unwrap();
+
+        // NaN 之后应该正确恢复
+        // 从索引 501 开始重新计算，到 510 时应有有效结果
+        let test_idx = 510;
+        let expected: f64 =
+            values[test_idx + 1 - PERIOD..=test_idx].iter().sum::<f64>() / PERIOD as f64;
+        let actual = result[test_idx];
+
+        assert!((actual - expected).abs() < 1e-10, "SMA NaN 恢复后精度不足");
     }
 }

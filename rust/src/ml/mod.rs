@@ -4,16 +4,16 @@
 // 提供高性能、零 Python 依赖的机器学习能力
 
 pub mod features;
+pub mod manager;
 pub mod models;
 pub mod trainer;
-pub mod manager;
 
 // 内部模块重导出 (供未来扩展使用)
 #[allow(unused_imports)]
 pub use features::*;
 #[allow(unused_imports)]
+pub use manager::*;
+#[allow(unused_imports)]
 pub use models::*;
 #[allow(unused_imports)]
 pub use trainer::*;
-#[allow(unused_imports)]
-pub use manager::*;

@@ -2,37 +2,79 @@
 //
 // 大部分 MA 函数已在 utils/ma.rs 中实现，这里重新导出并添加一些高级 MA
 #![allow(dead_code)]
+// SAREXT 等函数需要多个参数配置
+#![allow(clippy::too_many_arguments)]
 
+use crate::errors::validation::{
+    validate_lengths_match, validate_min_length, validate_not_empty, validate_period,
+};
+use crate::errors::{HazeError, HazeResult};
+use crate::init_result;
+use crate::utils::math::is_zero;
 #[allow(unused_imports)]
 pub use crate::utils::{dema, ema, hma, rma, sma, tema, wma};
 
 // 高级 Overlap Studies 指标（TA-Lib 兼容）
 
 /// HL2 - High-Low Midpoint
-pub fn hl2(high: &[f64], low: &[f64]) -> Vec<f64> {
-    high.iter()
-        .zip(low)
-        .map(|(&h, &l)| (h + l) / 2.0)
-        .collect()
+///
+/// # 返回
+/// - `HazeResult<Vec<f64>>` 中点值序列
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `LengthMismatch`: 输入长度不一致
+pub fn hl2(high: &[f64], low: &[f64]) -> HazeResult<Vec<f64>> {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low")])?;
+
+    Ok(high.iter().zip(low).map(|(&h, &l)| (h + l) / 2.0).collect())
 }
 
 /// HLC3 - High-Low-Close Average (Typical Price)
-pub fn hlc3(high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
-    high.iter()
+///
+/// # 返回
+/// - `HazeResult<Vec<f64>>` 典型价格序列
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `LengthMismatch`: 输入长度不一致
+pub fn hlc3(high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
+
+    Ok(high
+        .iter()
         .zip(low)
         .zip(close)
         .map(|((&h, &l), &c)| (h + l + c) / 3.0)
-        .collect()
+        .collect())
 }
 
 /// OHLC4 - Open-High-Low-Close Average
-pub fn ohlc4(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
-    open.iter()
+///
+/// # 返回
+/// - `HazeResult<Vec<f64>>` 四价平均序列
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `LengthMismatch`: 输入长度不一致
+pub fn ohlc4(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    validate_not_empty(open, "open")?;
+    validate_lengths_match(&[
+        (open, "open"),
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
+
+    Ok(open
+        .iter()
         .zip(high)
         .zip(low)
         .zip(close)
         .map(|(((&o, &h), &l), &c)| (o + h + l + c) / 4.0)
-        .collect()
+        .collect())
 }
 
 /// MIDPOINT - MidPoint over period
@@ -44,14 +86,21 @@ pub fn ohlc4(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64>
 /// - `period`: 周期
 ///
 /// # 返回
-/// - 中点序列（前 period-1 个值为 NaN）
-pub fn midpoint(values: &[f64], period: usize) -> Vec<f64> {
+/// - `HazeResult<Vec<f64>>` 中点序列（前 period-1 个值为 NaN）
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `InvalidPeriod`: 周期无效
+pub fn midpoint(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     use crate::utils::{rolling_max, rolling_min};
+
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
 
     let max_vals = rolling_max(values, period);
     let min_vals = rolling_min(values, period);
 
-    max_vals
+    Ok(max_vals
         .iter()
         .zip(min_vals.iter())
         .map(|(&max, &min)| {
@@ -61,7 +110,7 @@ pub fn midpoint(values: &[f64], period: usize) -> Vec<f64> {
                 (max + min) / 2.0
             }
         })
-        .collect()
+        .collect())
 }
 
 /// MIDPRICE - Midpoint Price over period
@@ -74,14 +123,23 @@ pub fn midpoint(values: &[f64], period: usize) -> Vec<f64> {
 /// - `period`: 周期
 ///
 /// # 返回
-/// - 价格中点序列（前 period-1 个值为 NaN）
-pub fn midprice(high: &[f64], low: &[f64], period: usize) -> Vec<f64> {
+/// - `HazeResult<Vec<f64>>` 价格中点序列（前 period-1 个值为 NaN）
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `LengthMismatch`: 输入长度不一致
+/// - `InvalidPeriod`: 周期无效
+pub fn midprice(high: &[f64], low: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     use crate::utils::{rolling_max, rolling_min};
+
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low")])?;
+    validate_period(period, high.len())?;
 
     let max_high = rolling_max(high, period);
     let min_low = rolling_min(low, period);
 
-    max_high
+    Ok(max_high
         .iter()
         .zip(min_low.iter())
         .map(|(&max, &min)| {
@@ -91,7 +149,7 @@ pub fn midprice(high: &[f64], low: &[f64], period: usize) -> Vec<f64> {
                 (max + min) / 2.0
             }
         })
-        .collect()
+        .collect())
 }
 
 /// TRIMA - Triangular Moving Average
@@ -104,14 +162,21 @@ pub fn midprice(high: &[f64], low: &[f64], period: usize) -> Vec<f64> {
 /// - `period`: 周期
 ///
 /// # 返回
-/// - 三角移动平均序列
-pub fn trima(values: &[f64], period: usize) -> Vec<f64> {
+/// - `HazeResult<Vec<f64>>` 三角移动平均序列
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `InvalidPeriod`: 周期无效
+pub fn trima(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
+
     // Step 1: 第一次 SMA
-    let first_sma = sma(values, period);
+    let first_sma = sma(values, period)?;
 
     // Step 2: 对 SMA 结果再次应用 SMA
     // 注意：需要调整周期以匹配 TA-Lib 的行为
-    let n = (period + 1) / 2;
+    let n = period.div_ceil(2);
     sma(&first_sma, n)
 }
 
@@ -126,19 +191,39 @@ pub fn trima(values: &[f64], period: usize) -> Vec<f64> {
 /// - `maximum`: 加速因子最大值（默认 0.2）
 ///
 /// # 返回
-/// - SAR 值序列
-pub fn sar(
-    high: &[f64],
-    low: &[f64],
-    acceleration: f64,
-    maximum: f64,
-) -> Vec<f64> {
-    let n = high.len().min(low.len());
-    if n < 2 {
-        return vec![f64::NAN; n];
+/// - `HazeResult<Vec<f64>>` SAR 值序列
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `LengthMismatch`: 输入长度不一致
+/// - `InsufficientData`: 数据长度小于 2
+pub fn sar(high: &[f64], low: &[f64], acceleration: f64, maximum: f64) -> HazeResult<Vec<f64>> {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low")])?;
+    validate_min_length(high, 2)?;
+
+    // Fail-Fast: AF 参数验证
+    if acceleration <= 0.0 {
+        return Err(HazeError::InvalidValue {
+            index: 0,
+            message: format!("acceleration ({acceleration}) must be > 0"),
+        });
+    }
+    if maximum <= 0.0 {
+        return Err(HazeError::InvalidValue {
+            index: 0,
+            message: format!("maximum ({maximum}) must be > 0"),
+        });
+    }
+    if maximum < acceleration {
+        return Err(HazeError::InvalidValue {
+            index: 0,
+            message: format!("maximum ({maximum}) must be >= acceleration ({acceleration})"),
+        });
     }
 
-    let mut result = vec![f64::NAN; n];
+    let n = high.len();
+    let mut result = init_result!(n);
 
     // 初始化：假设上升趋势
     let mut is_long = true;
@@ -210,7 +295,7 @@ pub fn sar(
         result[i] = sar_value;
     }
 
-    result
+    Ok(result)
 }
 
 /// SAREXT - Parabolic SAR Extended (更多参数控制)
@@ -230,7 +315,12 @@ pub fn sar(
 /// - `af_max_short`: 下降趋势 AF 最大值
 ///
 /// # 返回
-/// - SAR 值序列
+/// - `HazeResult<Vec<f64>>` SAR 值序列
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `LengthMismatch`: 输入长度不一致
+/// - `InsufficientData`: 数据长度小于 2
 pub fn sarext(
     high: &[f64],
     low: &[f64],
@@ -242,17 +332,61 @@ pub fn sarext(
     af_init_short: f64,
     af_short: f64,
     af_max_short: f64,
-) -> Vec<f64> {
-    let n = high.len().min(low.len());
-    if n < 2 {
-        return vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low")])?;
+    validate_min_length(high, 2)?;
+
+    // Fail-Fast: AF 参数验证 (Long)
+    if af_init_long <= 0.0 {
+        return Err(HazeError::InvalidValue {
+            index: 0,
+            message: format!("af_init_long ({af_init_long}) must be > 0"),
+        });
+    }
+    if af_long <= 0.0 {
+        return Err(HazeError::InvalidValue {
+            index: 0,
+            message: format!("af_long ({af_long}) must be > 0"),
+        });
+    }
+    if af_max_long < af_init_long {
+        return Err(HazeError::InvalidValue {
+            index: 0,
+            message: format!(
+                "af_max_long ({af_max_long}) must be >= af_init_long ({af_init_long})"
+            ),
+        });
     }
 
-    let mut result = vec![f64::NAN; n];
+    // Fail-Fast: AF 参数验证 (Short)
+    if af_init_short <= 0.0 {
+        return Err(HazeError::InvalidValue {
+            index: 0,
+            message: format!("af_init_short ({af_init_short}) must be > 0"),
+        });
+    }
+    if af_short <= 0.0 {
+        return Err(HazeError::InvalidValue {
+            index: 0,
+            message: format!("af_short ({af_short}) must be > 0"),
+        });
+    }
+    if af_max_short < af_init_short {
+        return Err(HazeError::InvalidValue {
+            index: 0,
+            message: format!(
+                "af_max_short ({af_max_short}) must be >= af_init_short ({af_init_short})"
+            ),
+        });
+    }
+
+    let n = high.len();
+    let mut result = init_result!(n);
 
     // 初始化
     let mut is_long = true;
-    let mut sar_value = if start_value == 0.0 {
+    let mut sar_value = if is_zero(start_value) {
         low[0]
     } else {
         start_value
@@ -276,14 +410,12 @@ pub fn sarext(
                 ep = low[i];
                 af = af_init_short;
             }
-        } else {
-            if high[i] > sar_value {
-                is_long = true;
-                reversed = true;
-                sar_value = ep - offset_on_reverse;
-                ep = high[i];
-                af = af_init_long;
-            }
+        } else if high[i] > sar_value {
+            is_long = true;
+            reversed = true;
+            sar_value = ep - offset_on_reverse;
+            ep = high[i];
+            af = af_init_long;
         }
 
         // 如果没有反转，更新 EP 和 AF
@@ -316,7 +448,7 @@ pub fn sarext(
         result[i] = sar_value;
     }
 
-    result
+    Ok(result)
 }
 
 /// MAMA - MESA Adaptive Moving Average
@@ -329,15 +461,18 @@ pub fn sarext(
 /// - `slow_limit`: 慢速限制（默认 0.05）
 ///
 /// # 返回
-/// - (MAMA, FAMA) 元组
-pub fn mama(values: &[f64], fast_limit: f64, slow_limit: f64) -> (Vec<f64>, Vec<f64>) {
-    let n = values.len();
-    if n < 6 {
-        return (vec![f64::NAN; n], vec![f64::NAN; n]);
-    }
+/// - `HazeResult<(Vec<f64>, Vec<f64>)>` (MAMA, FAMA) 元组
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `InsufficientData`: 数据长度小于 6
+pub fn mama(values: &[f64], fast_limit: f64, slow_limit: f64) -> HazeResult<(Vec<f64>, Vec<f64>)> {
+    validate_not_empty(values, "values")?;
+    validate_min_length(values, 6)?;
 
-    let mut mama_vals = vec![f64::NAN; n];
-    let mut fama_vals = vec![f64::NAN; n];
+    let n = values.len();
+    let mut mama_vals = init_result!(n);
+    let mut fama_vals = init_result!(n);
 
     // 初始化
     mama_vals[0] = values[0];
@@ -359,10 +494,10 @@ pub fn mama(values: &[f64], fast_limit: f64, slow_limit: f64) -> (Vec<f64>, Vec<
         }
 
         // 限制周期范围
-        period = period.max(6.0).min(50.0);
+        period = period.clamp(6.0, 50.0);
 
         // 计算 alpha（自适应因子）
-        let alpha = (fast_limit / period).max(slow_limit).min(fast_limit);
+        let alpha = (fast_limit / period).clamp(slow_limit, fast_limit);
 
         // 计算 MAMA
         mama_vals[i] = alpha * values[i] + (1.0 - alpha) * mama_vals[i - 1];
@@ -372,19 +507,20 @@ pub fn mama(values: &[f64], fast_limit: f64, slow_limit: f64) -> (Vec<f64>, Vec<
         fama_vals[i] = fama_alpha * mama_vals[i] + (1.0 - fama_alpha) * fama_vals[i - 1];
     }
 
-    (mama_vals, fama_vals)
+    Ok((mama_vals, fama_vals))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::errors::HazeError;
 
     #[test]
     fn test_hl2() {
         let high = vec![110.0, 111.0, 112.0];
         let low = vec![100.0, 101.0, 102.0];
 
-        let result = hl2(&high, &low);
+        let result = hl2(&high, &low).unwrap();
 
         assert_eq!(result[0], 105.0);
         assert_eq!(result[1], 106.0);
@@ -397,8 +533,54 @@ mod tests {
         let low = vec![100.0];
         let close = vec![105.0];
 
-        let result = hlc3(&high, &low, &close);
+        let result = hlc3(&high, &low, &close).unwrap();
 
-        assert_eq!(result[0], 105.0);  // (110 + 100 + 105) / 3
+        assert_eq!(result[0], 105.0); // (110 + 100 + 105) / 3
+    }
+
+    #[test]
+    fn test_hl2_empty_input() {
+        let result = hl2(&[], &[]);
+        assert!(matches!(result, Err(HazeError::EmptyInput { .. })));
+    }
+
+    #[test]
+    fn test_hlc3_length_mismatch() {
+        let high = vec![110.0, 111.0];
+        let low = vec![100.0];
+        let close = vec![105.0, 106.0];
+
+        let result = hlc3(&high, &low, &close);
+        assert!(matches!(result, Err(HazeError::LengthMismatch { .. })));
+    }
+
+    #[test]
+    fn test_midpoint_invalid_period() {
+        let values = vec![1.0, 2.0, 3.0];
+        let result = midpoint(&values, 0);
+        assert!(matches!(result, Err(HazeError::InvalidPeriod { .. })));
+    }
+
+    #[test]
+    fn test_sar_insufficient_data() {
+        let high = vec![10.0];
+        let low = vec![9.0];
+        let result = sar(&high, &low, 0.02, 0.2);
+        assert!(matches!(result, Err(HazeError::InsufficientData { .. })));
+    }
+
+    #[test]
+    fn test_mama_valid() {
+        let values: Vec<f64> = (0..20).map(|i| 100.0 + i as f64).collect();
+        let (mama_vals, fama_vals) = mama(&values, 0.5, 0.05).unwrap();
+        assert_eq!(mama_vals.len(), values.len());
+        assert_eq!(fama_vals.len(), values.len());
+    }
+
+    #[test]
+    fn test_mama_insufficient_data() {
+        let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
+        let result = mama(&values, 0.5, 0.05);
+        assert!(matches!(result, Err(HazeError::InsufficientData { .. })));
     }
 }

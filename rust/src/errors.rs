@@ -5,6 +5,11 @@
 
 use thiserror::Error;
 
+#[cfg(feature = "python")]
+use pyo3::exceptions::PyValueError;
+#[cfg(feature = "python")]
+use pyo3::prelude::*;
+
 /// Haze 库核心错误类型
 #[derive(Debug, Error)]
 pub enum HazeError {
@@ -49,6 +54,14 @@ pub enum HazeError {
     /// IO 错误
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+}
+
+/// PyO3 错误转换 - 将 HazeError 转换为 Python ValueError
+#[cfg(feature = "python")]
+impl From<HazeError> for PyErr {
+    fn from(err: HazeError) -> PyErr {
+        PyValueError::new_err(err.to_string())
+    }
 }
 
 /// Result 类型别名
@@ -128,13 +141,9 @@ pub mod validation {
     }
 
     /// 验证参数范围
+    #[allow(dead_code)]
     #[inline]
-    pub fn validate_range(
-        name: &'static str,
-        value: f64,
-        min: f64,
-        max: f64,
-    ) -> HazeResult<()> {
+    pub fn validate_range(name: &'static str, value: f64, min: f64, max: f64) -> HazeResult<()> {
         if value < min || value > max {
             return Err(HazeError::ParameterOutOfRange {
                 name,

@@ -1,3 +1,66 @@
+//! Streaming/Online Calculation Module
+//!
+//! # Overview
+//! This module provides incremental (online) indicator calculators that maintain
+//! internal state and update with O(1) time complexity per data point. These are
+//! essential for real-time trading systems where recalculating entire histories
+//! on each tick is impractical.
+//!
+//! # Design Philosophy
+//! - **State Machine Pattern**: Each calculator encapsulates its warmup and running state
+//! - **Numerical Stability**: Periodic recalculation prevents floating-point error accumulation
+//! - **Zero Allocation**: Updates allocate no memory after initialization
+//! - **NaN Safety**: Invalid inputs are handled gracefully without corrupting state
+//!
+//! # Available Calculators
+//!
+//! ## Moving Averages
+//! - [`OnlineSMA`] - Simple Moving Average with O(1) updates
+//! - [`OnlineEMA`] - Exponential Moving Average with warmup handling
+//!
+//! ## Momentum Indicators
+//! - [`OnlineRSI`] - Relative Strength Index with Wilder's smoothing
+//! - [`OnlineMACD`] - MACD with signal line and histogram
+//!
+//! ## Volatility Indicators
+//! - [`OnlineATR`] - Average True Range for OHLC data
+//! - [`OnlineBollingerBands`] - Bollinger Bands with configurable std dev
+//!
+//! # Examples
+//! ```rust
+//! use haze_library::utils::streaming::{OnlineSMA, OnlineEMA, OnlineRSI};
+//!
+//! let prices = vec![100.0, 101.0, 102.0, 103.0, 104.0, 105.0];
+//!
+//! // Real-time SMA calculation
+//! let mut sma = OnlineSMA::new(20);
+//! for price in prices.iter() {
+//!     if let Some(value) = sma.update(*price) {
+//!         println!("SMA(20): {}", value);
+//!     }
+//! }
+//!
+//! // Online RSI for momentum tracking
+//! let mut rsi = OnlineRSI::new(14);
+//! for price in prices.iter() {
+//!     if let Some(value) = rsi.update(*price) {
+//!         if value > 70.0 { println!("Overbought!"); }
+//!         if value < 30.0 { println!("Oversold!"); }
+//!     }
+//! }
+//! ```
+//!
+//! # Performance Characteristics
+//! - All update operations are O(1) time complexity
+//! - Memory usage is O(period) for window-based calculators
+//! - OnlineSMA/OnlineBollingerBands recalculate every 1000 updates for numerical stability
+//! - Warmup period returns None until sufficient data is accumulated
+//!
+//! # Cross-References
+//! - [`crate::utils::ma`] - Batch moving average implementations
+//! - [`crate::indicators::momentum`] - Batch momentum indicators
+//! - [`crate::indicators::volatility`] - Batch volatility indicators
+
 // utils/streaming.rs - 流式/在线计算模块
 #![allow(dead_code)]
 //
@@ -9,12 +72,18 @@ use std::collections::VecDeque;
 /// 在线 SMA 计算器
 ///
 /// 支持增量更新，O(1) 时间复杂度
+/// 使用定期重新计算以防止浮点误差累积
 #[derive(Debug, Clone)]
 pub struct OnlineSMA {
     period: usize,
     window: VecDeque<f64>,
     sum: f64,
+    /// 自上次完整重新计算以来的更新次数
+    updates_since_recalc: usize,
 }
+
+/// 重新计算间隔：每 1000 次更新重新计算一次以重置累积误差
+const SMA_RECALC_INTERVAL: usize = 1000;
 
 impl OnlineSMA {
     pub fn new(period: usize) -> Self {
@@ -22,6 +91,7 @@ impl OnlineSMA {
             period,
             window: VecDeque::with_capacity(period),
             sum: 0.0,
+            updates_since_recalc: 0,
         }
     }
 
@@ -38,6 +108,12 @@ impl OnlineSMA {
             if let Some(old) = self.window.pop_front() {
                 self.sum -= old;
             }
+            self.updates_since_recalc += 1;
+
+            // 定期完整重新计算以消除累积浮点误差
+            if self.updates_since_recalc >= SMA_RECALC_INTERVAL {
+                self.recalculate_sum();
+            }
         }
 
         if self.window.len() == self.period {
@@ -47,10 +123,17 @@ impl OnlineSMA {
         }
     }
 
+    /// 完整重新计算窗口和以消除累积浮点误差
+    fn recalculate_sum(&mut self) {
+        self.sum = self.window.iter().sum();
+        self.updates_since_recalc = 0;
+    }
+
     /// 重置状态
     pub fn reset(&mut self) {
         self.window.clear();
         self.sum = 0.0;
+        self.updates_since_recalc = 0;
     }
 
     /// 当前窗口大小
@@ -60,6 +143,13 @@ impl OnlineSMA {
 
     pub fn is_empty(&self) -> bool {
         self.window.is_empty()
+    }
+
+    /// 强制重新计算和以消除累积误差（用于关键计算点）
+    pub fn force_recalculate(&mut self) {
+        if self.window.len() == self.period {
+            self.recalculate_sum();
+        }
     }
 }
 
@@ -309,6 +399,8 @@ impl OnlineMACD {
 }
 
 /// 在线 Bollinger Bands 计算器
+///
+/// 使用定期重新计算以防止浮点误差累积
 #[derive(Debug, Clone)]
 pub struct OnlineBollingerBands {
     period: usize,
@@ -316,7 +408,12 @@ pub struct OnlineBollingerBands {
     window: VecDeque<f64>,
     sum: f64,
     sum_sq: f64,
+    /// 自上次完整重新计算以来的更新次数
+    updates_since_recalc: usize,
 }
+
+/// 重新计算间隔：每 1000 次更新重新计算一次以重置累积误差
+const BB_RECALC_INTERVAL: usize = 1000;
 
 impl OnlineBollingerBands {
     pub fn new(period: usize, std_dev: f64) -> Self {
@@ -326,6 +423,7 @@ impl OnlineBollingerBands {
             window: VecDeque::with_capacity(period),
             sum: 0.0,
             sum_sq: 0.0,
+            updates_since_recalc: 0,
         }
     }
 
@@ -344,6 +442,12 @@ impl OnlineBollingerBands {
                 self.sum -= old;
                 self.sum_sq -= old * old;
             }
+            self.updates_since_recalc += 1;
+
+            // 定期完整重新计算以消除累积浮点误差
+            if self.updates_since_recalc >= BB_RECALC_INTERVAL {
+                self.recalculate_sums();
+            }
         }
 
         if self.window.len() == self.period {
@@ -358,10 +462,25 @@ impl OnlineBollingerBands {
         }
     }
 
+    /// 完整重新计算窗口和以消除累积浮点误差
+    fn recalculate_sums(&mut self) {
+        self.sum = self.window.iter().sum();
+        self.sum_sq = self.window.iter().map(|&x| x * x).sum();
+        self.updates_since_recalc = 0;
+    }
+
     pub fn reset(&mut self) {
         self.window.clear();
         self.sum = 0.0;
         self.sum_sq = 0.0;
+        self.updates_since_recalc = 0;
+    }
+
+    /// 强制重新计算和以消除累积误差（用于关键计算点）
+    pub fn force_recalculate(&mut self) {
+        if self.window.len() == self.period {
+            self.recalculate_sums();
+        }
     }
 }
 
@@ -433,5 +552,148 @@ mod tests {
         let (mid, upper, lower) = bb.update(102.0).unwrap();
         assert!(upper > mid);
         assert!(mid > lower);
+    }
+}
+
+// ==================== 浮点误差校准测试 ====================
+
+#[cfg(test)]
+mod floating_point_error_tests {
+    use super::*;
+
+    /// 测试 OnlineSMA 在大量更新后的数值精度
+    #[test]
+    fn test_online_sma_large_update_precision() {
+        const N: usize = 100_000;
+        const PERIOD: usize = 20;
+
+        let mut sma = OnlineSMA::new(PERIOD);
+
+        // 收集所有值以便验证
+        let values: Vec<f64> = (0..N)
+            .map(|i| 1000.0 + (i as f64) * 0.001 + 0.0001 * ((i * 7) % 11) as f64)
+            .collect();
+
+        let mut last_result = None;
+        for &val in &values {
+            last_result = sma.update(val);
+        }
+
+        // 计算期望的精确值
+        let expected: f64 = values[N - PERIOD..N].iter().sum::<f64>() / PERIOD as f64;
+        let actual = last_result.unwrap();
+
+        let relative_error = (actual - expected).abs() / expected.abs();
+        assert!(
+            relative_error < 1e-10,
+            "OnlineSMA 精度不足: expected={expected}, actual={actual}, relative_error={relative_error}",
+        );
+    }
+
+    /// 测试 OnlineSMA 强制重新计算功能
+    #[test]
+    fn test_online_sma_force_recalculate() {
+        const PERIOD: usize = 5;
+
+        let mut sma = OnlineSMA::new(PERIOD);
+
+        // 添加一些值
+        for i in 0..PERIOD {
+            sma.update(i as f64 + 0.1);
+        }
+
+        // 强制重新计算
+        sma.force_recalculate();
+
+        // 添加更多值并检查
+        let result = sma.update(10.0).unwrap();
+        let expected = (1.1 + 2.1 + 3.1 + 4.1 + 10.0) / 5.0;
+        assert!((result - expected).abs() < 1e-10);
+    }
+
+    /// 测试 OnlineBollingerBands 在大量更新后的数值精度
+    #[test]
+    fn test_online_bollinger_large_update_precision() {
+        const N: usize = 100_000;
+        const PERIOD: usize = 20;
+
+        let mut bb = OnlineBollingerBands::new(PERIOD, 2.0);
+
+        // 收集所有值以便验证
+        let values: Vec<f64> = (0..N).map(|i| 100.0 + (i as f64) * 0.001).collect();
+
+        let mut last_result = None;
+        for &val in &values {
+            last_result = bb.update(val);
+        }
+
+        let (mid, upper, lower) = last_result.unwrap();
+
+        // 计算期望的精确均值
+        let expected_mean: f64 = values[N - PERIOD..N].iter().sum::<f64>() / PERIOD as f64;
+        let relative_error = (mid - expected_mean).abs() / expected_mean.abs();
+
+        assert!(
+            relative_error < 1e-10,
+            "OnlineBollingerBands 均值精度不足: expected={expected_mean}, actual={mid}, relative_error={relative_error}",
+        );
+
+        // 验证布林带结构正确
+        assert!(upper > mid, "上轨应大于中轨");
+        assert!(mid > lower, "中轨应大于下轨");
+    }
+
+    /// 测试 OnlineBollingerBands 强制重新计算功能
+    #[test]
+    fn test_online_bollinger_force_recalculate() {
+        const PERIOD: usize = 5;
+
+        let mut bb = OnlineBollingerBands::new(PERIOD, 2.0);
+
+        // 添加一些值
+        for i in 0..PERIOD {
+            bb.update(100.0 + i as f64);
+        }
+
+        // 强制重新计算
+        bb.force_recalculate();
+
+        // 添加更多值并检查结构
+        let (mid, upper, lower) = bb.update(110.0).unwrap();
+        assert!(upper > mid);
+        assert!(mid > lower);
+    }
+
+    /// 对比在线计算与批量计算的一致性
+    #[test]
+    fn test_online_vs_batch_consistency() {
+        use crate::utils::ma::sma;
+
+        const N: usize = 10_000;
+        const PERIOD: usize = 20;
+
+        let values: Vec<f64> = (0..N).map(|i| 50.0 + (i as f64).sin() * 10.0).collect();
+
+        // 批量计算
+        let batch_result = sma(&values, PERIOD).unwrap();
+
+        // 在线计算
+        let mut online_sma = OnlineSMA::new(PERIOD);
+        let mut online_results = Vec::with_capacity(N);
+        for &val in &values {
+            online_results.push(online_sma.update(val));
+        }
+
+        // 比较有效结果
+        for i in (PERIOD - 1)..N {
+            let batch_val = batch_result[i];
+            let online_val = online_results[i].unwrap();
+
+            let diff = (batch_val - online_val).abs();
+            assert!(
+                diff < 1e-10,
+                "索引 {i} 处在线与批量结果不一致: batch={batch_val}, online={online_val}, diff={diff}",
+            );
+        }
     }
 }

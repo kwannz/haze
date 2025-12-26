@@ -1,6 +1,9 @@
 // types.rs - 核心数据类型定义
 // 内部辅助函数保留供未来扩展
 #![allow(dead_code)]
+// OHLCV 元组类型在金融领域是标准模式
+#![allow(clippy::type_complexity)]
+#![allow(clippy::wrong_self_convention)]
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
@@ -15,7 +18,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Candle {
     #[pyo3(get, set)]
-    pub timestamp: i64,  // Unix 毫秒时间戳
+    pub timestamp: i64, // Unix 毫秒时间戳
     #[pyo3(get, set)]
     pub open: f64,
     #[pyo3(get, set)]
@@ -43,14 +46,7 @@ pub struct Candle {
 #[pyo3::pymethods]
 impl Candle {
     #[new]
-    pub fn new(
-        timestamp: i64,
-        open: f64,
-        high: f64,
-        low: f64,
-        close: f64,
-        volume: f64,
-    ) -> Self {
+    pub fn new(timestamp: i64, open: f64, high: f64, low: f64, close: f64, volume: f64) -> Self {
         Self {
             timestamp,
             open,
@@ -102,14 +98,7 @@ impl Candle {
 
 #[cfg(not(feature = "python"))]
 impl Candle {
-    pub fn new(
-        timestamp: i64,
-        open: f64,
-        high: f64,
-        low: f64,
-        close: f64,
-        volume: f64,
-    ) -> Self {
+    pub fn new(timestamp: i64, open: f64, high: f64, low: f64, close: f64, volume: f64) -> Self {
         Self {
             timestamp,
             open,
@@ -194,6 +183,10 @@ impl IndicatorResult {
     pub fn len(&self) -> usize {
         self.values.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
 }
 
 #[cfg(not(feature = "python"))]
@@ -212,6 +205,10 @@ impl IndicatorResult {
 
     pub fn len(&self) -> usize {
         self.values.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
     }
 }
 
@@ -281,7 +278,9 @@ impl MultiIndicatorResult {
 // ==================== 辅助函数 ====================
 
 /// 将 Vec<Candle> 转换为分离的 OHLCV 向量
-pub fn candles_to_vectors(candles: &[Candle]) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+pub fn candles_to_vectors(
+    candles: &[Candle],
+) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
     let open: Vec<f64> = candles.iter().map(|c| c.open).collect();
     let high: Vec<f64> = candles.iter().map(|c| c.high).collect();
     let low: Vec<f64> = candles.iter().map(|c| c.low).collect();
@@ -297,11 +296,13 @@ pub fn validate_ohlc(candles: &[Candle]) -> Result<(), String> {
         let min_oc = candle.open.min(candle.close);
 
         if candle.high < max_oc {
-            return Err(format!("Candle {} 违反 OHLC 逻辑: high < max(open, close)", i));
+            return Err(format!(
+                "Candle {i} 违反 OHLC 逻辑: high < max(open, close)"
+            ));
         }
 
         if candle.low > min_oc {
-            return Err(format!("Candle {} 违反 OHLC 逻辑: low > min(open, close)", i));
+            return Err(format!("Candle {i} 违反 OHLC 逻辑: low > min(open, close)"));
         }
     }
     Ok(())
@@ -329,7 +330,7 @@ mod tests {
         assert!(validate_ohlc(&valid_candles).is_ok());
 
         let invalid_candles = vec![
-            Candle::new(0, 100.0, 99.0, 98.0, 101.0, 1000.0),  // high < close
+            Candle::new(0, 100.0, 99.0, 98.0, 101.0, 1000.0), // high < close
         ];
         assert!(validate_ohlc(&invalid_candles).is_err());
     }

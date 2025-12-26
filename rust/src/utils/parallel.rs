@@ -1,9 +1,75 @@
-// utils/parallel.rs - 并行计算模块
-#![allow(dead_code)]
-//
-// 使用 Rayon 提供批量并行处理功能
-// 遵循 KISS 原则：仅提供最常用的并行模式
+//! Parallel Computation Module
+//!
+//! # Overview
+//! This module provides parallel computation utilities using Rayon for batch
+//! processing of technical indicators across multiple symbols or timeframes.
+//! It enables efficient multi-core utilization for computationally intensive
+//! indicator calculations in trading systems.
+//!
+//! # Design Philosophy
+//! - **KISS Principle**: Only the most common parallel patterns are provided
+//! - **Zero-Copy**: Uses references where possible to minimize memory overhead
+//! - **Work-Stealing**: Rayon's work-stealing scheduler for load balancing
+//!
+//! # Available Functions
+//!
+//! ## Multi-Symbol Parallelization
+//! - [`parallel_sma`] - Compute SMA for multiple trading pairs simultaneously
+//! - [`parallel_ema`] - Compute EMA for multiple trading pairs simultaneously
+//! - [`parallel_rsi`] - Compute RSI for multiple trading pairs simultaneously
+//! - [`parallel_atr`] - Compute ATR for multiple trading pairs simultaneously
+//!
+//! ## Multi-Period Parallelization
+//! - [`parallel_multi_period_sma`] - Compute multiple SMA periods (5, 10, 20, etc.)
+//! - [`parallel_multi_period_ema`] - Compute multiple EMA periods (12, 26, etc.)
+//!
+//! ## Generic Parallelization
+//! - [`parallel_compute`] - Generic parallel map for any indicator function
+//!
+//! ## Configuration
+//! - [`configure_thread_pool`] - Configure Rayon thread pool size
+//!
+//! # Examples
+//! ```rust
+//! use haze_library::utils::parallel::{parallel_sma, parallel_multi_period_sma};
+//!
+//! let btc_prices = vec![100.0, 101.0, 102.0, 103.0, 104.0];
+//! let eth_prices = vec![50.0, 51.0, 52.0, 53.0, 54.0];
+//!
+//! // Compute SMA for multiple symbols in parallel
+//! let data_sets: Vec<(&str, &[f64], usize)> = vec![
+//!     ("BTC", &btc_prices, 3),
+//!     ("ETH", &eth_prices, 3),
+//! ];
+//! let results = parallel_sma(&data_sets);
+//!
+//! // Compute multiple periods for single symbol
+//! let multi_sma = parallel_multi_period_sma(&btc_prices, &[5, 10, 20]);
+//! ```
+//!
+//! # Performance Characteristics
+//! - Parallelization overhead: ~1-5 microseconds per task spawn
+//! - Recommended: Use for datasets > 1000 elements or > 4 symbols
+//! - For small datasets, sequential computation may be faster
+//!
+//! # Thread Pool Configuration
+//! ```rust
+//! use haze_library::utils::parallel::configure_thread_pool;
+//!
+//! // Use 4 threads (0 = Rayon default based on CPU cores)
+//! configure_thread_pool(4).expect("Failed to configure thread pool");
+//! ```
+//!
+//! # Cross-References
+//! - [`crate::utils::ma`] - Underlying SMA/EMA implementations
+//! - [`crate::indicators::momentum`] - RSI implementation
+//! - [`crate::indicators::volatility`] - ATR implementation
 
+#![allow(dead_code)]
+// Parallel OHLCV dataset processing requires complex tuple types
+#![allow(clippy::type_complexity)]
+
+use crate::init_result;
 use rayon::prelude::*;
 
 use super::ma::{ema, sma};
@@ -17,12 +83,16 @@ use super::ma::{ema, sma};
 ///
 /// # 返回
 /// - Vec<(symbol_id, sma_values)>
-pub fn parallel_sma<'a>(
-    data_sets: &[(&'a str, &[f64], usize)],
-) -> Vec<(&'a str, Vec<f64>)> {
+pub fn parallel_sma<'a>(data_sets: &[(&'a str, &[f64], usize)]) -> Vec<(&'a str, Vec<f64>)> {
     data_sets
         .par_iter()
-        .map(|(symbol, values, period)| (*symbol, sma(values, *period)))
+        .map(|(symbol, values, period)| {
+            let n = values.len();
+            (
+                *symbol,
+                sma(values, *period).unwrap_or_else(|_| init_result!(n)),
+            )
+        })
         .collect()
 }
 
@@ -35,12 +105,16 @@ pub fn parallel_sma<'a>(
 ///
 /// # 返回
 /// - Vec<(symbol_id, ema_values)>
-pub fn parallel_ema<'a>(
-    data_sets: &[(&'a str, &[f64], usize)],
-) -> Vec<(&'a str, Vec<f64>)> {
+pub fn parallel_ema<'a>(data_sets: &[(&'a str, &[f64], usize)]) -> Vec<(&'a str, Vec<f64>)> {
     data_sets
         .par_iter()
-        .map(|(symbol, values, period)| (*symbol, ema(values, *period)))
+        .map(|(symbol, values, period)| {
+            let n = values.len();
+            (
+                *symbol,
+                ema(values, *period).unwrap_or_else(|_| init_result!(n)),
+            )
+        })
         .collect()
 }
 
@@ -55,9 +129,15 @@ pub fn parallel_ema<'a>(
 /// # 返回
 /// - Vec<(period, sma_values)>
 pub fn parallel_multi_period_sma(values: &[f64], periods: &[usize]) -> Vec<(usize, Vec<f64>)> {
+    let n = values.len();
     periods
         .par_iter()
-        .map(|&period| (period, sma(values, period)))
+        .map(|&period| {
+            (
+                period,
+                sma(values, period).unwrap_or_else(|_| init_result!(n)),
+            )
+        })
         .collect()
 }
 
@@ -72,9 +152,15 @@ pub fn parallel_multi_period_sma(values: &[f64], periods: &[usize]) -> Vec<(usiz
 /// # 返回
 /// - Vec<(period, ema_values)>
 pub fn parallel_multi_period_ema(values: &[f64], periods: &[usize]) -> Vec<(usize, Vec<f64>)> {
+    let n = values.len();
     periods
         .par_iter()
-        .map(|&period| (period, ema(values, period)))
+        .map(|&period| {
+            (
+                period,
+                ema(values, period).unwrap_or_else(|_| init_result!(n)),
+            )
+        })
         .collect()
 }
 
@@ -109,14 +195,10 @@ where
 ///
 /// # 返回
 /// - Vec<(symbol_id, rsi_values)>
-pub fn parallel_rsi<'a>(
-    data_sets: &[(&'a str, &[f64], usize)],
-) -> Vec<(&'a str, Vec<f64>)> {
+pub fn parallel_rsi<'a>(data_sets: &[(&'a str, &[f64], usize)]) -> Vec<(&'a str, Vec<f64>)> {
     data_sets
         .par_iter()
-        .map(|(symbol, values, period)| {
-            (*symbol, compute_rsi(values, *period))
-        })
+        .map(|(symbol, values, period)| (*symbol, compute_rsi(values, *period)))
         .collect()
 }
 
@@ -124,10 +206,10 @@ pub fn parallel_rsi<'a>(
 fn compute_rsi(values: &[f64], period: usize) -> Vec<f64> {
     let n = values.len();
     if period == 0 || period >= n {
-        return vec![f64::NAN; n];
+        return init_result!(n);
     }
 
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
     let mut gains = Vec::with_capacity(n - 1);
     let mut losses = Vec::with_capacity(n - 1);
 
@@ -180,9 +262,7 @@ pub fn parallel_atr<'a>(
 ) -> Vec<(&'a str, Vec<f64>)> {
     data_sets
         .par_iter()
-        .map(|(symbol, high, low, close, period)| {
-            (*symbol, compute_atr(high, low, close, *period))
-        })
+        .map(|(symbol, high, low, close, period)| (*symbol, compute_atr(high, low, close, *period)))
         .collect()
 }
 
@@ -190,10 +270,10 @@ pub fn parallel_atr<'a>(
 fn compute_atr(high: &[f64], low: &[f64], close: &[f64], period: usize) -> Vec<f64> {
     let n = high.len();
     if n != low.len() || n != close.len() || period == 0 || period > n {
-        return vec![f64::NAN; n];
+        return init_result!(n);
     }
 
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
     let mut tr_values = Vec::with_capacity(n);
 
     // True Range 计算
@@ -229,7 +309,7 @@ pub fn configure_thread_pool(num_threads: usize) -> Result<(), String> {
     rayon::ThreadPoolBuilder::new()
         .num_threads(num_threads)
         .build_global()
-        .map_err(|e| format!("Failed to configure thread pool: {}", e))
+        .map_err(|e| format!("Failed to configure thread pool: {e}"))
 }
 
 #[cfg(test)]
@@ -241,10 +321,8 @@ mod tests {
         let values1 = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let values2 = vec![10.0, 20.0, 30.0, 40.0, 50.0];
 
-        let data_sets: Vec<(&str, &[f64], usize)> = vec![
-            ("BTC", &values1, 3),
-            ("ETH", &values2, 3),
-        ];
+        let data_sets: Vec<(&str, &[f64], usize)> =
+            vec![("BTC", &values1, 3), ("ETH", &values2, 3)];
 
         let results = parallel_sma(&data_sets);
 
@@ -270,10 +348,8 @@ mod tests {
         let values1: Vec<f64> = (100..120).map(|x| x as f64).collect();
         let values2: Vec<f64> = (200..220).map(|x| x as f64).collect();
 
-        let data_sets: Vec<(&str, &[f64], usize)> = vec![
-            ("BTC", &values1, 14),
-            ("ETH", &values2, 14),
-        ];
+        let data_sets: Vec<(&str, &[f64], usize)> =
+            vec![("BTC", &values1, 14), ("ETH", &values2, 14)];
 
         let results = parallel_rsi(&data_sets);
 
@@ -290,9 +366,8 @@ mod tests {
         let low = vec![98.0, 99.0, 100.0, 101.0, 102.0];
         let close = vec![100.0, 101.0, 102.0, 103.0, 104.0];
 
-        let data_sets: Vec<(&str, &[f64], &[f64], &[f64], usize)> = vec![
-            ("BTC", &high, &low, &close, 3),
-        ];
+        let data_sets: Vec<(&str, &[f64], &[f64], &[f64], usize)> =
+            vec![("BTC", &high, &low, &close, 3)];
 
         let results = parallel_atr(&data_sets);
 

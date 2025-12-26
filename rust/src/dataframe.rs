@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 
+use crate::errors::{HazeError, HazeResult};
 use crate::indicators::{momentum, trend, volatility, volume};
 use crate::utils::ma;
 
@@ -39,17 +40,49 @@ impl OhlcvFrame {
         low: Vec<f64>,
         close: Vec<f64>,
         volume: Vec<f64>,
-    ) -> Result<Self, String> {
+    ) -> HazeResult<Self> {
         let len = timestamps.len();
 
         // 验证长度一致性
-        if open.len() != len
-            || high.len() != len
-            || low.len() != len
-            || close.len() != len
-            || volume.len() != len
-        {
-            return Err("All columns must have the same length".to_string());
+        if open.len() != len {
+            return Err(HazeError::LengthMismatch {
+                name1: "timestamps",
+                len1: len,
+                name2: "open",
+                len2: open.len(),
+            });
+        }
+        if high.len() != len {
+            return Err(HazeError::LengthMismatch {
+                name1: "timestamps",
+                len1: len,
+                name2: "high",
+                len2: high.len(),
+            });
+        }
+        if low.len() != len {
+            return Err(HazeError::LengthMismatch {
+                name1: "timestamps",
+                len1: len,
+                name2: "low",
+                len2: low.len(),
+            });
+        }
+        if close.len() != len {
+            return Err(HazeError::LengthMismatch {
+                name1: "timestamps",
+                len1: len,
+                name2: "close",
+                len2: close.len(),
+            });
+        }
+        if volume.len() != len {
+            return Err(HazeError::LengthMismatch {
+                name1: "timestamps",
+                len1: len,
+                name2: "volume",
+                len2: volume.len(),
+            });
         }
 
         Ok(Self {
@@ -71,7 +104,7 @@ impl OhlcvFrame {
         low: &[f64],
         close: &[f64],
         volume: &[f64],
-    ) -> Result<Self, String> {
+    ) -> HazeResult<Self> {
         Self::new(
             timestamps.to_vec(),
             open.to_vec(),
@@ -103,86 +136,113 @@ impl OhlcvFrame {
 
     /// SMA - Simple Moving Average
     pub fn sma(&mut self, period: usize) -> &[f64] {
-        let key = format!("sma_{}", period);
+        let key = format!("sma_{period}");
         if !self.cache.contains_key(&key) {
-            let result = ma::sma(&self.close, period);
+            let n = self.close.len();
+            let result = ma::sma(&self.close, period).unwrap_or_else(|_| vec![f64::NAN; n]);
             self.cache.insert(key.clone(), result);
         }
-        self.cache.get(&key).unwrap()
+        self.cache
+            .get(&key)
+            .expect("internal error: cache key should exist after insert")
     }
 
     /// EMA - Exponential Moving Average
     pub fn ema(&mut self, period: usize) -> &[f64] {
-        let key = format!("ema_{}", period);
+        let key = format!("ema_{period}");
         if !self.cache.contains_key(&key) {
-            let result = ma::ema(&self.close, period);
+            let n = self.close.len();
+            let result = ma::ema(&self.close, period).unwrap_or_else(|_| vec![f64::NAN; n]);
             self.cache.insert(key.clone(), result);
         }
-        self.cache.get(&key).unwrap()
+        self.cache
+            .get(&key)
+            .expect("internal error: cache key should exist after insert")
     }
 
     /// WMA - Weighted Moving Average
     pub fn wma(&mut self, period: usize) -> &[f64] {
-        let key = format!("wma_{}", period);
+        let key = format!("wma_{period}");
         if !self.cache.contains_key(&key) {
-            let result = ma::wma(&self.close, period);
+            let n = self.close.len();
+            let result = ma::wma(&self.close, period).unwrap_or_else(|_| vec![f64::NAN; n]);
             self.cache.insert(key.clone(), result);
         }
-        self.cache.get(&key).unwrap()
+        self.cache
+            .get(&key)
+            .expect("internal error: cache key should exist after insert")
     }
 
     /// HMA - Hull Moving Average
     pub fn hma(&mut self, period: usize) -> &[f64] {
-        let key = format!("hma_{}", period);
+        let key = format!("hma_{period}");
         if !self.cache.contains_key(&key) {
-            let result = ma::hma(&self.close, period);
+            let n = self.close.len();
+            let result = ma::hma(&self.close, period).unwrap_or_else(|_| vec![f64::NAN; n]);
             self.cache.insert(key.clone(), result);
         }
-        self.cache.get(&key).unwrap()
+        self.cache
+            .get(&key)
+            .expect("internal error: cache key should exist after insert")
     }
 
     // ==================== 波动率指标 ====================
 
     /// ATR - Average True Range
     pub fn atr(&mut self, period: usize) -> &[f64] {
-        let key = format!("atr_{}", period);
+        let key = format!("atr_{period}");
         if !self.cache.contains_key(&key) {
-            let result = volatility::atr(&self.high, &self.low, &self.close, period);
+            let n = self.close.len();
+            let result = volatility::atr(&self.high, &self.low, &self.close, period)
+                .unwrap_or_else(|_| vec![f64::NAN; n]);
             self.cache.insert(key.clone(), result);
         }
-        self.cache.get(&key).unwrap()
+        self.cache
+            .get(&key)
+            .expect("internal error: cache key should exist after insert")
     }
 
     /// True Range
     pub fn true_range(&mut self) -> &[f64] {
         let key = "true_range".to_string();
         if !self.cache.contains_key(&key) {
+            let n = self.close.len();
             // drift=1 是默认值
-            let result = volatility::true_range(&self.high, &self.low, &self.close, 1);
+            let result = volatility::true_range(&self.high, &self.low, &self.close, 1)
+                .unwrap_or_else(|_| vec![f64::NAN; n]);
             self.cache.insert(key.clone(), result);
         }
-        self.cache.get(&key).unwrap()
+        self.cache
+            .get(&key)
+            .expect("internal error: cache key should exist after insert")
     }
 
     /// Bollinger Bands - 返回 (middle, upper, lower)
     pub fn bollinger_bands(&mut self, period: usize, std_dev: f64) -> (&[f64], &[f64], &[f64]) {
-        let key_mid = format!("bb_mid_{}_{}", period, std_dev);
-        let key_upper = format!("bb_upper_{}_{}", period, std_dev);
-        let key_lower = format!("bb_lower_{}_{}", period, std_dev);
+        let key_mid = format!("bb_mid_{period}_{std_dev}");
+        let key_upper = format!("bb_upper_{period}_{std_dev}");
+        let key_lower = format!("bb_lower_{period}_{std_dev}");
 
         if !self.cache.contains_key(&key_mid) {
+            let n = self.close.len();
             // volatility::bollinger_bands 返回 (upper, middle, lower)
-            let (upper, mid, lower) =
-                volatility::bollinger_bands(&self.close, period, std_dev);
+            let (upper, mid, lower) = volatility::bollinger_bands(&self.close, period, std_dev)
+                .unwrap_or_else(|_| (vec![f64::NAN; n], vec![f64::NAN; n], vec![f64::NAN; n]));
             self.cache.insert(key_mid.clone(), mid);
             self.cache.insert(key_upper.clone(), upper);
             self.cache.insert(key_lower.clone(), lower);
         }
 
         (
-            self.cache.get(&key_mid).unwrap(),
-            self.cache.get(&key_upper).unwrap(),
-            self.cache.get(&key_lower).unwrap(),
+            self.cache
+                .get(&key_mid)
+                .expect("internal error: cache key should exist after insert"),
+            self.cache
+                .get(&key_upper)
+                .expect("internal error: cache key should exist after insert"),
+            self.cache
+                .get(&key_lower)
+                .expect("internal error: cache key should exist after insert"),
         )
     }
 
@@ -190,120 +250,158 @@ impl OhlcvFrame {
 
     /// RSI - Relative Strength Index
     pub fn rsi(&mut self, period: usize) -> &[f64] {
-        let key = format!("rsi_{}", period);
+        let key = format!("rsi_{period}");
         if !self.cache.contains_key(&key) {
-            let result = momentum::rsi(&self.close, period);
+            let n = self.close.len();
+            let result = momentum::rsi(&self.close, period).unwrap_or_else(|_| vec![f64::NAN; n]);
             self.cache.insert(key.clone(), result);
         }
-        self.cache.get(&key).unwrap()
+        self.cache
+            .get(&key)
+            .expect("internal error: cache key should exist after insert")
     }
 
     /// MACD - 返回 (macd, signal, histogram)
-    pub fn macd(
-        &mut self,
-        fast: usize,
-        slow: usize,
-        signal: usize,
-    ) -> (&[f64], &[f64], &[f64]) {
-        let key_macd = format!("macd_{}_{}_{}", fast, slow, signal);
-        let key_signal = format!("macd_signal_{}_{}_{}", fast, slow, signal);
-        let key_hist = format!("macd_hist_{}_{}_{}", fast, slow, signal);
+    pub fn macd(&mut self, fast: usize, slow: usize, signal: usize) -> (&[f64], &[f64], &[f64]) {
+        let key_macd = format!("macd_{fast}_{slow}_{signal}");
+        let key_signal = format!("macd_signal_{fast}_{slow}_{signal}");
+        let key_hist = format!("macd_hist_{fast}_{slow}_{signal}");
 
         if !self.cache.contains_key(&key_macd) {
+            let n = self.close.len();
             let (macd_line, signal_line, histogram) =
-                momentum::macd(&self.close, fast, slow, signal);
+                momentum::macd(&self.close, fast, slow, signal)
+                    .unwrap_or_else(|_| (vec![f64::NAN; n], vec![f64::NAN; n], vec![f64::NAN; n]));
             self.cache.insert(key_macd.clone(), macd_line);
             self.cache.insert(key_signal.clone(), signal_line);
             self.cache.insert(key_hist.clone(), histogram);
         }
 
         (
-            self.cache.get(&key_macd).unwrap(),
-            self.cache.get(&key_signal).unwrap(),
-            self.cache.get(&key_hist).unwrap(),
+            self.cache
+                .get(&key_macd)
+                .expect("internal error: cache key should exist after insert"),
+            self.cache
+                .get(&key_signal)
+                .expect("internal error: cache key should exist after insert"),
+            self.cache
+                .get(&key_hist)
+                .expect("internal error: cache key should exist after insert"),
         )
     }
 
     /// Stochastic - 返回 (k, d)
     pub fn stochastic(&mut self, k_period: usize, d_period: usize) -> (&[f64], &[f64]) {
-        let key_k = format!("stoch_k_{}_{}", k_period, d_period);
-        let key_d = format!("stoch_d_{}_{}", k_period, d_period);
+        let key_k = format!("stoch_k_{k_period}_{d_period}");
+        let key_d = format!("stoch_d_{k_period}_{d_period}");
 
         if !self.cache.contains_key(&key_k) {
+            let n = self.close.len();
             let (k, d) =
-                momentum::stochastic(&self.high, &self.low, &self.close, k_period, d_period);
+                momentum::stochastic(&self.high, &self.low, &self.close, k_period, d_period)
+                    .unwrap_or_else(|_| (vec![f64::NAN; n], vec![f64::NAN; n]));
             self.cache.insert(key_k.clone(), k);
             self.cache.insert(key_d.clone(), d);
         }
 
         (
-            self.cache.get(&key_k).unwrap(),
-            self.cache.get(&key_d).unwrap(),
+            self.cache
+                .get(&key_k)
+                .expect("internal error: cache key should exist after insert"),
+            self.cache
+                .get(&key_d)
+                .expect("internal error: cache key should exist after insert"),
         )
     }
 
     /// CCI - Commodity Channel Index
     pub fn cci(&mut self, period: usize) -> &[f64] {
-        let key = format!("cci_{}", period);
+        let key = format!("cci_{period}");
         if !self.cache.contains_key(&key) {
-            let result = momentum::cci(&self.high, &self.low, &self.close, period);
+            let n = self.close.len();
+            let result = momentum::cci(&self.high, &self.low, &self.close, period)
+                .unwrap_or_else(|_| vec![f64::NAN; n]);
             self.cache.insert(key.clone(), result);
         }
-        self.cache.get(&key).unwrap()
+        self.cache
+            .get(&key)
+            .expect("internal error: cache key should exist after insert")
     }
 
     /// Williams %R
     pub fn williams_r(&mut self, period: usize) -> &[f64] {
-        let key = format!("willr_{}", period);
+        let key = format!("willr_{period}");
         if !self.cache.contains_key(&key) {
-            let result = momentum::williams_r(&self.high, &self.low, &self.close, period);
+            let n = self.close.len();
+            let result = momentum::williams_r(&self.high, &self.low, &self.close, period)
+                .unwrap_or_else(|_| vec![f64::NAN; n]);
             self.cache.insert(key.clone(), result);
         }
-        self.cache.get(&key).unwrap()
+        self.cache
+            .get(&key)
+            .expect("internal error: cache key should exist after insert")
     }
 
     // ==================== 趋势指标 ====================
 
     /// SuperTrend - 返回 (supertrend, direction)
     pub fn supertrend(&mut self, period: usize, multiplier: f64) -> (&[f64], &[f64]) {
-        let key_st = format!("supertrend_{}_{}", period, multiplier);
-        let key_dir = format!("supertrend_dir_{}_{}", period, multiplier);
+        let key_st = format!("supertrend_{period}_{multiplier}");
+        let key_dir = format!("supertrend_dir_{period}_{multiplier}");
 
         if !self.cache.contains_key(&key_st) {
-            let (st, dir, _upper, _lower) = trend::supertrend(
-                &self.high,
-                &self.low,
-                &self.close,
-                period,
-                multiplier,
-            );
+            let (st, dir, _upper, _lower) =
+                trend::supertrend(&self.high, &self.low, &self.close, period, multiplier)
+                    .unwrap_or_else(|_| {
+                        let n = self.high.len();
+                        (
+                            vec![f64::NAN; n],
+                            vec![f64::NAN; n],
+                            vec![f64::NAN; n],
+                            vec![f64::NAN; n],
+                        )
+                    });
             self.cache.insert(key_st.clone(), st);
             self.cache.insert(key_dir.clone(), dir);
         }
 
         (
-            self.cache.get(&key_st).unwrap(),
-            self.cache.get(&key_dir).unwrap(),
+            self.cache
+                .get(&key_st)
+                .expect("internal error: cache key should exist after insert"),
+            self.cache
+                .get(&key_dir)
+                .expect("internal error: cache key should exist after insert"),
         )
     }
 
     /// ADX - Average Directional Index，返回 (adx, plus_di, minus_di)
     pub fn adx(&mut self, period: usize) -> (&[f64], &[f64], &[f64]) {
-        let key_adx = format!("adx_{}", period);
-        let key_plus = format!("adx_plus_di_{}", period);
-        let key_minus = format!("adx_minus_di_{}", period);
+        let key_adx = format!("adx_{period}");
+        let key_plus = format!("adx_plus_di_{period}");
+        let key_minus = format!("adx_minus_di_{period}");
 
         if !self.cache.contains_key(&key_adx) {
-            let (adx, plus_di, minus_di) = trend::adx(&self.high, &self.low, &self.close, period);
+            let (adx, plus_di, minus_di) = trend::adx(&self.high, &self.low, &self.close, period)
+                .unwrap_or_else(|_| {
+                    let n = self.high.len();
+                    (vec![f64::NAN; n], vec![f64::NAN; n], vec![f64::NAN; n])
+                });
             self.cache.insert(key_adx.clone(), adx);
             self.cache.insert(key_plus.clone(), plus_di);
             self.cache.insert(key_minus.clone(), minus_di);
         }
 
         (
-            self.cache.get(&key_adx).unwrap(),
-            self.cache.get(&key_plus).unwrap(),
-            self.cache.get(&key_minus).unwrap(),
+            self.cache
+                .get(&key_adx)
+                .expect("internal error: cache key should exist after insert"),
+            self.cache
+                .get(&key_plus)
+                .expect("internal error: cache key should exist after insert"),
+            self.cache
+                .get(&key_minus)
+                .expect("internal error: cache key should exist after insert"),
         )
     }
 
@@ -313,32 +411,42 @@ impl OhlcvFrame {
     pub fn obv(&mut self) -> &[f64] {
         let key = "obv".to_string();
         if !self.cache.contains_key(&key) {
-            let result = volume::obv(&self.close, &self.volume);
+            let n = self.close.len();
+            let result =
+                volume::obv(&self.close, &self.volume).unwrap_or_else(|_| vec![f64::NAN; n]);
             self.cache.insert(key.clone(), result);
         }
-        self.cache.get(&key).unwrap()
+        self.cache
+            .get(&key)
+            .expect("internal error: cache key should exist after insert")
     }
 
     /// VWAP - Volume Weighted Average Price
     pub fn vwap(&mut self, period: usize) -> &[f64] {
-        let key = format!("vwap_{}", period);
+        let key = format!("vwap_{period}");
         if !self.cache.contains_key(&key) {
-            let result =
-                volume::vwap(&self.high, &self.low, &self.close, &self.volume, period);
+            let n = self.close.len();
+            let result = volume::vwap(&self.high, &self.low, &self.close, &self.volume, period)
+                .unwrap_or_else(|_| vec![f64::NAN; n]);
             self.cache.insert(key.clone(), result);
         }
-        self.cache.get(&key).unwrap()
+        self.cache
+            .get(&key)
+            .expect("internal error: cache key should exist after insert")
     }
 
     /// MFI - Money Flow Index
     pub fn mfi(&mut self, period: usize) -> &[f64] {
-        let key = format!("mfi_{}", period);
+        let key = format!("mfi_{period}");
         if !self.cache.contains_key(&key) {
-            let result =
-                volume::mfi(&self.high, &self.low, &self.close, &self.volume, period);
+            let n = self.close.len();
+            let result = volume::mfi(&self.high, &self.low, &self.close, &self.volume, period)
+                .unwrap_or_else(|_| vec![f64::NAN; n]);
             self.cache.insert(key.clone(), result);
         }
-        self.cache.get(&key).unwrap()
+        self.cache
+            .get(&key)
+            .expect("internal error: cache key should exist after insert")
     }
 
     // ==================== 批量计算 ====================
@@ -346,13 +454,20 @@ impl OhlcvFrame {
     /// 批量计算多个 SMA 周期
     pub fn batch_sma(&mut self, periods: &[usize]) -> HashMap<usize, Vec<f64>> {
         let mut results = HashMap::new();
+        let n = self.close.len();
         for &period in periods {
-            let key = format!("sma_{}", period);
+            let key = format!("sma_{period}");
             if !self.cache.contains_key(&key) {
-                let result = ma::sma(&self.close, period);
+                let result = ma::sma(&self.close, period).unwrap_or_else(|_| vec![f64::NAN; n]);
                 self.cache.insert(key.clone(), result);
             }
-            results.insert(period, self.cache.get(&key).unwrap().clone());
+            results.insert(
+                period,
+                self.cache
+                    .get(&key)
+                    .expect("internal error: cache key should exist after insert")
+                    .clone(),
+            );
         }
         results
     }
@@ -360,13 +475,20 @@ impl OhlcvFrame {
     /// 批量计算多个 EMA 周期
     pub fn batch_ema(&mut self, periods: &[usize]) -> HashMap<usize, Vec<f64>> {
         let mut results = HashMap::new();
+        let n = self.close.len();
         for &period in periods {
-            let key = format!("ema_{}", period);
+            let key = format!("ema_{period}");
             if !self.cache.contains_key(&key) {
-                let result = ma::ema(&self.close, period);
+                let result = ma::ema(&self.close, period).unwrap_or_else(|_| vec![f64::NAN; n]);
                 self.cache.insert(key.clone(), result);
             }
-            results.insert(period, self.cache.get(&key).unwrap().clone());
+            results.insert(
+                period,
+                self.cache
+                    .get(&key)
+                    .expect("internal error: cache key should exist after insert")
+                    .clone(),
+            );
         }
         results
     }
@@ -426,7 +548,7 @@ pub fn create_ohlcv_frame(
     low: &[f64],
     close: &[f64],
     volume: &[f64],
-) -> Result<OhlcvFrame, String> {
+) -> HazeResult<OhlcvFrame> {
     OhlcvFrame::from_slices(timestamps, open, high, low, close, volume)
 }
 
@@ -502,8 +624,22 @@ mod tests {
         // 检查所有三个值都有效的情况
         for i in 19..100 {
             if mid[i].is_finite() && upper[i].is_finite() && lower[i].is_finite() {
-                assert!(upper[i] >= mid[i], "upper[{}]={} should >= mid[{}]={}", i, upper[i], i, mid[i]);
-                assert!(mid[i] >= lower[i], "mid[{}]={} should >= lower[{}]={}", i, mid[i], i, lower[i]);
+                assert!(
+                    upper[i] >= mid[i],
+                    "upper[{}]={} should >= mid[{}]={}",
+                    i,
+                    upper[i],
+                    i,
+                    mid[i]
+                );
+                assert!(
+                    mid[i] >= lower[i],
+                    "mid[{}]={} should >= lower[{}]={}",
+                    i,
+                    mid[i],
+                    i,
+                    lower[i]
+                );
             }
         }
     }
@@ -560,15 +696,17 @@ mod tests {
 
     #[test]
     fn test_validation() {
+        use crate::errors::HazeError;
+
         // 长度不一致应该返回错误
         let result = OhlcvFrame::new(
             vec![1, 2, 3],
-            vec![1.0, 2.0],  // 长度不匹配
+            vec![1.0, 2.0], // 长度不匹配
             vec![1.0, 2.0, 3.0],
             vec![1.0, 2.0, 3.0],
             vec![1.0, 2.0, 3.0],
             vec![1.0, 2.0, 3.0],
         );
-        assert!(result.is_err());
+        assert!(matches!(result, Err(HazeError::LengthMismatch { .. })));
     }
 }

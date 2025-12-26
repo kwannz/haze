@@ -11,7 +11,7 @@ use std::collections::HashMap;
 pub struct FibonacciRetracement {
     pub start_price: f64,
     pub end_price: f64,
-    pub levels: HashMap<String, f64>,  // "0.382" -> price
+    pub levels: HashMap<String, f64>, // "0.382" -> price
 }
 
 /// Fibonacci Extension Levels（扩展位）
@@ -37,6 +37,8 @@ pub const FIB_EXTENSION_RATIOS: [f64; 6] = [1.272, 1.414, 1.618, 2.0, 2.618, 3.6
 ///
 /// # 示例
 /// ```rust
+/// use haze_library::indicators::fibonacci::fib_retracement;
+///
 /// let start = 100.0;
 /// let end = 150.0;
 /// let retracement = fib_retracement(start, end, None);
@@ -54,7 +56,7 @@ pub fn fib_retracement(
 
     for &ratio in ratios {
         let level_price = end_price - (price_range * ratio);
-        levels.insert(format!("{:.3}", ratio), level_price);
+        levels.insert(format!("{ratio:.3}"), level_price);
     }
 
     FibonacciRetracement {
@@ -78,6 +80,8 @@ pub fn fib_retracement(
 ///
 /// # 示例
 /// ```rust
+/// use haze_library::indicators::fibonacci::fib_extension;
+///
 /// let a = 100.0;  // 起点
 /// let b = 150.0;  // 高点
 /// let c = 130.0;  // 回撤点
@@ -97,7 +101,7 @@ pub fn fib_extension(
 
     for &ratio in ratios {
         let level_price = retracement_price + (initial_move * ratio);
-        levels.insert(format!("{:.3}", ratio), level_price);
+        levels.insert(format!("{ratio:.3}"), level_price);
     }
 
     FibonacciExtension {
@@ -115,10 +119,7 @@ pub fn fib_extension(
 /// - `lookback`: 回溯周期（检测趋势的窗口）
 ///
 /// 返回：每个价格对应的回撤位向量（7 个回撤位 * n 个价格点）
-pub fn dynamic_fib_retracement(
-    prices: &[f64],
-    lookback: usize,
-) -> Vec<HashMap<String, f64>> {
+pub fn dynamic_fib_retracement(prices: &[f64], lookback: usize) -> Vec<HashMap<String, f64>> {
     let n = prices.len();
     let mut results = Vec::with_capacity(n);
 
@@ -130,8 +131,18 @@ pub fn dynamic_fib_retracement(
         }
 
         let window = &prices[i - lookback..=i];
-        let start_idx = window.iter().enumerate().min_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0;
-        let end_idx = window.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0;
+        let start_idx = window
+            .iter()
+            .enumerate()
+            .min_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .unwrap()
+            .0;
+        let end_idx = window
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .unwrap()
+            .0;
 
         let (start_price, end_price) = if start_idx < end_idx {
             // 上升趋势（低→高）
@@ -214,10 +225,7 @@ pub fn fib_fan_lines(
 pub fn fib_time_zones(start_index: usize, max_zones: usize) -> Vec<usize> {
     let fib_sequence = generate_fibonacci_sequence(max_zones);
 
-    fib_sequence
-        .iter()
-        .map(|&fib| start_index + fib)
-        .collect()
+    fib_sequence.iter().map(|&fib| start_index + fib).collect()
 }
 
 /// 生成 Fibonacci 数列

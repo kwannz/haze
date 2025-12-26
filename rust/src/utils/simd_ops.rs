@@ -1,39 +1,116 @@
+//! SIMD-Optimized Mathematical Operations
+//!
+//! # Overview
+//! This module provides SIMD-friendly implementations of common mathematical
+//! operations used in technical analysis. Rather than using explicit SIMD
+//! intrinsics, the code is structured to enable automatic vectorization by
+//! the Rust compiler (LLVM), providing portable performance across architectures.
+//!
+//! # Design Philosophy
+//! - **Compiler-Friendly Code**: Simple loops that LLVM can auto-vectorize
+//! - **Chunked Processing**: Uses 8-element chunks matching AVX-512 width
+//! - **Zero Dependencies**: No external SIMD libraries required
+//! - **Numerical Stability**: Chunked summation reduces floating-point errors
+//!
+//! # Available Functions
+//!
+//! ## Vector Arithmetic
+//! - [`add_vectors`] - Element-wise vector addition
+//! - [`sub_vectors`] - Element-wise vector subtraction
+//! - [`mul_vectors`] - Element-wise vector multiplication
+//! - [`div_vectors`] - Element-wise vector division (NaN-safe)
+//! - [`scale_vector`] - Scalar multiplication
+//!
+//! ## Aggregation Operations
+//! - [`sum_vector`] - Chunked summation for numerical stability
+//! - [`dot_product`] - Dot product with chunked accumulation
+//! - [`max_vector`] - Find maximum value
+//! - [`min_vector`] - Find minimum value
+//! - [`mean_vector`] - Calculate arithmetic mean
+//! - [`std_vector`] - Calculate population standard deviation
+//!
+//! ## Fast Indicator Implementations
+//! - [`fast_sma`] - SMA using cumulative sum optimization
+//! - [`fast_ema`] - EMA using recursive formula
+//! - [`batch_sma`] - Compute multiple SMA periods efficiently
+//!
+//! # Examples
+//! ```rust
+//! use haze_library::utils::simd_ops::{add_vectors, dot_product, fast_sma};
+//!
+//! // Vector operations
+//! let a = vec![1.0, 2.0, 3.0, 4.0];
+//! let b = vec![5.0, 6.0, 7.0, 8.0];
+//! let sum = add_vectors(&a, &b);  // [6.0, 8.0, 10.0, 12.0]
+//! let dot = dot_product(&a, &b);  // 70.0
+//!
+//! // Fast SMA calculation
+//! let prices = vec![100.0, 101.0, 102.0, 103.0, 104.0];
+//! let sma = fast_sma(&prices, 3);
+//! ```
+//!
+//! # Performance Characteristics
+//! - Vector operations: ~2-4x speedup with auto-vectorization enabled
+//! - Chunk size of 8 elements aligns with AVX-512 registers
+//! - `fast_sma`/`fast_ema` use O(n) sliding window, not O(n*period)
+//! - Compile with `-C target-cpu=native` for best performance
+//!
+//! # Cross-References
+//! - [`crate::utils::ma`] - Standard moving average implementations
+//! - [`crate::utils::stats`] - Statistical functions with different trade-offs
+//! - [`crate::utils::parallel`] - Multi-threaded parallel processing
+
 // utils/simd_ops.rs - SIMD 优化的数学操作
 #![allow(dead_code)]
 //
 // 使用编译器友好的代码结构启用自动向量化
 // 遵循 KISS 原则：利用编译器优化而非手写 SIMD
 
+use crate::init_result;
+use crate::utils::math::is_not_zero;
+
 /// SIMD 友好的向量加法
 ///
 /// 编译器会自动向量化简单的 for 循环
+///
+/// # Panics
+/// 如果 `a` 和 `b` 长度不匹配则 panic
 #[inline]
 pub fn add_vectors(a: &[f64], b: &[f64]) -> Vec<f64> {
-    debug_assert_eq!(a.len(), b.len(), "Vector lengths must match");
+    assert_eq!(a.len(), b.len(), "Vector lengths must match");
     a.iter().zip(b.iter()).map(|(&x, &y)| x + y).collect()
 }
 
 /// SIMD 友好的向量减法
+///
+/// # Panics
+/// 如果 `a` 和 `b` 长度不匹配则 panic
 #[inline]
 pub fn sub_vectors(a: &[f64], b: &[f64]) -> Vec<f64> {
-    debug_assert_eq!(a.len(), b.len(), "Vector lengths must match");
+    assert_eq!(a.len(), b.len(), "Vector lengths must match");
     a.iter().zip(b.iter()).map(|(&x, &y)| x - y).collect()
 }
 
 /// SIMD 友好的向量乘法
+///
+/// # Panics
+/// 如果 `a` 和 `b` 长度不匹配则 panic
 #[inline]
 pub fn mul_vectors(a: &[f64], b: &[f64]) -> Vec<f64> {
-    debug_assert_eq!(a.len(), b.len(), "Vector lengths must match");
+    assert_eq!(a.len(), b.len(), "Vector lengths must match");
     a.iter().zip(b.iter()).map(|(&x, &y)| x * y).collect()
 }
 
 /// SIMD 友好的向量除法
+///
+/// # Panics
+/// 如果 `a` 和 `b` 长度不匹配则 panic
 #[inline]
 pub fn div_vectors(a: &[f64], b: &[f64]) -> Vec<f64> {
-    debug_assert_eq!(a.len(), b.len(), "Vector lengths must match");
+    assert_eq!(a.len(), b.len(), "Vector lengths must match");
     a.iter()
         .zip(b.iter())
-        .map(|(&x, &y)| if y != 0.0 { x / y } else { f64::NAN })
+        .map(|(&x, &y)| if is_not_zero(y) { x / y } else { f64::NAN })
         .collect()
 }
 
@@ -68,9 +145,12 @@ pub fn sum_vector(a: &[f64]) -> f64 {
 }
 
 /// SIMD 友好的点积
+///
+/// # Panics
+/// 如果 `a` 和 `b` 长度不匹配则 panic
 #[inline]
 pub fn dot_product(a: &[f64], b: &[f64]) -> f64 {
-    debug_assert_eq!(a.len(), b.len(), "Vector lengths must match");
+    assert_eq!(a.len(), b.len(), "Vector lengths must match");
 
     const CHUNK_SIZE: usize = 8;
 
@@ -99,10 +179,10 @@ pub fn dot_product(a: &[f64], b: &[f64]) -> f64 {
 pub fn fast_sma(values: &[f64], period: usize) -> Vec<f64> {
     let n = values.len();
     if period == 0 || period > n {
-        return vec![f64::NAN; n];
+        return init_result!(n);
     }
 
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
     let period_f64 = period as f64;
 
     // 计算初始窗口和
@@ -124,13 +204,13 @@ pub fn fast_sma(values: &[f64], period: usize) -> Vec<f64> {
 pub fn fast_ema(values: &[f64], period: usize) -> Vec<f64> {
     let n = values.len();
     if period == 0 || period > n {
-        return vec![f64::NAN; n];
+        return init_result!(n);
     }
 
     let alpha = 2.0 / (period as f64 + 1.0);
     let one_minus_alpha = 1.0 - alpha;
 
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
 
     // 初始值为 SMA
     let first_sum: f64 = values[..period].iter().sum();
@@ -184,7 +264,8 @@ pub fn std_vector(values: &[f64]) -> f64 {
     }
 
     let mean = mean_vector(values);
-    let variance: f64 = values.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / values.len() as f64;
+    let variance: f64 =
+        values.iter().map(|&x| (x - mean).powi(2)).sum::<f64>() / values.len() as f64;
     variance.sqrt()
 }
 

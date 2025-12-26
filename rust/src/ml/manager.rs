@@ -4,7 +4,7 @@
 // 提供模型序列化、持久化和智能加载功能
 // 遵循 Occam's Razor: 最简单的序列化方案 (bincode)
 
-use crate::ml::models::SFGModelConfig;
+use crate::ml::models::{SFGModel, SFGModelConfig, SerializableWeights};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -37,7 +37,7 @@ impl SFGModelManager {
 
         // 创建目录(如果不存在)
         if let Err(e) = fs::create_dir_all(&path) {
-            eprintln!("Warning: Failed to create model directory: {}", e);
+            eprintln!("Warning: Failed to create model directory: {e}");
         }
 
         Self {
@@ -48,16 +48,17 @@ impl SFGModelManager {
 
     /// 保存模型元数据
     pub fn save_metadata(&mut self, name: &str, metadata: &ModelMetadata) -> Result<(), String> {
-        let path = self.model_dir.join(format!("{}.meta.json", name));
+        let path = self.model_dir.join(format!("{name}.meta.json"));
 
         let file =
-            File::create(&path).map_err(|e| format!("Failed to create metadata file: {}", e))?;
+            File::create(&path).map_err(|e| format!("Failed to create metadata file: {e}"))?;
 
         let writer = BufWriter::new(file);
         serde_json::to_writer_pretty(writer, metadata)
-            .map_err(|e| format!("Failed to write metadata: {}", e))?;
+            .map_err(|e| format!("Failed to write metadata: {e}"))?;
 
-        self.metadata_cache.insert(name.to_string(), metadata.clone());
+        self.metadata_cache
+            .insert(name.to_string(), metadata.clone());
 
         Ok(())
     }
@@ -69,26 +70,27 @@ impl SFGModelManager {
             return Ok(meta.clone());
         }
 
-        let path = self.model_dir.join(format!("{}.meta.json", name));
+        let path = self.model_dir.join(format!("{name}.meta.json"));
 
         if !path.exists() {
-            return Err(format!("Metadata file not found: {}", name));
+            return Err(format!("Metadata file not found: {name}"));
         }
 
-        let file = File::open(&path).map_err(|e| format!("Failed to open metadata file: {}", e))?;
+        let file = File::open(&path).map_err(|e| format!("Failed to open metadata file: {e}"))?;
 
         let reader = BufReader::new(file);
-        let metadata: ModelMetadata =
-            serde_json::from_reader(reader).map_err(|e| format!("Failed to parse metadata: {}", e))?;
+        let metadata: ModelMetadata = serde_json::from_reader(reader)
+            .map_err(|e| format!("Failed to parse metadata: {e}"))?;
 
-        self.metadata_cache.insert(name.to_string(), metadata.clone());
+        self.metadata_cache
+            .insert(name.to_string(), metadata.clone());
 
         Ok(metadata)
     }
 
     /// 检查模型是否存在
     pub fn model_exists(&self, name: &str) -> bool {
-        let path = self.model_dir.join(format!("{}.meta.json", name));
+        let path = self.model_dir.join(format!("{name}.meta.json"));
         path.exists()
     }
 
@@ -112,16 +114,81 @@ impl SFGModelManager {
 
     /// 删除模型
     pub fn delete_model(&mut self, name: &str) -> Result<(), String> {
-        let meta_path = self.model_dir.join(format!("{}.meta.json", name));
+        let meta_path = self.model_dir.join(format!("{name}.meta.json"));
+        let weights_path = self.model_dir.join(format!("{name}.weights.bin"));
 
         if meta_path.exists() {
-            fs::remove_file(&meta_path)
-                .map_err(|e| format!("Failed to delete metadata: {}", e))?;
+            fs::remove_file(&meta_path).map_err(|e| format!("Failed to delete metadata: {e}"))?;
+        }
+
+        if weights_path.exists() {
+            fs::remove_file(&weights_path)
+                .map_err(|e| format!("Failed to delete weights: {e}"))?;
         }
 
         self.metadata_cache.remove(name);
 
         Ok(())
+    }
+
+    /// 保存完整模型 (元数据 + 权重)
+    ///
+    /// 元数据以 JSON 格式保存，权重以 bincode 二进制格式保存
+    pub fn save_model(
+        &mut self,
+        name: &str,
+        model: &SFGModel,
+        metadata: &ModelMetadata,
+    ) -> Result<(), String> {
+        // 1. 保存元数据
+        self.save_metadata(name, metadata)?;
+
+        // 2. 保存权重 (如果模型已训练)
+        if let Some(weights) = model.get_serializable_weights() {
+            let path = self.model_dir.join(format!("{name}.weights.bin"));
+
+            let file =
+                File::create(&path).map_err(|e| format!("Failed to create weights file: {e}"))?;
+
+            let writer = BufWriter::new(file);
+            bincode::serialize_into(writer, &weights)
+                .map_err(|e| format!("Failed to serialize weights: {e}"))?;
+        }
+
+        Ok(())
+    }
+
+    /// 加载完整模型 (元数据 + 权重)
+    ///
+    /// 根据元数据中的配置创建模型，然后恢复权重
+    pub fn load_model(&mut self, name: &str) -> Result<(SFGModel, ModelMetadata), String> {
+        // 1. 加载元数据
+        let metadata = self.load_metadata(name)?;
+
+        // 2. 根据配置创建模型
+        let mut model = SFGModel::from_config(&metadata.config);
+
+        // 3. 加载权重 (如果存在)
+        let weights_path = self.model_dir.join(format!("{name}.weights.bin"));
+
+        if weights_path.exists() {
+            let file = File::open(&weights_path)
+                .map_err(|e| format!("Failed to open weights file: {e}"))?;
+
+            let reader = BufReader::new(file);
+            let weights: SerializableWeights = bincode::deserialize_from(reader)
+                .map_err(|e| format!("Failed to deserialize weights: {e}"))?;
+
+            model.set_serializable_weights(weights);
+        }
+
+        Ok((model, metadata))
+    }
+
+    /// 检查模型权重是否存在
+    pub fn weights_exist(&self, name: &str) -> bool {
+        let path = self.model_dir.join(format!("{name}.weights.bin"));
+        path.exists()
     }
 
     /// 获取模型目录
@@ -188,6 +255,8 @@ pub fn create_metadata(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ml::models::{AISuperTrendLinReg, ATR2RidgeModel, ModelType, MomentumLinRegModel};
+    use ndarray::{Array1, Array2};
     use std::env;
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -253,9 +322,9 @@ mod tests {
 
         // 保存多个模型
         for i in 0..3 {
-            let metadata = create_metadata(&format!("model_{}", i), &config, 100, 10);
+            let metadata = create_metadata(&format!("model_{i}"), &config, 100, 10);
             manager
-                .save_metadata(&format!("model_{}", i), &metadata)
+                .save_metadata(&format!("model_{i}"), &metadata)
                 .unwrap();
         }
 
@@ -279,6 +348,222 @@ mod tests {
 
         manager.delete_model("to_delete").unwrap();
         assert!(!manager.model_exists("to_delete"));
+
+        // 清理
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    // ==================== 完整模型持久化测试 ====================
+
+    #[test]
+    fn test_save_and_load_linreg_model() {
+        let dir = get_test_dir();
+        let mut manager = SFGModelManager::new(dir.to_str().unwrap());
+
+        // 创建并训练模型
+        let features = Array2::from_shape_vec(
+            (5, 2),
+            vec![1.0, 2.0, 2.0, 4.0, 3.0, 6.0, 4.0, 8.0, 5.0, 10.0],
+        )
+        .unwrap();
+        let targets = Array1::from_vec(vec![3.0, 6.0, 9.0, 12.0, 15.0]);
+
+        let mut model = SFGModel::LinReg(AISuperTrendLinReg::new());
+        model.train(&features, &targets).unwrap();
+        assert!(model.is_trained());
+
+        // 保存模型
+        let config = SFGModelConfig::default();
+        let metadata = create_metadata("linreg_test", &config, 5, 2);
+        manager.save_model("linreg_test", &model, &metadata).unwrap();
+
+        // 验证文件存在
+        assert!(manager.model_exists("linreg_test"));
+        assert!(manager.weights_exist("linreg_test"));
+
+        // 加载模型
+        let (loaded_model, loaded_metadata) = manager.load_model("linreg_test").unwrap();
+        assert!(loaded_model.is_trained());
+        assert_eq!(loaded_metadata.training_samples, 5);
+
+        // 验证预测一致性
+        let original_predictions = model.predict(&features);
+        let loaded_predictions = loaded_model.predict(&features);
+
+        for i in 0..5 {
+            assert!(
+                (original_predictions[i] - loaded_predictions[i]).abs() < 1e-10,
+                "Prediction mismatch at index {}: {} vs {}",
+                i,
+                original_predictions[i],
+                loaded_predictions[i]
+            );
+        }
+
+        // 清理
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_and_load_ridge_model() {
+        let dir = get_test_dir();
+        let mut manager = SFGModelManager::new(dir.to_str().unwrap());
+
+        // 创建并训练模型
+        let features = Array2::from_shape_vec(
+            (5, 2),
+            vec![1.0, 2.0, 2.0, 4.0, 3.0, 6.0, 4.0, 8.0, 5.0, 10.0],
+        )
+        .unwrap();
+        let targets = Array1::from_vec(vec![3.0, 6.0, 9.0, 12.0, 15.0]);
+
+        let mut model = SFGModel::Ridge(ATR2RidgeModel::new(0.5));
+        model.train(&features, &targets).unwrap();
+        assert!(model.is_trained());
+
+        // 保存模型
+        let config = SFGModelConfig {
+            model_type: ModelType::Ridge,
+            ridge_alpha: 0.5,
+            ..Default::default()
+        };
+        let metadata = create_metadata("ridge_test", &config, 5, 2);
+        manager.save_model("ridge_test", &model, &metadata).unwrap();
+
+        // 加载模型
+        let (loaded_model, _) = manager.load_model("ridge_test").unwrap();
+        assert!(loaded_model.is_trained());
+
+        // 验证预测一致性
+        let original_predictions = model.predict(&features);
+        let loaded_predictions = loaded_model.predict(&features);
+
+        for i in 0..5 {
+            assert!(
+                (original_predictions[i] - loaded_predictions[i]).abs() < 1e-10,
+                "Prediction mismatch at index {}: {} vs {}",
+                i,
+                original_predictions[i],
+                loaded_predictions[i]
+            );
+        }
+
+        // 清理
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_and_load_momentum_model() {
+        let dir = get_test_dir();
+        let mut manager = SFGModelManager::new(dir.to_str().unwrap());
+
+        // 创建并训练模型
+        let features = Array2::from_shape_vec(
+            (5, 3),
+            vec![
+                1.0, 0.5, 0.1, 2.0, 1.0, 0.2, 3.0, 1.5, 0.3, 4.0, 2.0, 0.4, 5.0, 2.5, 0.5,
+            ],
+        )
+        .unwrap();
+        let targets = Array1::from_vec(vec![1.6, 3.2, 4.8, 6.4, 8.0]);
+
+        let mut model = SFGModel::Momentum(MomentumLinRegModel::new());
+        model.train(&features, &targets).unwrap();
+        assert!(model.is_trained());
+
+        // 保存模型
+        let config = SFGModelConfig::default();
+        let metadata = create_metadata("momentum_test", &config, 5, 3);
+        manager
+            .save_model("momentum_test", &model, &metadata)
+            .unwrap();
+
+        // 加载模型
+        let (loaded_model, _) = manager.load_model("momentum_test").unwrap();
+        assert!(loaded_model.is_trained());
+
+        // 验证预测一致性
+        let original_predictions = model.predict(&features);
+        let loaded_predictions = loaded_model.predict(&features);
+
+        for i in 0..5 {
+            assert!(
+                (original_predictions[i] - loaded_predictions[i]).abs() < 1e-10,
+                "Prediction mismatch at index {i}"
+            );
+        }
+
+        // 清理
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_save_untrained_model() {
+        let dir = get_test_dir();
+        let mut manager = SFGModelManager::new(dir.to_str().unwrap());
+
+        // 创建未训练模型
+        let model = SFGModel::LinReg(AISuperTrendLinReg::new());
+        assert!(!model.is_trained());
+
+        // 保存未训练模型
+        let config = SFGModelConfig::default();
+        let metadata = create_metadata("untrained", &config, 0, 0);
+        manager.save_model("untrained", &model, &metadata).unwrap();
+
+        // 元数据应存在，但权重文件不应存在
+        assert!(manager.model_exists("untrained"));
+        assert!(!manager.weights_exist("untrained"));
+
+        // 加载应成功但模型未训练
+        let (loaded_model, _) = manager.load_model("untrained").unwrap();
+        assert!(!loaded_model.is_trained());
+
+        // 清理
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_delete_model_with_weights() {
+        let dir = get_test_dir();
+        let mut manager = SFGModelManager::new(dir.to_str().unwrap());
+
+        // 创建并训练模型
+        let features = Array2::from_shape_vec((5, 2), vec![1.0; 10]).unwrap();
+        let targets = Array1::from_vec(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
+
+        let mut model = SFGModel::LinReg(AISuperTrendLinReg::new());
+        model.train(&features, &targets).unwrap();
+
+        let config = SFGModelConfig::default();
+        let metadata = create_metadata("to_delete_full", &config, 5, 2);
+        manager
+            .save_model("to_delete_full", &model, &metadata)
+            .unwrap();
+
+        // 验证存在
+        assert!(manager.model_exists("to_delete_full"));
+        assert!(manager.weights_exist("to_delete_full"));
+
+        // 删除
+        manager.delete_model("to_delete_full").unwrap();
+
+        // 验证都删除了
+        assert!(!manager.model_exists("to_delete_full"));
+        assert!(!manager.weights_exist("to_delete_full"));
+
+        // 清理
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_load_nonexistent_model() {
+        let dir = get_test_dir();
+        let mut manager = SFGModelManager::new(dir.to_str().unwrap());
+
+        let result = manager.load_model("nonexistent");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not found"));
 
         // 清理
         let _ = fs::remove_dir_all(&dir);

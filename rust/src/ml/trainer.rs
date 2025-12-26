@@ -5,10 +5,11 @@
 // 遵循 KISS 原则: 简单直接的训练流程
 
 use crate::ml::features::{
-    prepare_atr2_features, prepare_momentum_features, prepare_supertrend_features,
-    polynomial_features,
+    polynomial_features, prepare_atr2_features, prepare_momentum_features,
+    prepare_supertrend_features,
 };
 use crate::ml::models::{ModelType, SFGModel, SFGModelConfig};
+use crate::utils::math::is_not_zero;
 use ndarray::Array1;
 
 /// 训练配置
@@ -214,11 +215,12 @@ pub fn train_momentum_model(rsi: &[f64], config: &TrainConfig) -> Result<TrainRe
 /// 在线训练并预测 SuperTrend
 ///
 /// 适用于实时场景: 每个点使用历史数据训练后预测
-pub fn online_predict_supertrend(
-    close: &[f64],
-    atr: &[f64],
-    config: &TrainConfig,
-) -> Vec<f64> {
+///
+/// # 索引说明
+/// - `feature[i]` 使用 `close[i..i+lookback]` 构建
+/// - `target[i]` 预测 `close[i+lookback]` 相对于 `close[i+lookback-1]` 的变化率
+/// - `predictions[i+lookback]` 存储 `feature[i]` 对应的预测结果
+pub fn online_predict_supertrend(close: &[f64], atr: &[f64], config: &TrainConfig) -> Vec<f64> {
     let len = close.len();
     let mut predictions = vec![0.0; len];
 
@@ -227,7 +229,7 @@ pub fn online_predict_supertrend(
         return predictions;
     }
 
-    // 准备所有特征
+    // 准备所有特征: n_features = len - lookback
     let (all_features, _) = prepare_supertrend_features(close, atr, config.lookback);
     let all_features = if config.use_polynomial {
         polynomial_features(&all_features)
@@ -235,22 +237,30 @@ pub fn online_predict_supertrend(
         all_features
     };
 
-    if all_features.dim().0 == 0 {
+    let n_features = all_features.dim().0;
+    if n_features == 0 {
         return predictions;
     }
 
-    // 一次性训练 (使用最近 train_window 数据)
-    let n = all_features.dim().0;
-    let train_size = config.train_window.min(n);
+    // 防御性断言: 确保特征数量符合预期
+    debug_assert_eq!(
+        n_features,
+        len.saturating_sub(config.lookback),
+        "Feature count mismatch"
+    );
 
+    // 使用前 train_size 个样本训练
+    let train_size = config.train_window.min(n_features);
     let train_features = all_features.slice(ndarray::s![..train_size, ..]).to_owned();
 
     // 构造目标 (价格变化率)
+    // target[i] = (close[i+lookback] - close[i+lookback-1]) / close[i+lookback-1]
     let mut train_targets = Array1::zeros(train_size);
     for i in 0..train_size {
-        let idx = i + config.lookback;
-        if idx > 0 && close[idx - 1] != 0.0 {
-            train_targets[i] = (close[idx] - close[idx - 1]) / close[idx - 1];
+        let target_idx = i + config.lookback;
+        // 安全检查: target_idx 应该 < len 且 target_idx >= 1
+        if target_idx < len && target_idx >= 1 && is_not_zero(close[target_idx - 1]) {
+            train_targets[i] = (close[target_idx] - close[target_idx - 1]) / close[target_idx - 1];
         }
     }
 
@@ -267,14 +277,14 @@ pub fn online_predict_supertrend(
         return predictions;
     }
 
-    // 预测
+    // 预测所有样本
     let all_predictions = model.predict(&all_features);
 
-    // 填充结果
+    // 填充结果: predictions[i+lookback] = prediction for feature[i]
     for i in 0..all_predictions.len() {
-        let idx = i + config.lookback;
-        if idx < len {
-            predictions[idx] = all_predictions[i];
+        let output_idx = i + config.lookback;
+        if output_idx < len {
+            predictions[output_idx] = all_predictions[i];
         }
     }
 
@@ -282,6 +292,10 @@ pub fn online_predict_supertrend(
 }
 
 /// 在线训练并预测 ATR2 阈值调整
+///
+/// # 索引说明
+/// - `feature[i]` 对应原始数据索引 `i + window`
+/// - `predictions[i+window]` 存储对应预测结果
 pub fn online_predict_atr2(
     close: &[f64],
     atr: &[f64],
@@ -296,17 +310,23 @@ pub fn online_predict_atr2(
         return predictions;
     }
 
-    // 准备所有特征
+    // 准备所有特征: n_features = len - window
     let (all_features, all_targets) = prepare_atr2_features(close, atr, volume, config.lookback);
 
-    if all_features.dim().0 == 0 {
+    let n_features = all_features.dim().0;
+    if n_features == 0 {
         return predictions;
     }
 
-    // 一次性训练
-    let n = all_features.dim().0;
-    let train_size = config.train_window.min(n);
+    // 防御性断言
+    debug_assert_eq!(
+        n_features,
+        len.saturating_sub(config.lookback),
+        "Feature count mismatch"
+    );
 
+    // 使用前 train_size 个样本训练
+    let train_size = config.train_window.min(n_features);
     let train_features = all_features.slice(ndarray::s![..train_size, ..]).to_owned();
     let train_targets = all_targets.slice(ndarray::s![..train_size]).to_owned();
 
@@ -323,14 +343,14 @@ pub fn online_predict_atr2(
         return predictions;
     }
 
-    // 预测
+    // 预测所有样本
     let all_predictions = model.predict(&all_features);
 
-    // 填充结果
+    // 填充结果: predictions[i+lookback] = prediction for feature[i]
     for i in 0..all_predictions.len() {
-        let idx = i + config.lookback;
-        if idx < len {
-            predictions[idx] = all_predictions[i];
+        let output_idx = i + config.lookback;
+        if output_idx < len {
+            predictions[output_idx] = all_predictions[i];
         }
     }
 
@@ -338,6 +358,10 @@ pub fn online_predict_atr2(
 }
 
 /// 在线训练并预测 Momentum
+///
+/// # 索引说明
+/// - `feature[i]` 使用 `rsi[i..i+lookback]` 构建
+/// - `predictions[i+lookback]` 存储对应预测结果
 pub fn online_predict_momentum(rsi: &[f64], config: &TrainConfig) -> Vec<f64> {
     let len = rsi.len();
     let mut predictions = vec![0.0; len];
@@ -347,7 +371,7 @@ pub fn online_predict_momentum(rsi: &[f64], config: &TrainConfig) -> Vec<f64> {
         return predictions;
     }
 
-    // 准备所有特征
+    // 准备所有特征: n_features = len - lookback
     let (all_features, all_targets) = prepare_momentum_features(rsi, config.lookback);
 
     let all_features = if config.use_polynomial {
@@ -356,14 +380,20 @@ pub fn online_predict_momentum(rsi: &[f64], config: &TrainConfig) -> Vec<f64> {
         all_features
     };
 
-    if all_features.dim().0 == 0 {
+    let n_features = all_features.dim().0;
+    if n_features == 0 {
         return predictions;
     }
 
-    // 一次性训练
-    let n = all_features.dim().0;
-    let train_size = config.train_window.min(n);
+    // 防御性断言
+    debug_assert_eq!(
+        n_features,
+        len.saturating_sub(config.lookback),
+        "Feature count mismatch"
+    );
 
+    // 使用前 train_size 个样本训练
+    let train_size = config.train_window.min(n_features);
     let train_features = all_features.slice(ndarray::s![..train_size, ..]).to_owned();
     let train_targets = all_targets.slice(ndarray::s![..train_size]).to_owned();
 
@@ -380,14 +410,14 @@ pub fn online_predict_momentum(rsi: &[f64], config: &TrainConfig) -> Vec<f64> {
         return predictions;
     }
 
-    // 预测
+    // 预测所有样本
     let all_predictions = model.predict(&all_features);
 
-    // 填充结果
+    // 填充结果: predictions[i+lookback] = prediction for feature[i]
     for i in 0..all_predictions.len() {
-        let idx = i + config.lookback;
-        if idx < len {
-            predictions[idx] = all_predictions[i];
+        let output_idx = i + config.lookback;
+        if output_idx < len {
+            predictions[output_idx] = all_predictions[i];
         }
     }
 

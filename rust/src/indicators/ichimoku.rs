@@ -1,5 +1,6 @@
 // indicators/ichimoku.rs - Ichimoku Cloud（一目均衡表）
 #![allow(dead_code)]
+#![allow(clippy::needless_range_loop)]
 //
 // 一目均衡表是日本传统技术分析系统，包含 5 条线：
 // 1. Tenkan-sen（转换线）：9 周期高低平均
@@ -10,16 +11,17 @@
 //
 // "云"（Kumo）由先行带 A 和 B 形成，提供动态支撑/阻力区域
 
+use crate::init_result;
 use crate::utils::stats::{rolling_max, rolling_min};
 
 /// Ichimoku Cloud 结构体
 #[derive(Debug, Clone)]
 pub struct IchimokuCloud {
-    pub tenkan_sen: Vec<f64>,      // 转换线
-    pub kijun_sen: Vec<f64>,       // 基准线
-    pub senkou_span_a: Vec<f64>,   // 先行带 A
-    pub senkou_span_b: Vec<f64>,   // 先行带 B
-    pub chikou_span: Vec<f64>,     // 延迟线
+    pub tenkan_sen: Vec<f64>,    // 转换线
+    pub kijun_sen: Vec<f64>,     // 基准线
+    pub senkou_span_a: Vec<f64>, // 先行带 A
+    pub senkou_span_b: Vec<f64>, // 先行带 B
+    pub chikou_span: Vec<f64>,   // 延迟线
 }
 
 /// 计算 Ichimoku Cloud（一目均衡表）
@@ -41,8 +43,15 @@ pub struct IchimokuCloud {
 /// 5. Chikou Span = Close, shifted backward 26
 ///
 /// # 示例
-/// ```rust
+/// ```rust,no_run
+/// use haze_library::indicators::ichimoku::ichimoku_cloud;
+///
+/// let high = vec![110.0; 100];
+/// let low = vec![100.0; 100];
+/// let close = vec![105.0; 100];
+///
 /// let ichimoku = ichimoku_cloud(&high, &low, &close, 9, 26, 52);
+/// assert_eq!(ichimoku.tenkan_sen.len(), close.len());
 /// ```
 pub fn ichimoku_cloud(
     high: &[f64],
@@ -61,7 +70,7 @@ pub fn ichimoku_cloud(
     let kijun_sen = calc_donchian_midline(high, low, kijun_period);
 
     // 3. Senkou Span A (Leading Span A): (Tenkan + Kijun) / 2, shifted +26
-    let mut senkou_span_a = vec![f64::NAN; n];
+    let mut senkou_span_a = init_result!(n);
     for i in 0..n {
         if !tenkan_sen[i].is_nan() && !kijun_sen[i].is_nan() {
             let value = (tenkan_sen[i] + kijun_sen[i]) / 2.0;
@@ -75,7 +84,7 @@ pub fn ichimoku_cloud(
 
     // 4. Senkou Span B (Leading Span B): (52-period high + low) / 2, shifted +26
     let span_b_midline = calc_donchian_midline(high, low, senkou_b_period);
-    let mut senkou_span_b = vec![f64::NAN; n];
+    let mut senkou_span_b = init_result!(n);
     for i in 0..n {
         if !span_b_midline[i].is_nan() {
             let future_idx = i + kijun_period;
@@ -86,10 +95,8 @@ pub fn ichimoku_cloud(
     }
 
     // 5. Chikou Span (Lagging Span): Close price, shifted -26
-    let mut chikou_span = vec![f64::NAN; n];
-    for i in kijun_period..n {
-        chikou_span[i - kijun_period] = close[i];
-    }
+    let mut chikou_span = init_result!(n);
+    chikou_span[..(n - kijun_period)].copy_from_slice(&close[kijun_period..n]);
 
     IchimokuCloud {
         tenkan_sen,
@@ -105,7 +112,7 @@ pub fn ichimoku_cloud(
 /// 这是 Ichimoku 各线的核心计算逻辑
 fn calc_donchian_midline(high: &[f64], low: &[f64], period: usize) -> Vec<f64> {
     let n = high.len();
-    let mut result = vec![f64::NAN; n];
+    let mut result = init_result!(n);
 
     let high_max = rolling_max(high, period);
     let low_min = rolling_min(low, period);
@@ -122,11 +129,11 @@ fn calc_donchian_midline(high: &[f64], low: &[f64], period: usize) -> Vec<f64> {
 /// Ichimoku 信号类型
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum IchimokuSignal {
-    StrongBullish,   // 强看涨：价格在云上方，云为绿色（Span A > Span B），Chikou 在价格上方
-    Bullish,         // 看涨：价格在云上方
-    Neutral,         // 中性：价格在云内
-    Bearish,         // 看跌：价格在云下方
-    StrongBearish,   // 强看跌：价格在云下方，云为红色（Span A < Span B），Chikou 在价格下方
+    StrongBullish, // 强看涨：价格在云上方，云为绿色（Span A > Span B），Chikou 在价格上方
+    Bullish,       // 看涨：价格在云上方
+    Neutral,       // 中性：价格在云内
+    Bearish,       // 看跌：价格在云下方
+    StrongBearish, // 强看跌：价格在云下方，云为红色（Span A < Span B），Chikou 在价格下方
 }
 
 /// 生成 Ichimoku 信号
@@ -199,8 +206,10 @@ pub fn ichimoku_tk_cross(ichimoku: &IchimokuCloud) -> Vec<f64> {
         let curr_tenkan = ichimoku.tenkan_sen[i];
         let curr_kijun = ichimoku.kijun_sen[i];
 
-        if prev_tenkan.is_nan() || prev_kijun.is_nan()
-            || curr_tenkan.is_nan() || curr_kijun.is_nan()
+        if prev_tenkan.is_nan()
+            || prev_kijun.is_nan()
+            || curr_tenkan.is_nan()
+            || curr_kijun.is_nan()
         {
             continue;
         }
@@ -259,11 +268,11 @@ pub fn cloud_color(ichimoku: &IchimokuCloud) -> Vec<f64> {
         if span_a.is_nan() || span_b.is_nan() {
             colors.push(0.0);
         } else if span_a > span_b {
-            colors.push(1.0);  // 绿云（看涨）
+            colors.push(1.0); // 绿云（看涨）
         } else if span_a < span_b {
             colors.push(-1.0); // 红云（看跌）
         } else {
-            colors.push(0.0);  // 中性
+            colors.push(0.0); // 中性
         }
     }
 
@@ -291,9 +300,9 @@ mod tests {
     #[test]
     fn test_tk_cross() {
         let high = vec![
-            100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0,
-            110.0, 111.0, 112.0, 113.0, 114.0, 115.0, 116.0, 117.0, 118.0, 119.0,
-            120.0, 121.0, 122.0, 123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0,
+            100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0,
+            112.0, 113.0, 114.0, 115.0, 116.0, 117.0, 118.0, 119.0, 120.0, 121.0, 122.0, 123.0,
+            124.0, 125.0, 126.0, 127.0, 128.0, 129.0,
         ];
         let low: Vec<f64> = high.iter().map(|&h| h - 2.0).collect();
         let close: Vec<f64> = high.iter().map(|&h| h - 1.0).collect();

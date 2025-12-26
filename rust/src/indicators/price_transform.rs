@@ -1,10 +1,10 @@
-// 价格变换函数保留供未来扩展
-#![allow(dead_code)]
+//! Price Transform Indicators Module
+//!
+//! 价格变换指标，用于从 OHLC 数据计算各种典型价格
+//! 这些是 TA-Lib 中最基础的价格计算函数
 
-/// Price Transform Indicators Module
-///
-/// 价格变换指标，用于从 OHLC 数据计算各种典型价格
-/// 这些是 TA-Lib 中最基础的价格计算函数
+use crate::errors::validation::{validate_lengths_match, validate_not_empty};
+use crate::errors::HazeResult;
 
 /// AVGPRICE - Average Price
 ///
@@ -17,9 +17,21 @@
 /// - `close`: 收盘价序列
 ///
 /// # 返回
-/// - 平均价格序列
-pub fn avgprice(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
-    let n = open.len().min(high.len()).min(low.len()).min(close.len());
+/// - `HazeResult<Vec<f64>>`: 平均价格序列
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `LengthMismatch`: 数组长度不匹配
+pub fn avgprice(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    validate_not_empty(open, "open")?;
+    validate_lengths_match(&[
+        (open, "open"),
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
+
+    let n = open.len();
     let mut result = Vec::with_capacity(n);
 
     for i in 0..n {
@@ -27,7 +39,7 @@ pub fn avgprice(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> Vec<f
         result.push(avg);
     }
 
-    result
+    Ok(result)
 }
 
 /// MEDPRICE - Median Price
@@ -41,9 +53,16 @@ pub fn avgprice(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> Vec<f
 /// - `low`: 最低价序列
 ///
 /// # 返回
-/// - 中间价序列
-pub fn medprice(high: &[f64], low: &[f64]) -> Vec<f64> {
-    let n = high.len().min(low.len());
+/// - `HazeResult<Vec<f64>>`: 中间价序列
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `LengthMismatch`: 数组长度不匹配
+pub fn medprice(high: &[f64], low: &[f64]) -> HazeResult<Vec<f64>> {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low")])?;
+
+    let n = high.len();
     let mut result = Vec::with_capacity(n);
 
     for i in 0..n {
@@ -51,7 +70,7 @@ pub fn medprice(high: &[f64], low: &[f64]) -> Vec<f64> {
         result.push(med);
     }
 
-    result
+    Ok(result)
 }
 
 /// TYPPRICE - Typical Price
@@ -66,9 +85,16 @@ pub fn medprice(high: &[f64], low: &[f64]) -> Vec<f64> {
 /// - `close`: 收盘价序列
 ///
 /// # 返回
-/// - 典型价格序列
-pub fn typprice(high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
-    let n = high.len().min(low.len()).min(close.len());
+/// - `HazeResult<Vec<f64>>`: 典型价格序列
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `LengthMismatch`: 数组长度不匹配
+pub fn typprice(high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
+
+    let n = high.len();
     let mut result = Vec::with_capacity(n);
 
     for i in 0..n {
@@ -76,7 +102,7 @@ pub fn typprice(high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
         result.push(typ);
     }
 
-    result
+    Ok(result)
 }
 
 /// WCLPRICE - Weighted Close Price
@@ -91,9 +117,16 @@ pub fn typprice(high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
 /// - `close`: 收盘价序列
 ///
 /// # 返回
-/// - 加权收盘价序列
-pub fn wclprice(high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
-    let n = high.len().min(low.len()).min(close.len());
+/// - `HazeResult<Vec<f64>>`: 加权收盘价序列
+///
+/// # 错误
+/// - `EmptyInput`: 输入为空
+/// - `LengthMismatch`: 数组长度不匹配
+pub fn wclprice(high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
+
+    let n = high.len();
     let mut result = Vec::with_capacity(n);
 
     for i in 0..n {
@@ -101,27 +134,27 @@ pub fn wclprice(high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
         result.push(wcl);
     }
 
-    result
+    Ok(result)
 }
 
 /// HL2 - (High + Low) / 2
 ///
 /// 等同于 MEDPRICE，为兼容性保留
-pub fn hl2(high: &[f64], low: &[f64]) -> Vec<f64> {
+pub fn hl2(high: &[f64], low: &[f64]) -> HazeResult<Vec<f64>> {
     medprice(high, low)
 }
 
 /// HLC3 - (High + Low + Close) / 3
 ///
 /// 等同于 TYPPRICE，为兼容性保留
-pub fn hlc3(high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
+pub fn hlc3(high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
     typprice(high, low, close)
 }
 
 /// OHLC4 - (Open + High + Low + Close) / 4
 ///
 /// 等同于 AVGPRICE，为兼容性保留
-pub fn ohlc4(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> Vec<f64> {
+pub fn ohlc4(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
     avgprice(open, high, low, close)
 }
 
@@ -136,7 +169,7 @@ mod tests {
         let low = vec![99.0, 101.0];
         let close = vec![103.0, 105.0];
 
-        let result = avgprice(&open, &high, &low, &close);
+        let result = avgprice(&open, &high, &low, &close).unwrap();
 
         // (100+105+99+103)/4 = 101.75
         assert!((result[0] - 101.75).abs() < 1e-10);
@@ -145,11 +178,27 @@ mod tests {
     }
 
     #[test]
+    fn test_avgprice_empty_input() {
+        let result = avgprice(&[], &[], &[], &[]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_avgprice_length_mismatch() {
+        let open = vec![100.0, 102.0];
+        let high = vec![105.0];
+        let low = vec![99.0, 101.0];
+        let close = vec![103.0, 105.0];
+        let result = avgprice(&open, &high, &low, &close);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_medprice() {
         let high = vec![105.0, 107.0];
         let low = vec![99.0, 101.0];
 
-        let result = medprice(&high, &low);
+        let result = medprice(&high, &low).unwrap();
 
         // (105+99)/2 = 102.0
         assert_eq!(result[0], 102.0);
@@ -163,7 +212,7 @@ mod tests {
         let low = vec![99.0, 101.0];
         let close = vec![103.0, 105.0];
 
-        let result = typprice(&high, &low, &close);
+        let result = typprice(&high, &low, &close).unwrap();
 
         // (105+99+103)/3 = 102.333...
         assert!((result[0] - 102.333333333).abs() < 1e-9);
@@ -177,7 +226,7 @@ mod tests {
         let low = vec![99.0, 101.0];
         let close = vec![103.0, 105.0];
 
-        let result = wclprice(&high, &low, &close);
+        let result = wclprice(&high, &low, &close).unwrap();
 
         // (105+99+2*103)/4 = 102.5
         assert_eq!(result[0], 102.5);
@@ -193,12 +242,18 @@ mod tests {
         let open = vec![100.0];
 
         // HL2 == MEDPRICE
-        assert_eq!(hl2(&high, &low), medprice(&high, &low));
+        assert_eq!(hl2(&high, &low).unwrap(), medprice(&high, &low).unwrap());
 
         // HLC3 == TYPPRICE
-        assert_eq!(hlc3(&high, &low, &close), typprice(&high, &low, &close));
+        assert_eq!(
+            hlc3(&high, &low, &close).unwrap(),
+            typprice(&high, &low, &close).unwrap()
+        );
 
         // OHLC4 == AVGPRICE
-        assert_eq!(ohlc4(&open, &high, &low, &close), avgprice(&open, &high, &low, &close));
+        assert_eq!(
+            ohlc4(&open, &high, &low, &close).unwrap(),
+            avgprice(&open, &high, &low, &close).unwrap()
+        );
     }
 }

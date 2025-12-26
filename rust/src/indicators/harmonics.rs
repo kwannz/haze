@@ -11,6 +11,8 @@
 // 4. PRZ Calculation（潜在反转区）- 多Fib投影汇合
 // 5. Probability Estimation（概率估算）- 基于Fib吻合度
 
+use crate::init_result;
+use crate::utils::math::is_zero;
 use std::collections::HashMap;
 
 // ============================================================================
@@ -171,9 +173,9 @@ pub struct PatternRatios {
 /// PRZ - 潜在反转区
 #[derive(Debug, Clone, Copy)]
 pub struct PrzZone {
-    pub price_high: f64,     // PRZ 上边界
-    pub price_low: f64,      // PRZ 下边界
-    pub price_center: f64,   // PRZ 中心（最佳入场点）
+    pub price_high: f64,      // PRZ 上边界
+    pub price_low: f64,       // PRZ 下边界
+    pub price_center: f64,    // PRZ 中心（最佳入场点）
     pub confluence_count: u8, // Fib 汇合数量（越多越强）
 }
 
@@ -182,20 +184,20 @@ pub struct PrzZone {
 pub struct SwingPoint {
     pub index: usize,
     pub price: f64,
-    pub is_high: bool,  // true=高点，false=低点
+    pub is_high: bool, // true=高点，false=低点
 }
 
 /// XABCD Pattern - 谐波形态结构（基础版本，保持向后兼容）
 #[derive(Debug, Clone)]
 pub struct HarmonicPattern {
-    pub pattern_type: String,  // "Gartley", "Bat", "Butterfly", etc.
+    pub pattern_type: String, // "Gartley", "Bat", "Butterfly", etc.
     pub x: SwingPoint,
     pub a: SwingPoint,
     pub b: SwingPoint,
     pub c: SwingPoint,
     pub d: SwingPoint,
     pub is_bullish: bool,
-    pub ratios: HashMap<String, f64>,  // 实际 Fibonacci 比率
+    pub ratios: HashMap<String, f64>, // 实际 Fibonacci 比率
 }
 
 /// XABCD Pattern 扩展版本（包含PRZ、概率、目标价位）
@@ -206,14 +208,14 @@ pub struct HarmonicPatternExt {
     pub x: SwingPoint,
     pub a: SwingPoint,
     pub b: SwingPoint,
-    pub c: Option<SwingPoint>,  // 形成中可能无 C
-    pub d: Option<SwingPoint>,  // 形成中可能无 D
+    pub c: Option<SwingPoint>, // 形成中可能无 C
+    pub d: Option<SwingPoint>, // 形成中可能无 D
     pub is_bullish: bool,
     pub ratios: HashMap<String, f64>,
-    pub prz: Option<PrzZone>,           // 预测的 PRZ
-    pub completion_probability: f64,     // 0.0 ~ 1.0
-    pub target_prices: Vec<f64>,         // TP1, TP2, TP3
-    pub stop_loss: Option<f64>,          // 止损价位
+    pub prz: Option<PrzZone>,        // 预测的 PRZ
+    pub completion_probability: f64, // 0.0 ~ 1.0
+    pub target_prices: Vec<f64>,     // TP1, TP2, TP3
+    pub stop_loss: Option<f64>,      // 止损价位
 }
 
 impl HarmonicPatternExt {
@@ -301,10 +303,15 @@ fn check_fib_ratio(actual: f64, expected: f64, tolerance: f64) -> bool {
 
 /// 计算两点之间的价格变动比率（回撤或扩展）
 #[inline]
-fn calc_ratio(point1_price: f64, point2_price: f64, reference_start: f64, reference_end: f64) -> f64 {
+fn calc_ratio(
+    point1_price: f64,
+    point2_price: f64,
+    reference_start: f64,
+    reference_end: f64,
+) -> f64 {
     let point_move = (point2_price - point1_price).abs();
     let reference_move = (reference_end - reference_start).abs();
-    if reference_move == 0.0 {
+    if is_zero(reference_move) {
         0.0
     } else {
         point_move / reference_move
@@ -334,13 +341,15 @@ pub fn detect_gartley(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         let d = swings[i + 4];
 
         // 验证摆动点交替（高低高低高 或 低高低高低）
-        if x.is_high == a.is_high || a.is_high == b.is_high
-            || b.is_high == c.is_high || c.is_high == d.is_high
+        if x.is_high == a.is_high
+            || a.is_high == b.is_high
+            || b.is_high == c.is_high
+            || c.is_high == d.is_high
         {
             continue;
         }
 
-        let is_bullish = !x.is_high;  // X 是低点则为看涨
+        let is_bullish = !x.is_high; // X 是低点则为看涨
 
         // 计算 Fibonacci 比率
         let ab_xa = calc_ratio(a.price, b.price, x.price, a.price);
@@ -350,8 +359,8 @@ pub fn detect_gartley(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
 
         // Gartley 比率验证
         if check_fib_ratio(ab_xa, 0.618, FIB_TOLERANCE)
-            && bc_ab >= 0.382 - FIB_TOLERANCE && bc_ab <= 0.886 + FIB_TOLERANCE
-            && cd_bc >= 1.272 - FIB_TOLERANCE && cd_bc <= 1.618 + FIB_TOLERANCE
+            && (0.382 - FIB_TOLERANCE..=0.886 + FIB_TOLERANCE).contains(&bc_ab)
+            && (1.272 - FIB_TOLERANCE..=1.618 + FIB_TOLERANCE).contains(&cd_bc)
             && check_fib_ratio(ad_xa, 0.786, FIB_TOLERANCE)
         {
             let mut ratios = HashMap::new();
@@ -397,8 +406,10 @@ pub fn detect_bat(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         let c = swings[i + 3];
         let d = swings[i + 4];
 
-        if x.is_high == a.is_high || a.is_high == b.is_high
-            || b.is_high == c.is_high || c.is_high == d.is_high
+        if x.is_high == a.is_high
+            || a.is_high == b.is_high
+            || b.is_high == c.is_high
+            || c.is_high == d.is_high
         {
             continue;
         }
@@ -411,9 +422,9 @@ pub fn detect_bat(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         let ad_xa = calc_ratio(a.price, d.price, x.price, a.price);
 
         // Bat 比率验证
-        if ab_xa >= 0.382 - FIB_TOLERANCE && ab_xa <= 0.500 + FIB_TOLERANCE
-            && bc_ab >= 0.382 - FIB_TOLERANCE && bc_ab <= 0.886 + FIB_TOLERANCE
-            && cd_bc >= 1.618 - FIB_TOLERANCE && cd_bc <= 2.618 + FIB_TOLERANCE
+        if (0.382 - FIB_TOLERANCE..=0.500 + FIB_TOLERANCE).contains(&ab_xa)
+            && (0.382 - FIB_TOLERANCE..=0.886 + FIB_TOLERANCE).contains(&bc_ab)
+            && (1.618 - FIB_TOLERANCE..=2.618 + FIB_TOLERANCE).contains(&cd_bc)
             && check_fib_ratio(ad_xa, 0.886, FIB_TOLERANCE)
         {
             let mut ratios = HashMap::new();
@@ -459,8 +470,10 @@ pub fn detect_butterfly(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         let c = swings[i + 3];
         let d = swings[i + 4];
 
-        if x.is_high == a.is_high || a.is_high == b.is_high
-            || b.is_high == c.is_high || c.is_high == d.is_high
+        if x.is_high == a.is_high
+            || a.is_high == b.is_high
+            || b.is_high == c.is_high
+            || c.is_high == d.is_high
         {
             continue;
         }
@@ -474,9 +487,9 @@ pub fn detect_butterfly(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
 
         // Butterfly 比率验证
         if check_fib_ratio(ab_xa, 0.786, FIB_TOLERANCE)
-            && bc_ab >= 0.382 - FIB_TOLERANCE && bc_ab <= 0.886 + FIB_TOLERANCE
-            && cd_bc >= 1.618 - FIB_TOLERANCE && cd_bc <= 2.24 + FIB_TOLERANCE
-            && ad_xa >= 1.27 - FIB_TOLERANCE && ad_xa <= 1.618 + FIB_TOLERANCE
+            && (0.382 - FIB_TOLERANCE..=0.886 + FIB_TOLERANCE).contains(&bc_ab)
+            && (1.618 - FIB_TOLERANCE..=2.24 + FIB_TOLERANCE).contains(&cd_bc)
+            && (1.27 - FIB_TOLERANCE..=1.618 + FIB_TOLERANCE).contains(&ad_xa)
         {
             let mut ratios = HashMap::new();
             ratios.insert("AB/XA".to_string(), ab_xa);
@@ -521,8 +534,10 @@ pub fn detect_crab(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         let c = swings[i + 3];
         let d = swings[i + 4];
 
-        if x.is_high == a.is_high || a.is_high == b.is_high
-            || b.is_high == c.is_high || c.is_high == d.is_high
+        if x.is_high == a.is_high
+            || a.is_high == b.is_high
+            || b.is_high == c.is_high
+            || c.is_high == d.is_high
         {
             continue;
         }
@@ -535,9 +550,9 @@ pub fn detect_crab(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         let ad_xa = calc_ratio(a.price, d.price, x.price, a.price);
 
         // Crab 比率验证
-        if ab_xa >= 0.382 - FIB_TOLERANCE && ab_xa <= 0.618 + FIB_TOLERANCE
-            && bc_ab >= 0.382 - FIB_TOLERANCE && bc_ab <= 0.886 + FIB_TOLERANCE
-            && cd_bc >= 2.24 - FIB_TOLERANCE && cd_bc <= 3.618 + FIB_TOLERANCE
+        if (0.382 - FIB_TOLERANCE..=0.618 + FIB_TOLERANCE).contains(&ab_xa)
+            && (0.382 - FIB_TOLERANCE..=0.886 + FIB_TOLERANCE).contains(&bc_ab)
+            && (2.24 - FIB_TOLERANCE..=3.618 + FIB_TOLERANCE).contains(&cd_bc)
             && check_fib_ratio(ad_xa, 1.618, FIB_TOLERANCE)
         {
             let mut ratios = HashMap::new();
@@ -583,8 +598,10 @@ pub fn detect_shark(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         let c = swings[i + 3];
         let d = swings[i + 4];
 
-        if x.is_high == a.is_high || a.is_high == b.is_high
-            || b.is_high == c.is_high || c.is_high == d.is_high
+        if x.is_high == a.is_high
+            || a.is_high == b.is_high
+            || b.is_high == c.is_high
+            || c.is_high == d.is_high
         {
             continue;
         }
@@ -597,10 +614,10 @@ pub fn detect_shark(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         let ad_xa = calc_ratio(a.price, d.price, x.price, a.price);
 
         // Shark 比率验证
-        if ab_xa >= 0.382 - FIB_TOLERANCE && ab_xa <= 0.618 + FIB_TOLERANCE
-            && bc_ab >= 1.13 - FIB_TOLERANCE && bc_ab <= 1.618 + FIB_TOLERANCE
-            && cd_bc >= 1.618 - FIB_TOLERANCE && cd_bc <= 2.24 + FIB_TOLERANCE
-            && ad_xa >= 0.886 - FIB_TOLERANCE && ad_xa <= 1.13 + FIB_TOLERANCE
+        if (0.382 - FIB_TOLERANCE..=0.618 + FIB_TOLERANCE).contains(&ab_xa)
+            && (1.13 - FIB_TOLERANCE..=1.618 + FIB_TOLERANCE).contains(&bc_ab)
+            && (1.618 - FIB_TOLERANCE..=2.24 + FIB_TOLERANCE).contains(&cd_bc)
+            && (0.886 - FIB_TOLERANCE..=1.13 + FIB_TOLERANCE).contains(&ad_xa)
         {
             let mut ratios = HashMap::new();
             ratios.insert("AB/XA".to_string(), ab_xa);
@@ -645,8 +662,10 @@ pub fn detect_cypher(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         let c = swings[i + 3];
         let d = swings[i + 4];
 
-        if x.is_high == a.is_high || a.is_high == b.is_high
-            || b.is_high == c.is_high || c.is_high == d.is_high
+        if x.is_high == a.is_high
+            || a.is_high == b.is_high
+            || b.is_high == c.is_high
+            || c.is_high == d.is_high
         {
             continue;
         }
@@ -659,8 +678,8 @@ pub fn detect_cypher(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         let ad_xa = calc_ratio(a.price, d.price, x.price, a.price);
 
         // Cypher 比率验证（注意 CD 是相对 XC 而非 BC）
-        if ab_xa >= 0.382 - FIB_TOLERANCE && ab_xa <= 0.618 + FIB_TOLERANCE
-            && bc_ab >= 1.272 - FIB_TOLERANCE && bc_ab <= 1.414 + FIB_TOLERANCE
+        if (0.382 - FIB_TOLERANCE..=0.618 + FIB_TOLERANCE).contains(&ab_xa)
+            && (1.272 - FIB_TOLERANCE..=1.414 + FIB_TOLERANCE).contains(&bc_ab)
             && check_fib_ratio(cd_xc, 0.786, FIB_TOLERANCE)
             && check_fib_ratio(ad_xa, 0.786, FIB_TOLERANCE)
         {
@@ -733,7 +752,10 @@ pub fn detect_alt_bat(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
 }
 
 /// 通用形态检测函数
-fn detect_pattern_generic(swings: &[SwingPoint], pattern_type: PatternType) -> Vec<HarmonicPattern> {
+fn detect_pattern_generic(
+    swings: &[SwingPoint],
+    pattern_type: PatternType,
+) -> Vec<HarmonicPattern> {
     let mut patterns = Vec::new();
     if swings.len() < 5 {
         return patterns;
@@ -748,8 +770,10 @@ fn detect_pattern_generic(swings: &[SwingPoint], pattern_type: PatternType) -> V
         let c = swings[i + 3];
         let d = swings[i + 4];
 
-        if x.is_high == a.is_high || a.is_high == b.is_high
-            || b.is_high == c.is_high || c.is_high == d.is_high
+        if x.is_high == a.is_high
+            || a.is_high == b.is_high
+            || b.is_high == c.is_high
+            || c.is_high == d.is_high
         {
             continue;
         }
@@ -783,7 +807,11 @@ fn detect_pattern_generic(swings: &[SwingPoint], pattern_type: PatternType) -> V
 
         patterns.push(HarmonicPattern {
             pattern_type: pattern_type.name_en().to_string(),
-            x, a, b, c, d,
+            x,
+            a,
+            b,
+            c,
+            d,
             is_bullish,
             ratios: ratio_map,
         });
@@ -802,7 +830,10 @@ fn ratio_in_range(actual: f64, range: (f64, f64)) -> bool {
 
 /// 计算潜在反转区（PRZ）
 pub fn calculate_prz(
-    x: &SwingPoint, a: &SwingPoint, b: &SwingPoint, c: &SwingPoint,
+    x: &SwingPoint,
+    a: &SwingPoint,
+    b: &SwingPoint,
+    c: &SwingPoint,
     pattern_type: PatternType,
 ) -> PrzZone {
     let ratios = pattern_type.ratios();
@@ -830,11 +861,18 @@ pub fn calculate_prz(
         projections.push((cd_xc_low.min(cd_xc_high), cd_xc_low.max(cd_xc_high)));
     }
 
-    let prz_low = projections.iter().map(|(l, _)| *l).fold(f64::NEG_INFINITY, f64::max);
-    let prz_high = projections.iter().map(|(_, h)| *h).fold(f64::INFINITY, f64::min);
+    let prz_low = projections
+        .iter()
+        .map(|(l, _)| *l)
+        .fold(f64::NEG_INFINITY, f64::max);
+    let prz_high = projections
+        .iter()
+        .map(|(_, h)| *h)
+        .fold(f64::INFINITY, f64::min);
 
     let (final_low, final_high) = if prz_low > prz_high {
-        let center: f64 = projections.iter().map(|(l, h)| (l + h) / 2.0).sum::<f64>() / projections.len() as f64;
+        let center: f64 =
+            projections.iter().map(|(l, h)| (l + h) / 2.0).sum::<f64>() / projections.len() as f64;
         let spread = xa_move * 0.05;
         (center - spread, center + spread)
     } else {
@@ -842,7 +880,10 @@ pub fn calculate_prz(
     };
 
     let prz_center = (final_low + final_high) / 2.0;
-    let confluence = projections.iter().filter(|(l, h)| prz_center >= *l && prz_center <= *h).count() as u8;
+    let confluence = projections
+        .iter()
+        .filter(|(l, h)| prz_center >= *l && prz_center <= *h)
+        .count() as u8;
 
     PrzZone {
         price_low: final_low,
@@ -857,7 +898,10 @@ pub fn calculate_prz(
 // ============================================================================
 
 /// 计算形态完成概率
-pub fn calc_completion_probability(ratios: &HashMap<String, f64>, pattern_type: PatternType) -> f64 {
+pub fn calc_completion_probability(
+    ratios: &HashMap<String, f64>,
+    pattern_type: PatternType,
+) -> f64 {
     let ideal = pattern_type.ratios();
     let mut score = 0.0;
 
@@ -899,8 +943,10 @@ pub fn calc_target_prices(pattern: &HarmonicPattern, is_bullish: bool) -> (f64, 
 
 /// 检测正在形成的形态（XABC 阶段）
 pub fn detect_forming_patterns(
-    high: &[f64], low: &[f64],
-    left_bars: usize, right_bars: usize,
+    high: &[f64],
+    low: &[f64],
+    left_bars: usize,
+    right_bars: usize,
     lookback: usize,
 ) -> Vec<HarmonicPatternExt> {
     let swings = detect_swing_points(high, low, left_bars, right_bars);
@@ -940,12 +986,16 @@ pub fn detect_forming_patterns(
                 let ab_mid = (ideal.ab_xa.0 + ideal.ab_xa.1) / 2.0;
                 let bc_mid = (ideal.bc_ab.0 + ideal.bc_ab.1) / 2.0;
                 let prob = ((1.0 - ((ab_xa - ab_mid).abs() / ab_mid.max(0.001)).min(1.0))
-                    + (1.0 - ((bc_ab - bc_mid).abs() / bc_mid.max(0.001)).min(1.0))) / 2.0 * 0.7;
+                    + (1.0 - ((bc_ab - bc_mid).abs() / bc_mid.max(0.001)).min(1.0)))
+                    / 2.0
+                    * 0.7;
 
                 forming.push(HarmonicPatternExt {
                     pattern_type: *pattern_type,
                     state: PatternState::Forming,
-                    x, a, b,
+                    x,
+                    a,
+                    b,
                     c: Some(c),
                     d: None,
                     is_bullish,
@@ -970,8 +1020,12 @@ pub fn detect_forming_patterns(
 /// 返回: (signals, prz_upper, prz_lower, probability)
 /// - signals: 1=看涨, -1=看跌, 0=无信号
 pub fn harmonics_signal(
-    high: &[f64], low: &[f64], close: &[f64],
-    left_bars: usize, right_bars: usize, min_probability: f64,
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    left_bars: usize,
+    right_bars: usize,
+    min_probability: f64,
 ) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
     let n = high.len();
 
@@ -981,9 +1035,9 @@ pub fn harmonics_signal(
     }
 
     let mut signals = vec![0.0; n];
-    let mut prz_upper = vec![f64::NAN; n];
-    let mut prz_lower = vec![f64::NAN; n];
-    let mut probability = vec![f64::NAN; n];
+    let mut prz_upper = init_result!(n);
+    let mut prz_lower = init_result!(n);
+    let mut probability = init_result!(n);
 
     let _ = close; // 保留参数以备后续使用
 
@@ -996,7 +1050,9 @@ pub fn harmonics_signal(
 
     for pattern in &completed {
         let d_idx = pattern.d.index;
-        if d_idx >= n { continue; }
+        if d_idx >= n {
+            continue;
+        }
 
         let pattern_type = match pattern.pattern_type.as_str() {
             "Gartley" => PatternType::Gartley,
@@ -1026,7 +1082,7 @@ pub fn harmonics_signal(
         if let Some(prz) = &pattern.prz {
             if pattern.completion_probability >= min_probability * 0.5 {
                 let last_idx = n - 1;
-                if signals[last_idx] == 0.0 && prz_upper[last_idx].is_nan() {
+                if is_zero(signals[last_idx]) && prz_upper[last_idx].is_nan() {
                     prz_upper[last_idx] = prz.price_high;
                     prz_lower[last_idx] = prz.price_low;
                     probability[last_idx] = pattern.completion_probability;
@@ -1040,8 +1096,11 @@ pub fn harmonics_signal(
 
 /// 检测所有形态（扩展版本）
 pub fn detect_all_harmonics_ext(
-    high: &[f64], low: &[f64],
-    left_bars: usize, right_bars: usize, include_forming: bool,
+    high: &[f64],
+    low: &[f64],
+    left_bars: usize,
+    right_bars: usize,
+    include_forming: bool,
 ) -> Vec<HarmonicPatternExt> {
     let mut results = Vec::new();
 
@@ -1063,7 +1122,11 @@ pub fn detect_all_harmonics_ext(
         let prz = calculate_prz(&p.x, &p.a, &p.b, &p.c, pattern_type);
         let prob = calc_completion_probability(&p.ratios, pattern_type);
         let (tp1, tp2, tp3) = calc_target_prices(p, p.is_bullish);
-        let stop = if p.is_bullish { p.d.price * 0.98 } else { p.d.price * 1.02 };
+        let stop = if p.is_bullish {
+            p.d.price * 0.98
+        } else {
+            p.d.price * 1.02
+        };
 
         let mut ext = HarmonicPatternExt::from_basic(p, pattern_type);
         ext.prz = Some(prz);
@@ -1074,10 +1137,16 @@ pub fn detect_all_harmonics_ext(
     }
 
     if include_forming {
-        results.extend(detect_forming_patterns(high, low, left_bars, right_bars, 50));
+        results.extend(detect_forming_patterns(
+            high, low, left_bars, right_bars, 50,
+        ));
     }
 
-    results.sort_by_key(|p| p.d.map(|d| d.index).or_else(|| p.c.map(|c| c.index)).unwrap_or(p.b.index));
+    results.sort_by_key(|p| {
+        p.d.map(|d| d.index)
+            .or_else(|| p.c.map(|c| c.index))
+            .unwrap_or(p.b.index)
+    });
     results
 }
 
@@ -1109,10 +1178,26 @@ mod tests {
 
     #[test]
     fn test_prz_calculation() {
-        let x = SwingPoint { index: 0, price: 100.0, is_high: false };
-        let a = SwingPoint { index: 10, price: 150.0, is_high: true };
-        let b = SwingPoint { index: 20, price: 119.0, is_high: false };
-        let c = SwingPoint { index: 30, price: 140.0, is_high: true };
+        let x = SwingPoint {
+            index: 0,
+            price: 100.0,
+            is_high: false,
+        };
+        let a = SwingPoint {
+            index: 10,
+            price: 150.0,
+            is_high: true,
+        };
+        let b = SwingPoint {
+            index: 20,
+            price: 119.0,
+            is_high: false,
+        };
+        let c = SwingPoint {
+            index: 30,
+            price: 140.0,
+            is_high: true,
+        };
         let prz = calculate_prz(&x, &a, &b, &c, PatternType::Gartley);
         assert!(prz.price_center > 100.0 && prz.price_center < 150.0);
     }

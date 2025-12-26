@@ -4,6 +4,7 @@
 // 为 SFG 指标提供特征准备和转换功能
 // 遵循 KISS 原则: 专注于三种特征类型
 
+use crate::utils::math::{is_not_zero, kahan_sum_iter, should_use_kahan, KAHAN_THRESHOLD_CRITICAL};
 use ndarray::{Array1, Array2};
 
 /// 准备 AI SuperTrend 特征
@@ -35,7 +36,7 @@ pub fn prepare_supertrend_features(
         let target_idx = i + lookback;
         if target_idx < close.len() {
             let prev = close[target_idx - 1];
-            if prev != 0.0 {
+            if is_not_zero(prev) {
                 targets[i] = (close[target_idx] - prev) / prev;
             }
         }
@@ -76,12 +77,12 @@ pub fn prepare_atr2_features(
 
         // 特征 2: 价格变化率
         let prev = close[idx - 1];
-        if prev != 0.0 {
+        if is_not_zero(prev) {
             features[[i, 1]] = (close[idx] - prev) / prev;
         }
 
         // 特征 3: 成交量比率
-        if !volume_ma[i].is_nan() && volume_ma[i] != 0.0 {
+        if !volume_ma[i].is_nan() && is_not_zero(volume_ma[i]) {
             features[[i, 2]] = volume[idx] / volume_ma[i];
         } else {
             features[[i, 2]] = 1.0;
@@ -104,10 +105,7 @@ pub fn prepare_atr2_features(
 ///
 /// 特征组成: RSI 滞后序列
 /// 共 lookback 个特征维度
-pub fn prepare_momentum_features(
-    rsi: &[f64],
-    lookback: usize,
-) -> (Array2<f64>, Array1<f64>) {
+pub fn prepare_momentum_features(rsi: &[f64], lookback: usize) -> (Array2<f64>, Array1<f64>) {
     let n = rsi.len().saturating_sub(lookback);
     if n == 0 {
         return (Array2::zeros((0, lookback)), Array1::zeros(0));
@@ -172,6 +170,9 @@ pub fn polynomial_features(features: &Array2<f64>) -> Array2<f64> {
 /// 特征标准化 (Z-score normalization)
 ///
 /// 每列: (x - mean) / std
+///
+/// Uses Kahan summation for improved numerical precision when n >= KAHAN_THRESHOLD_CRITICAL.
+/// This is important for ML features where small errors can compound.
 pub fn standardize(features: &Array2<f64>) -> Array2<f64> {
     let (n, m) = features.dim();
     if n == 0 || m == 0 {
@@ -179,15 +180,24 @@ pub fn standardize(features: &Array2<f64>) -> Array2<f64> {
     }
 
     let mut result = features.clone();
+    let use_kahan = should_use_kahan(n, KAHAN_THRESHOLD_CRITICAL);
 
     for col in 0..m {
         let column = features.column(col);
 
-        // 计算均值
-        let mean: f64 = column.iter().sum::<f64>() / n as f64;
+        // 计算均值 - use Kahan for large feature sets
+        let mean: f64 = if use_kahan {
+            kahan_sum_iter(column.iter().copied()) / n as f64
+        } else {
+            column.iter().sum::<f64>() / n as f64
+        };
 
-        // 计算标准差
-        let variance: f64 = column.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64;
+        // 计算标准差 - use Kahan for large feature sets
+        let variance: f64 = if use_kahan {
+            kahan_sum_iter(column.iter().map(|x| (x - mean).powi(2))) / n as f64
+        } else {
+            column.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / n as f64
+        };
         let std = variance.sqrt();
 
         // 标准化
@@ -224,8 +234,8 @@ fn simple_ma(data: &[f64], period: usize) -> Vec<f64> {
             sum -= data[i - period];
         }
         if i >= period - 1 {
-            // 安全索引: i >= period-1 保证 i-(period-1) >= 0
-            result[i - (period - 1)] = sum / period as f64;
+            // 标准右对齐: 第一个有效值在 index period-1
+            result[i] = sum / period as f64;
         }
     }
 
@@ -238,7 +248,9 @@ mod tests {
 
     #[test]
     fn test_prepare_supertrend_features() {
-        let close = vec![100.0, 102.0, 101.0, 103.0, 105.0, 104.0, 106.0, 108.0, 107.0, 109.0];
+        let close = vec![
+            100.0, 102.0, 101.0, 103.0, 105.0, 104.0, 106.0, 108.0, 107.0, 109.0,
+        ];
         let atr = vec![2.0, 2.1, 2.0, 2.2, 2.3, 2.1, 2.4, 2.5, 2.3, 2.6];
 
         let (features, targets) = prepare_supertrend_features(&close, &atr, 3);
@@ -252,7 +264,9 @@ mod tests {
     fn test_prepare_atr2_features() {
         let close = vec![100.0, 102.0, 101.0, 103.0, 105.0, 104.0, 106.0, 108.0];
         let atr = vec![2.0, 2.1, 2.0, 2.2, 2.3, 2.1, 2.4, 2.5];
-        let volume = vec![1000.0, 1100.0, 1050.0, 1200.0, 1150.0, 1300.0, 1250.0, 1400.0];
+        let volume = vec![
+            1000.0, 1100.0, 1050.0, 1200.0, 1150.0, 1300.0, 1250.0, 1400.0,
+        ];
 
         let (features, targets) = prepare_atr2_features(&close, &atr, &volume, 3);
 

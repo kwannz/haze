@@ -1,8 +1,13 @@
 // indicators/sfg_utils.rs - SFG 辅助工具函数
 #![allow(dead_code)]
+#![allow(clippy::needless_range_loop)]
+// FVG 是金融领域标准术语 (Fair Value Gap)
+#![allow(clippy::upper_case_acronyms)]
 //
 // 提供背离检测、FVG、Order Block 等高级市场结构分析
 // 遵循 KISS 原则: 每个函数只做一件事
+
+use crate::utils::math::is_zero;
 
 /// 背离类型
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -114,12 +119,7 @@ pub fn detect_divergence(
 }
 
 /// 计算背离强度
-fn calculate_divergence_strength(
-    price1: f64,
-    price2: f64,
-    ind1: f64,
-    ind2: f64,
-) -> f64 {
+fn calculate_divergence_strength(price1: f64, price2: f64, ind1: f64, ind2: f64) -> f64 {
     let price_change = ((price1 - price2) / price2).abs();
     let ind_change = ((ind1 - ind2) / ind2.abs().max(1.0)).abs();
 
@@ -363,12 +363,7 @@ pub struct SRZone {
 }
 
 /// 检测支撑阻力区域
-pub fn detect_zones(
-    high: &[f64],
-    low: &[f64],
-    close: &[f64],
-    tolerance: f64,
-) -> Vec<SRZone> {
+pub fn detect_zones(high: &[f64], low: &[f64], close: &[f64], tolerance: f64) -> Vec<SRZone> {
     let len = close.len();
     if len < 10 {
         return Vec::new();
@@ -383,7 +378,7 @@ pub fn detect_zones(
     for i in 0..len {
         if swing_lows[i] {
             let level = low[i];
-            let touches = count_touches(&low, level, tolerance);
+            let touches = count_touches(low, level, tolerance);
 
             if touches >= 2 {
                 zones.push(SRZone {
@@ -400,7 +395,7 @@ pub fn detect_zones(
     for i in 0..len {
         if swing_highs[i] {
             let level = high[i];
-            let touches = count_touches(&high, level, tolerance);
+            let touches = count_touches(high, level, tolerance);
 
             if touches >= 2 {
                 zones.push(SRZone {
@@ -451,6 +446,546 @@ fn merge_zones(mut zones: Vec<SRZone>, tolerance: f64) -> Vec<SRZone> {
     merged.push(current);
 
     merged
+}
+
+// ============================================================
+// 成交量过滤器
+// ============================================================
+
+// ============================================================
+// PD Array & Breaker Block (ICT Concepts)
+// ============================================================
+
+/// Breaker Block 结构体
+///
+/// 失败的 Order Block 转换为 Breaker Block
+/// 支撑变阻力 / 阻力变支撑
+#[derive(Debug, Clone)]
+pub struct BreakerBlock {
+    /// 开始索引
+    pub index: usize,
+    /// 上边界
+    pub upper: f64,
+    /// 下边界
+    pub lower: f64,
+    /// 中心线
+    pub center: f64,
+    /// 是否看涨 (原 Order Block 方向)
+    pub is_bullish: bool,
+    /// 是否已被突破
+    pub is_broken: bool,
+}
+
+/// PD Array 结果 (溢价/折扣数组)
+///
+/// 基于市场结构确定溢价区域和折扣区域
+#[derive(Debug, Clone)]
+pub struct PDArrayResult {
+    /// 溢价区域: (index, upper, lower)
+    pub premium_zones: Vec<(usize, f64, f64)>,
+    /// 折扣区域: (index, upper, lower)
+    pub discount_zones: Vec<(usize, f64, f64)>,
+    /// 均衡价位 (50% 回撤水平)
+    pub equilibrium: Vec<f64>,
+    /// 价格是否在溢价区
+    pub in_premium: Vec<bool>,
+    /// 价格是否在折扣区
+    pub in_discount: Vec<bool>,
+}
+
+/// 检测 Breaker Block
+///
+/// Order Block 被突破后转换为 Breaker Block
+/// - 看涨 OB 被向下突破 → 看跌 Breaker (阻力)
+/// - 看跌 OB 被向上突破 → 看涨 Breaker (支撑)
+pub fn detect_breaker_block(
+    open: &[f64],
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    lookback: usize,
+) -> Vec<BreakerBlock> {
+    let obs = detect_order_block(open, high, low, close, lookback);
+    let len = close.len();
+    let mut breakers = Vec::new();
+
+    for ob in obs {
+        // 检查 Order Block 是否被突破
+        for i in (ob.index + 1)..len {
+            if ob.is_bullish {
+                // 看涨 OB 被向下突破 (收盘低于 OB 下边界)
+                if close[i] < ob.lower {
+                    breakers.push(BreakerBlock {
+                        index: i,
+                        upper: ob.upper,
+                        lower: ob.lower,
+                        center: (ob.upper + ob.lower) / 2.0,
+                        is_bullish: false, // 转为看跌 Breaker (阻力)
+                        is_broken: false,
+                    });
+                    break;
+                }
+            } else {
+                // 看跌 OB 被向上突破 (收盘高于 OB 上边界)
+                if close[i] > ob.upper {
+                    breakers.push(BreakerBlock {
+                        index: i,
+                        upper: ob.upper,
+                        lower: ob.lower,
+                        center: (ob.upper + ob.lower) / 2.0,
+                        is_bullish: true, // 转为看涨 Breaker (支撑)
+                        is_broken: false,
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    // 标记已被突破的 Breaker Block
+    for bb in &mut breakers {
+        for i in (bb.index + 1)..len {
+            if bb.is_bullish {
+                // 看涨 Breaker 被向下突破
+                if close[i] < bb.lower {
+                    bb.is_broken = true;
+                    break;
+                }
+            } else {
+                // 看跌 Breaker 被向上突破
+                if close[i] > bb.upper {
+                    bb.is_broken = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    breakers
+}
+
+/// 计算 PD Array (溢价/折扣数组)
+///
+/// 基于摆动高低点计算溢价区和折扣区
+/// - 溢价区: 高于 50% 回撤 (卖出区域)
+/// - 折扣区: 低于 50% 回撤 (买入区域)
+pub fn pd_array(high: &[f64], low: &[f64], close: &[f64], swing_lookback: usize) -> PDArrayResult {
+    let len = close.len();
+    let mut result = PDArrayResult {
+        premium_zones: Vec::new(),
+        discount_zones: Vec::new(),
+        equilibrium: vec![f64::NAN; len],
+        in_premium: vec![false; len],
+        in_discount: vec![false; len],
+    };
+
+    if len < swing_lookback * 2 {
+        return result;
+    }
+
+    // 找到摆动高低点
+    let (swing_highs, swing_lows) = find_swing_points(close, swing_lookback);
+
+    // 找最近的摆动高点和低点对
+    let mut last_swing_high: Option<(usize, f64)> = None;
+    let mut last_swing_low: Option<(usize, f64)> = None;
+
+    for i in 0..len {
+        // 更新最近的摆动点
+        if swing_highs[i] {
+            last_swing_high = Some((i, high[i]));
+        }
+        if swing_lows[i] {
+            last_swing_low = Some((i, low[i]));
+        }
+
+        // 计算 PD Array
+        if let (Some((_, sh)), Some((_, sl))) = (last_swing_high, last_swing_low) {
+            let range = sh - sl;
+            if range > 0.0 {
+                let equilibrium = sl + range * 0.5;
+                result.equilibrium[i] = equilibrium;
+
+                // 判断当前价格位置
+                if close[i] > equilibrium {
+                    result.in_premium[i] = true;
+                    // 记录溢价区域
+                    if !result
+                        .in_premium
+                        .get(i.saturating_sub(1))
+                        .copied()
+                        .unwrap_or(false)
+                    {
+                        result.premium_zones.push((i, sh, equilibrium));
+                    }
+                } else {
+                    result.in_discount[i] = true;
+                    // 记录折扣区域
+                    if !result
+                        .in_discount
+                        .get(i.saturating_sub(1))
+                        .copied()
+                        .unwrap_or(false)
+                    {
+                        result.discount_zones.push((i, equilibrium, sl));
+                    }
+                }
+            }
+        }
+    }
+
+    result
+}
+
+/// PD Array 信号生成
+///
+/// # 返回
+/// - (buy_signals, sell_signals, stop_loss, take_profit)
+pub fn pd_array_signals(
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    swing_lookback: usize,
+    atr_values: &[f64],
+) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+    let len = close.len();
+    let mut buy_signals = vec![0.0; len];
+    let mut sell_signals = vec![0.0; len];
+    let mut stop_loss = vec![f64::NAN; len];
+    let mut take_profit = vec![f64::NAN; len];
+
+    let pd = pd_array(high, low, close, swing_lookback);
+
+    for i in 1..len {
+        let atr_val = if atr_values[i].is_nan() {
+            0.0
+        } else {
+            atr_values[i]
+        };
+
+        // 从溢价区进入折扣区 → 买入信号
+        if pd.in_premium[i - 1] && pd.in_discount[i] {
+            buy_signals[i] = 1.0;
+            stop_loss[i] = close[i] - 2.0 * atr_val;
+            take_profit[i] = pd.equilibrium[i] + atr_val; // 回归均衡点以上
+        }
+
+        // 从折扣区进入溢价区 → 卖出信号
+        if pd.in_discount[i - 1] && pd.in_premium[i] {
+            sell_signals[i] = 1.0;
+            stop_loss[i] = close[i] + 2.0 * atr_val;
+            take_profit[i] = pd.equilibrium[i] - atr_val; // 回归均衡点以下
+        }
+    }
+
+    (buy_signals, sell_signals, stop_loss, take_profit)
+}
+
+/// Breaker Block 信号生成
+///
+/// # 返回
+/// - (buy_signals, sell_signals, breaker_upper, breaker_lower)
+pub fn breaker_block_signals(
+    open: &[f64],
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    lookback: usize,
+) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+    let len = close.len();
+    let mut buy_signals = vec![0.0; len];
+    let mut sell_signals = vec![0.0; len];
+    let mut breaker_upper = vec![f64::NAN; len];
+    let mut breaker_lower = vec![f64::NAN; len];
+
+    let breakers = detect_breaker_block(open, high, low, close, lookback);
+
+    for bb in breakers {
+        if bb.is_broken {
+            continue; // 已失效的 Breaker 不产生信号
+        }
+
+        // 标记 Breaker Block 区域
+        breaker_upper[bb.index] = bb.upper;
+        breaker_lower[bb.index] = bb.lower;
+
+        // 在后续K线检测价格回测 Breaker Block
+        for i in (bb.index + 1)..len {
+            if bb.is_bullish {
+                // 看涨 Breaker: 价格回测到区域内 → 买入
+                if low[i] <= bb.upper && close[i] >= bb.lower {
+                    buy_signals[i] = 1.0;
+                    break;
+                }
+            } else {
+                // 看跌 Breaker: 价格回测到区域内 → 卖出
+                if high[i] >= bb.lower && close[i] <= bb.upper {
+                    sell_signals[i] = 1.0;
+                    break;
+                }
+            }
+        }
+    }
+
+    (buy_signals, sell_signals, breaker_upper, breaker_lower)
+}
+
+// ============================================================
+// Linear Regression Channel & Enhanced Supply/Demand Zones
+// ============================================================
+
+/// 线性回归通道结果
+#[derive(Debug, Clone)]
+pub struct LinearRegressionChannel {
+    /// 上轨 (+2 标准误差)
+    pub upper: Vec<f64>,
+    /// 回归线 (中轨)
+    pub middle: Vec<f64>,
+    /// 下轨 (-2 标准误差)
+    pub lower: Vec<f64>,
+    /// 斜率
+    pub slope: Vec<f64>,
+    /// R² 决定系数
+    pub r_squared: Vec<f64>,
+}
+
+/// 增强型支撑阻力区域
+#[derive(Debug, Clone)]
+pub struct EnhancedSRZone {
+    /// 价格水平
+    pub level: f64,
+    /// 区域上边界
+    pub upper: f64,
+    /// 区域下边界
+    pub lower: f64,
+    /// 触及次数
+    pub touches: usize,
+    /// 是否支撑
+    pub is_support: bool,
+    /// 强度 (0-1)
+    pub strength: f64,
+    /// 是否有成交量确认
+    pub volume_confirmed: bool,
+    /// 线性回归斜率 (区域趋势)
+    pub linreg_slope: f64,
+}
+
+/// 计算线性回归通道
+///
+/// 使用线性回归拟合价格，加减标准误差形成通道
+pub fn linear_regression_channel(
+    close: &[f64],
+    period: usize,
+    std_dev_mult: f64,
+) -> LinearRegressionChannel {
+    let len = close.len();
+    let mut result = LinearRegressionChannel {
+        upper: vec![f64::NAN; len],
+        middle: vec![f64::NAN; len],
+        lower: vec![f64::NAN; len],
+        slope: vec![f64::NAN; len],
+        r_squared: vec![f64::NAN; len],
+    };
+
+    if period < 3 || period > len {
+        return result;
+    }
+
+    for i in (period - 1)..len {
+        let window = &close[i + 1 - period..=i];
+
+        // 计算线性回归
+        let x_mean = (period - 1) as f64 / 2.0;
+        let y_mean: f64 = window.iter().sum::<f64>() / period as f64;
+
+        let mut numerator = 0.0;
+        let mut denominator = 0.0;
+        let mut ss_total = 0.0;
+
+        for (j, &y) in window.iter().enumerate() {
+            let x = j as f64;
+            let x_diff = x - x_mean;
+            let y_diff = y - y_mean;
+
+            numerator += x_diff * y_diff;
+            denominator += x_diff * x_diff;
+            ss_total += y_diff * y_diff;
+        }
+
+        if is_zero(denominator) {
+            continue;
+        }
+
+        let slope = numerator / denominator;
+        let intercept = y_mean - slope * x_mean;
+
+        // 回归线终点值
+        let linreg_value = intercept + slope * (period - 1) as f64;
+
+        // 计算标准误差
+        let ss_residual: f64 = window
+            .iter()
+            .enumerate()
+            .map(|(j, &y)| {
+                let y_pred = intercept + slope * j as f64;
+                (y - y_pred).powi(2)
+            })
+            .sum();
+
+        let std_error = (ss_residual / (period - 2) as f64).sqrt();
+
+        result.middle[i] = linreg_value;
+        result.upper[i] = linreg_value + std_dev_mult * std_error;
+        result.lower[i] = linreg_value - std_dev_mult * std_error;
+        result.slope[i] = slope;
+
+        // 计算 R²
+        if ss_total > 0.0 {
+            result.r_squared[i] = 1.0 - (ss_residual / ss_total);
+        } else {
+            result.r_squared[i] = 1.0;
+        }
+    }
+
+    result
+}
+
+/// 检测增强型供需区域
+///
+/// 结合线性回归和成交量确认
+pub fn detect_supply_demand_zones(
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    volume: &[f64],
+    tolerance: f64,
+    linreg_period: usize,
+) -> Vec<EnhancedSRZone> {
+    let len = close.len();
+    if len < linreg_period {
+        return Vec::new();
+    }
+
+    // 基础区域检测
+    let basic_zones = detect_zones(high, low, close, tolerance);
+
+    // 计算线性回归
+    let (slopes, _, _) = crate::utils::stats::linear_regression(close, linreg_period);
+
+    // 计算成交量均值
+    let vol_sum: f64 = volume.iter().sum();
+    let vol_mean = vol_sum / len as f64;
+
+    // 增强区域信息
+    let mut enhanced_zones = Vec::new();
+
+    for zone in basic_zones {
+        // 找到区域附近的成交量
+        let mut zone_volume = 0.0;
+        let mut zone_count = 0;
+
+        for i in 0..len {
+            let price = if zone.is_support { low[i] } else { high[i] };
+            if (price - zone.level).abs() <= zone.level * tolerance {
+                zone_volume += volume[i];
+                zone_count += 1;
+            }
+        }
+
+        let avg_zone_volume = if zone_count > 0 {
+            zone_volume / zone_count as f64
+        } else {
+            0.0
+        };
+        let volume_confirmed = avg_zone_volume > vol_mean;
+
+        // 获取区域趋势斜率
+        let zone_slope = slopes.last().copied().unwrap_or(0.0);
+
+        // 计算区域边界
+        let zone_range = zone.level * tolerance;
+
+        enhanced_zones.push(EnhancedSRZone {
+            level: zone.level,
+            upper: zone.level + zone_range,
+            lower: zone.level - zone_range,
+            touches: zone.touches,
+            is_support: zone.is_support,
+            strength: zone.strength * (if volume_confirmed { 1.2 } else { 0.8 }),
+            volume_confirmed,
+            linreg_slope: zone_slope,
+        });
+    }
+
+    enhanced_zones
+}
+
+/// 线性回归供需区域信号生成
+///
+/// # 返回
+/// - (buy_signals, sell_signals, stop_loss, take_profit)
+pub fn linreg_supply_demand_signals(
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    volume: &[f64],
+    atr_values: &[f64],
+    linreg_period: usize,
+    tolerance: f64,
+) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+    let len = close.len();
+    let mut buy_signals = vec![0.0; len];
+    let mut sell_signals = vec![0.0; len];
+    let mut stop_loss = vec![f64::NAN; len];
+    let mut take_profit = vec![f64::NAN; len];
+
+    // 计算线性回归通道
+    let channel = linear_regression_channel(close, linreg_period, 2.0);
+
+    // 检测供需区域
+    let zones = detect_supply_demand_zones(high, low, close, volume, tolerance, linreg_period);
+
+    for i in linreg_period..len {
+        let atr_val = if atr_values[i].is_nan() {
+            0.0
+        } else {
+            atr_values[i]
+        };
+
+        // 检查是否触及支撑区域 + 通道下轨
+        for zone in &zones {
+            if zone.is_support && zone.strength > 0.5 {
+                // 价格接近支撑区且在通道下轨附近
+                if (close[i] - zone.level).abs() < zone.level * tolerance
+                    && !channel.lower[i].is_nan()
+                    && close[i] <= channel.lower[i]
+                {
+                    buy_signals[i] = 1.0;
+                    stop_loss[i] = zone.lower - atr_val;
+                    take_profit[i] = channel.middle[i];
+                    break;
+                }
+            }
+        }
+
+        // 检查是否触及阻力区域 + 通道上轨
+        for zone in &zones {
+            if !zone.is_support && zone.strength > 0.5 {
+                // 价格接近阻力区且在通道上轨附近
+                if (close[i] - zone.level).abs() < zone.level * tolerance
+                    && !channel.upper[i].is_nan()
+                    && close[i] >= channel.upper[i]
+                {
+                    sell_signals[i] = 1.0;
+                    stop_loss[i] = zone.upper + atr_val;
+                    take_profit[i] = channel.middle[i];
+                    break;
+                }
+            }
+        }
+    }
+
+    (buy_signals, sell_signals, stop_loss, take_profit)
 }
 
 // ============================================================
@@ -559,7 +1094,9 @@ mod tests {
         // period=5, 所以从索引5开始有效
         // 索引 0-4 的平均 = (100+100+100+100+100)/5 = 100
         // 索引 5 的成交量 = 300, 是 3 倍, 应该是 spike
-        let volume = vec![100.0, 100.0, 100.0, 100.0, 100.0, 300.0, 100.0, 100.0, 100.0, 100.0];
+        let volume = vec![
+            100.0, 100.0, 100.0, 100.0, 100.0, 300.0, 100.0, 100.0, 100.0, 100.0,
+        ];
 
         let filter = volume_filter(&volume, 5);
 
@@ -585,5 +1122,169 @@ mod tests {
 
         // 应该检测到 ~100 和 ~105 附近的区域
         assert!(!zones.is_empty() || zones.is_empty());
+    }
+
+    // ============================================================
+    // PD Array & Breaker Block 测试
+    // ============================================================
+
+    #[test]
+    fn test_pd_array() {
+        let high = vec![
+            110.0, 115.0, 118.0, 116.0, 114.0, 112.0, 114.0, 116.0, 118.0, 120.0,
+        ];
+        let low = vec![
+            100.0, 105.0, 108.0, 106.0, 104.0, 102.0, 104.0, 106.0, 108.0, 110.0,
+        ];
+        let close = vec![
+            105.0, 110.0, 115.0, 110.0, 107.0, 105.0, 108.0, 112.0, 116.0, 118.0,
+        ];
+
+        let result = pd_array(&high, &low, &close, 2);
+
+        assert_eq!(result.equilibrium.len(), 10);
+        assert_eq!(result.in_premium.len(), 10);
+        assert_eq!(result.in_discount.len(), 10);
+    }
+
+    #[test]
+    fn test_pd_array_signals() {
+        let high = vec![
+            110.0, 115.0, 118.0, 116.0, 114.0, 112.0, 114.0, 116.0, 118.0, 120.0,
+        ];
+        let low = vec![
+            100.0, 105.0, 108.0, 106.0, 104.0, 102.0, 104.0, 106.0, 108.0, 110.0,
+        ];
+        let close = vec![
+            105.0, 110.0, 115.0, 110.0, 107.0, 105.0, 108.0, 112.0, 116.0, 118.0,
+        ];
+        let atr = vec![2.0; 10];
+
+        let (buy, sell, sl, tp) = pd_array_signals(&high, &low, &close, 2, &atr);
+
+        assert_eq!(buy.len(), 10);
+        assert_eq!(sell.len(), 10);
+        assert_eq!(sl.len(), 10);
+        assert_eq!(tp.len(), 10);
+    }
+
+    #[test]
+    fn test_detect_breaker_block() {
+        let open = vec![
+            100.0, 102.0, 104.0, 106.0, 108.0, 110.0, 108.0, 106.0, 104.0, 102.0,
+        ];
+        let high = vec![
+            102.0, 104.0, 106.0, 108.0, 110.0, 112.0, 110.0, 108.0, 106.0, 104.0,
+        ];
+        let low = vec![
+            99.0, 101.0, 103.0, 105.0, 107.0, 109.0, 107.0, 105.0, 103.0, 101.0,
+        ];
+        let close = vec![
+            101.0, 103.0, 105.0, 107.0, 109.0, 111.0, 107.0, 105.0, 103.0, 100.0,
+        ];
+
+        let breakers = detect_breaker_block(&open, &high, &low, &close, 2);
+
+        // 结果取决于数据模式
+        assert!(breakers.iter().all(|bb| bb.index < close.len()));
+        assert!(breakers.iter().all(|bb| bb.upper >= bb.lower));
+    }
+
+    #[test]
+    fn test_breaker_block_signals() {
+        let open = vec![
+            100.0, 102.0, 104.0, 106.0, 108.0, 110.0, 108.0, 106.0, 104.0, 102.0,
+        ];
+        let high = vec![
+            102.0, 104.0, 106.0, 108.0, 110.0, 112.0, 110.0, 108.0, 106.0, 104.0,
+        ];
+        let low = vec![
+            99.0, 101.0, 103.0, 105.0, 107.0, 109.0, 107.0, 105.0, 103.0, 101.0,
+        ];
+        let close = vec![
+            101.0, 103.0, 105.0, 107.0, 109.0, 111.0, 107.0, 105.0, 103.0, 100.0,
+        ];
+
+        let (buy, sell, upper, lower) = breaker_block_signals(&open, &high, &low, &close, 2);
+
+        assert_eq!(buy.len(), 10);
+        assert_eq!(sell.len(), 10);
+        assert_eq!(upper.len(), 10);
+        assert_eq!(lower.len(), 10);
+    }
+
+    // ============================================================
+    // Linear Regression Channel 测试
+    // ============================================================
+
+    #[test]
+    fn test_linear_regression_channel() {
+        // 上升趋势数据
+        let close = vec![
+            100.0, 102.0, 104.0, 106.0, 108.0, 110.0, 112.0, 114.0, 116.0, 118.0,
+        ];
+
+        let channel = linear_regression_channel(&close, 5, 2.0);
+
+        assert_eq!(channel.middle.len(), 10);
+        assert_eq!(channel.upper.len(), 10);
+        assert_eq!(channel.lower.len(), 10);
+        assert_eq!(channel.slope.len(), 10);
+
+        // 前 4 个值应为 NaN
+        assert!(channel.middle[0].is_nan());
+        assert!(channel.middle[3].is_nan());
+
+        // 从索引 4 开始有效
+        assert!(!channel.middle[4].is_nan());
+        assert!(channel.slope[4] > 0.0); // 上升趋势
+        assert!(channel.r_squared[4] > 0.9); // 高拟合度
+    }
+
+    #[test]
+    fn test_detect_supply_demand_zones() {
+        let high = vec![
+            105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0, 113.0, 114.0,
+        ];
+        let low = vec![
+            100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0,
+        ];
+        let close = vec![
+            103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0,
+        ];
+        let volume = vec![
+            1000.0, 1200.0, 800.0, 1500.0, 900.0, 1100.0, 1300.0, 700.0, 1400.0, 1000.0,
+        ];
+
+        let zones = detect_supply_demand_zones(&high, &low, &close, &volume, 0.02, 5);
+
+        // 结果取决于数据
+        for zone in &zones {
+            assert!(zone.upper > zone.lower);
+            assert!(zone.strength >= 0.0);
+        }
+    }
+
+    #[test]
+    fn test_linreg_supply_demand_signals() {
+        let high = vec![
+            105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0, 113.0, 114.0,
+        ];
+        let low = vec![
+            100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0,
+        ];
+        let close = vec![
+            103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0,
+        ];
+        let volume = vec![1000.0; 10];
+        let atr = vec![2.0; 10];
+
+        let (buy, sell, sl, tp) =
+            linreg_supply_demand_signals(&high, &low, &close, &volume, &atr, 5, 0.02);
+
+        assert_eq!(buy.len(), 10);
+        assert_eq!(sell.len(), 10);
+        assert_eq!(sl.len(), 10);
+        assert_eq!(tp.len(), 10);
     }
 }

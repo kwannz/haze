@@ -5,12 +5,12 @@
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
 
-mod types;
-mod errors;
-mod utils;
-mod indicators;
-mod ml;
 mod dataframe;
+pub mod errors;
+pub mod indicators;
+mod ml;
+pub mod types;
+pub mod utils;
 #[macro_use]
 mod macros;
 
@@ -18,11 +18,173 @@ mod macros;
 #[cfg(feature = "polars")]
 mod polars_compat;
 
+pub use dataframe::{create_ohlcv_frame, OhlcvFrame};
 pub use errors::{HazeError, HazeResult};
-pub use dataframe::{OhlcvFrame, create_ohlcv_frame};
 
 #[cfg(feature = "python")]
 use types::{Candle, IndicatorResult, MultiIndicatorResult};
+
+#[cfg(feature = "python")]
+type Vec4F64 = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
+
+#[cfg(feature = "python")]
+type Vec5F64 = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
+
+#[cfg(feature = "python")]
+type Vec6F64 = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
+
+#[cfg(feature = "python")]
+type Vec7F64 = (
+    Vec<f64>,
+    Vec<f64>,
+    Vec<f64>,
+    Vec<f64>,
+    Vec<f64>,
+    Vec<f64>,
+    Vec<f64>,
+);
+
+#[cfg(feature = "python")]
+type Pivots9F64 = (f64, f64, f64, f64, f64, f64, f64, f64, f64);
+
+#[cfg(feature = "python")]
+fn nan_vec(len: usize) -> Vec<f64> {
+    vec![f64::NAN; len]
+}
+
+#[cfg(feature = "python")]
+fn ok_or_nan_vec(result: HazeResult<Vec<f64>>, len: usize) -> PyResult<Vec<f64>> {
+    match result {
+        Ok(values) => Ok(values),
+        Err(
+            HazeError::EmptyInput { .. }
+            | HazeError::InsufficientData { .. }
+            | HazeError::InvalidPeriod { .. },
+        ) => Ok(nan_vec(len)),
+        Err(err) => Err(err.into()),
+    }
+}
+
+#[cfg(feature = "python")]
+fn ok_or_nan_vec2(
+    result: HazeResult<(Vec<f64>, Vec<f64>)>,
+    len: usize,
+) -> PyResult<(Vec<f64>, Vec<f64>)> {
+    match result {
+        Ok(values) => Ok(values),
+        Err(
+            HazeError::EmptyInput { .. }
+            | HazeError::InsufficientData { .. }
+            | HazeError::InvalidPeriod { .. },
+        ) => Ok((nan_vec(len), nan_vec(len))),
+        Err(err) => Err(err.into()),
+    }
+}
+
+#[cfg(feature = "python")]
+fn ok_or_nan_vec3(
+    result: HazeResult<(Vec<f64>, Vec<f64>, Vec<f64>)>,
+    len: usize,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+    match result {
+        Ok(values) => Ok(values),
+        Err(
+            HazeError::EmptyInput { .. }
+            | HazeError::InsufficientData { .. }
+            | HazeError::InvalidPeriod { .. },
+        ) => Ok((nan_vec(len), nan_vec(len), nan_vec(len))),
+        Err(err) => Err(err.into()),
+    }
+}
+
+#[cfg(feature = "python")]
+fn ok_or_nan_vec4(result: HazeResult<Vec4F64>, len: usize) -> PyResult<Vec4F64> {
+    match result {
+        Ok(values) => Ok(values),
+        Err(
+            HazeError::EmptyInput { .. }
+            | HazeError::InsufficientData { .. }
+            | HazeError::InvalidPeriod { .. },
+        ) => Ok((nan_vec(len), nan_vec(len), nan_vec(len), nan_vec(len))),
+        Err(err) => Err(err.into()),
+    }
+}
+
+#[cfg(feature = "python")]
+fn ok_or_nan_vec5(result: HazeResult<Vec5F64>, len: usize) -> PyResult<Vec5F64> {
+    match result {
+        Ok(values) => Ok(values),
+        Err(
+            HazeError::EmptyInput { .. }
+            | HazeError::InsufficientData { .. }
+            | HazeError::InvalidPeriod { .. },
+        ) => Ok((
+            nan_vec(len),
+            nan_vec(len),
+            nan_vec(len),
+            nan_vec(len),
+            nan_vec(len),
+        )),
+        Err(err) => Err(err.into()),
+    }
+}
+
+#[cfg(feature = "python")]
+fn ok_or_nan_vec6(result: HazeResult<Vec6F64>, len: usize) -> PyResult<Vec6F64> {
+    match result {
+        Ok(values) => Ok(values),
+        Err(
+            HazeError::EmptyInput { .. }
+            | HazeError::InsufficientData { .. }
+            | HazeError::InvalidPeriod { .. },
+        ) => Ok((
+            nan_vec(len),
+            nan_vec(len),
+            nan_vec(len),
+            nan_vec(len),
+            nan_vec(len),
+            nan_vec(len),
+        )),
+        Err(err) => Err(err.into()),
+    }
+}
+
+#[cfg(feature = "python")]
+fn ok_or_nan_vec7(result: HazeResult<Vec7F64>, len: usize) -> PyResult<Vec7F64> {
+    match result {
+        Ok(values) => Ok(values),
+        Err(
+            HazeError::EmptyInput { .. }
+            | HazeError::InsufficientData { .. }
+            | HazeError::InvalidPeriod { .. },
+        ) => Ok((
+            nan_vec(len),
+            nan_vec(len),
+            nan_vec(len),
+            nan_vec(len),
+            nan_vec(len),
+            nan_vec(len),
+            nan_vec(len),
+        )),
+        Err(err) => Err(err.into()),
+    }
+}
+
+#[cfg(feature = "python")]
+fn ok_or_nan_vec2_f64(
+    result: HazeResult<(Vec<f64>, Vec<f64>, f64)>,
+    len: usize,
+) -> PyResult<(Vec<f64>, Vec<f64>, f64)> {
+    match result {
+        Ok(values) => Ok(values),
+        Err(
+            HazeError::EmptyInput { .. }
+            | HazeError::InsufficientData { .. }
+            | HazeError::InvalidPeriod { .. },
+        ) => Ok((nan_vec(len), nan_vec(len), f64::NAN)),
+        Err(err) => Err(err.into()),
+    }
+}
 
 // ==================== PyO3 模块定义 ====================
 
@@ -41,6 +203,10 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_bollinger_bands, m)?)?;
     m.add_function(wrap_pyfunction!(py_keltner_channel, m)?)?;
     m.add_function(wrap_pyfunction!(py_donchian_channel, m)?)?;
+    m.add_function(wrap_pyfunction!(py_chandelier_exit, m)?)?;
+    m.add_function(wrap_pyfunction!(py_historical_volatility, m)?)?;
+    m.add_function(wrap_pyfunction!(py_ulcer_index, m)?)?;
+    m.add_function(wrap_pyfunction!(py_mass_index, m)?)?;
 
     // Momentum 指标
     m.add_function(wrap_pyfunction!(py_rsi, m)?)?;
@@ -57,12 +223,16 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_adx, m)?)?;
     m.add_function(wrap_pyfunction!(py_aroon, m)?)?;
     m.add_function(wrap_pyfunction!(py_psar, m)?)?;
+    m.add_function(wrap_pyfunction!(py_trix, m)?)?;
+    m.add_function(wrap_pyfunction!(py_dpo, m)?)?;
 
     // Volume 指标
     m.add_function(wrap_pyfunction!(py_obv, m)?)?;
     m.add_function(wrap_pyfunction!(py_vwap, m)?)?;
     m.add_function(wrap_pyfunction!(py_mfi, m)?)?;
+    m.add_function(wrap_pyfunction!(py_force_index, m)?)?;
     m.add_function(wrap_pyfunction!(py_cmf, m)?)?;
+    m.add_function(wrap_pyfunction!(py_volume_oscillator, m)?)?;
     m.add_function(wrap_pyfunction!(py_volume_profile, m)?)?;
 
     // MA/Overlap 指标
@@ -85,7 +255,6 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_standard_pivots, m)?)?;
     m.add_function(wrap_pyfunction!(py_fibonacci_pivots, m)?)?;
     m.add_function(wrap_pyfunction!(py_camarilla_pivots, m)?)?;
-
 
     // 扩展 Momentum 指标
     m.add_function(wrap_pyfunction!(py_kdj, m)?)?;
@@ -134,6 +303,7 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_covariance, m)?)?;
     m.add_function(wrap_pyfunction!(py_beta, m)?)?;
     m.add_function(wrap_pyfunction!(py_standard_error, m)?)?;
+    m.add_function(wrap_pyfunction!(py_stderr, m)?)?;
     // 价格变换指标
     m.add_function(wrap_pyfunction!(py_avgprice, m)?)?;
     m.add_function(wrap_pyfunction!(py_medprice, m)?)?;
@@ -277,8 +447,6 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_dx, m)?)?;
     m.add_function(wrap_pyfunction!(py_plus_di, m)?)?;
     m.add_function(wrap_pyfunction!(py_minus_di, m)?)?;
-    m.add_function(wrap_pyfunction!(py_t3, m)?)?;
-    m.add_function(wrap_pyfunction!(py_kama, m)?)?;
 
     // Batch 8: pandas-ta 独有指标 (180 → 190)
     m.add_function(wrap_pyfunction!(py_entropy, m)?)?;
@@ -333,38 +501,191 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_true_range(high: Vec<f64>, low: Vec<f64>, close: Vec<f64>, drift: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(indicators::true_range(&high, &low, &close, drift.unwrap_or(1)))
+#[pyo3(signature = (high, low, close, drift=1))]
+#[pyo3(text_signature = "(high, low, close, drift=1)")]
+/// Calculate True Range (TR)
+///
+/// Maximum of high-low, |high-prev close|, |low-prev close|.
+/// Foundation for ATR calculation.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// drift : int, optional
+///     Lookback for previous close (default: 1)
+///
+/// Returns
+/// -------
+/// list of float - True Range values
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+fn py_true_range(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    drift: Option<usize>,
+) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::true_range(&high, &low, &close, drift.unwrap_or(1)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_atr(high: Vec<f64>, low: Vec<f64>, close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(indicators::atr(&high, &low, &close, period.unwrap_or(14)))
+#[pyo3(text_signature = "(high, low, close, period=14)")]
+/// Calculate Average True Range (ATR)
+///
+/// Measures market volatility by decomposing the entire range
+/// of a price bar.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// list of float - ATR values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+fn py_atr(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    period: Option<usize>,
+) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::atr(&high, &low, &close, period.unwrap_or(14)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_natr(high: Vec<f64>, low: Vec<f64>, close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(indicators::natr(&high, &low, &close, period.unwrap_or(14)))
+#[pyo3(text_signature = "(high, low, close, period=14)")]
+/// Calculate Normalized ATR (NATR)
+///
+/// ATR expressed as percentage of price, enabling cross-asset comparison.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// list of float - NATR values (percentage)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+fn py_natr(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    period: Option<usize>,
+) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::natr(&high, &low, &close, period.unwrap_or(14)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, period=20, std_multiplier=2.0)")]
+/// Calculate Bollinger Bands
+///
+/// Volatility bands placed above and below a moving average.
+/// Useful for identifying overbought/oversold conditions.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     MA period (default: 20)
+/// std_multiplier : float, optional
+///     Standard deviation multiplier (default: 2.0)
+///
+/// Returns
+/// -------
+/// tuple of (list, list, list) - (upper band, middle band, lower band)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_bollinger_bands(
     close: Vec<f64>,
     period: Option<usize>,
     std_multiplier: Option<f64>,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::bollinger_bands(
-        &close,
-        period.unwrap_or(20),
-        std_multiplier.unwrap_or(2.0),
-    ))
+    let len = close.len();
+    ok_or_nan_vec3(
+        indicators::bollinger_bands(&close, period.unwrap_or(20), std_multiplier.unwrap_or(2.0)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, period=20, atr_period=10, multiplier=2.0)")]
+/// Calculate Keltner Channel
+///
+/// Volatility-based envelope using ATR instead of standard deviation.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     EMA period (default: 20)
+/// atr_period : int, optional
+///     ATR period (default: 10)
+/// multiplier : float, optional
+///     ATR multiplier (default: 2.0)
+///
+/// Returns
+/// -------
+/// tuple of (list, list, list) - (upper band, middle band, lower band)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_keltner_channel(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -373,48 +694,336 @@ fn py_keltner_channel(
     atr_period: Option<usize>,
     multiplier: Option<f64>,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::keltner_channel(
-        &high,
-        &low,
-        &close,
-        period.unwrap_or(20),
-        atr_period.unwrap_or(10),
-        multiplier.unwrap_or(2.0),
-    ))
+    let len = close.len();
+    ok_or_nan_vec3(
+        indicators::keltner_channel(
+            &high,
+            &low,
+            &close,
+            period.unwrap_or(20),
+            atr_period.unwrap_or(10),
+            multiplier.unwrap_or(2.0),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_donchian_channel(high: Vec<f64>, low: Vec<f64>, period: Option<usize>) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::donchian_channel(&high, &low, period.unwrap_or(20)))
+#[pyo3(text_signature = "(high, low, period=20)")]
+/// Calculate Donchian Channel
+///
+/// Price channel based on highest high and lowest low over a period.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// period : int, optional
+///     Lookback period (default: 20)
+///
+/// Returns
+/// -------
+/// tuple of (list, list, list) - (upper band, middle band, lower band)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+fn py_donchian_channel(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    period: Option<usize>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+    let len = high.len();
+    ok_or_nan_vec3(
+        indicators::donchian_channel(&high, &low, period.unwrap_or(20)),
+        len,
+    )
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (high, low, close, period=22, atr_period=22, multiplier=3.0))]
+#[pyo3(text_signature = "(high, low, close, period=22, atr_period=22, multiplier=3.0)")]
+/// Calculate Chandelier Exit
+///
+/// A volatility-based trailing stop indicator that sets exit levels based on ATR.
+/// Helps identify optimal stop-loss levels for long and short positions.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period for highest/lowest (default: 22)
+/// atr_period : int, optional
+///     ATR calculation period (default: 22)
+/// multiplier : float, optional
+///     ATR multiplier for exit distance (default: 3.0)
+///
+/// Returns
+/// -------
+/// tuple of (list, list) - (long_exit, short_exit), NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+fn py_chandelier_exit(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    period: Option<usize>,
+    atr_period: Option<usize>,
+    multiplier: Option<f64>,
+) -> PyResult<(Vec<f64>, Vec<f64>)> {
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::chandelier_exit(
+            &high,
+            &low,
+            &close,
+            period.unwrap_or(22),
+            atr_period.unwrap_or(22),
+            multiplier.unwrap_or(3.0),
+        ),
+        len,
+    )
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (close, period=20))]
+#[pyo3(text_signature = "(close, period=20)")]
+/// Calculate Historical Volatility
+///
+/// Measures the standard deviation of logarithmic returns annualized to represent
+/// price volatility. Higher values indicate more volatile price movements.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 20)
+///
+/// Returns
+/// -------
+/// list of float - Annualized volatility values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+fn py_historical_volatility(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::historical_volatility(&close, period.unwrap_or(20)),
+        len,
+    )
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (close, period=14))]
+#[pyo3(text_signature = "(close, period=14)")]
+/// Calculate Ulcer Index
+///
+/// Measures downside volatility and risk by calculating the depth and duration
+/// of price declines from recent highs. Unlike standard deviation, it focuses
+/// exclusively on downside risk.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// list of float - Ulcer Index values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+///
+/// Examples
+/// --------
+/// >>> ui = py_ulcer_index([50.0, 49.5, 48.0, 49.0, 51.0], period=14)
+/// >>> ui[13]  # First valid value
+/// 2.45
+fn py_ulcer_index(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(indicators::ulcer_index(&close, period.unwrap_or(14)), len)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (high, low, period=25, ema_period=9))]
+#[pyo3(text_signature = "(high, low, period=25, ema_period=9)")]
+/// Calculate Mass Index
+///
+/// Identifies trend reversals by analyzing the range between high and low prices.
+/// Uses the ratio of EMA of range to EMA of EMA of range. Values above 27 suggest
+/// a reversal bulge, while drops below 26.5 indicate potential trend changes.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// period : int, optional
+///     Summation period (default: 25)
+/// ema_period : int, optional
+///     EMA calculation period (default: 9)
+///
+/// Returns
+/// -------
+/// list of float - Mass Index values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+///
+/// Examples
+/// --------
+/// >>> mi = py_mass_index([10.5, 10.8, 11.0], [10.0, 10.3, 10.5], period=25, ema_period=9)
+/// >>> mi[33]  # First valid value after warmup
+/// 26.8
+fn py_mass_index(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    period: Option<usize>,
+    ema_period: Option<usize>,
+) -> PyResult<Vec<f64>> {
+    let len = high.len();
+    ok_or_nan_vec(
+        indicators::mass_index(&high, &low, period.unwrap_or(25), ema_period.unwrap_or(9)),
+        len,
+    )
 }
 
 // ==================== Momentum 指标包装 ====================
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, period=14)")]
+/// Calculate Relative Strength Index (RSI)
+///
+/// Measures the magnitude of recent price changes to evaluate
+/// overbought or oversold conditions.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// list of float - RSI values (0-100), NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+///
+/// Examples
+/// --------
+/// >>> rsi = py_rsi([44.0, 44.25, 44.375, ...], period=14)
+/// >>> rsi[14]  # First valid value
+/// 52.3
 fn py_rsi(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(indicators::rsi(&close, period.unwrap_or(14)))
+    let len = close.len();
+    ok_or_nan_vec(indicators::rsi(&close, period.unwrap_or(14)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, fast_period=12, slow_period=26, signal_period=9)")]
+/// Calculate Moving Average Convergence Divergence (MACD)
+///
+/// Trend-following momentum indicator showing the relationship
+/// between two moving averages.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// fast_period : int, optional
+///     Fast EMA period (default: 12)
+/// slow_period : int, optional
+///     Slow EMA period (default: 26)
+/// signal_period : int, optional
+///     Signal line period (default: 9)
+///
+/// Returns
+/// -------
+/// tuple of (list, list, list) - (MACD line, signal line, histogram)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_macd(
     close: Vec<f64>,
     fast_period: Option<usize>,
     slow_period: Option<usize>,
     signal_period: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::macd(
-        &close,
-        fast_period.unwrap_or(12),
-        slow_period.unwrap_or(26),
-        signal_period.unwrap_or(9),
-    ))
+    let len = close.len();
+    ok_or_nan_vec3(
+        indicators::macd(
+            &close,
+            fast_period.unwrap_or(12),
+            slow_period.unwrap_or(26),
+            signal_period.unwrap_or(9),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, k_period=14, d_period=3)")]
+/// Calculate Stochastic Oscillator
+///
+/// Compares closing price to price range over a period.
+/// Identifies overbought (>80) and oversold (<20) conditions.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// k_period : int, optional
+///     %K period (default: 14)
+/// d_period : int, optional
+///     %D period (default: 3)
+///
+/// Returns
+/// -------
+/// tuple of (list, list) - (%K line, %D line)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_stochastic(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -422,17 +1031,47 @@ fn py_stochastic(
     k_period: Option<usize>,
     d_period: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::stochastic(
-        &high,
-        &low,
-        &close,
-        k_period.unwrap_or(14),
-        d_period.unwrap_or(3),
-    ))
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::stochastic(
+            &high,
+            &low,
+            &close,
+            k_period.unwrap_or(14),
+            d_period.unwrap_or(3),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, rsi_period=14, stoch_period=14, k_period=3, d_period=3)")]
+/// Calculate Stochastic RSI
+///
+/// Applies Stochastic formula to RSI values for increased sensitivity.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// rsi_period : int, optional
+///     RSI period (default: 14)
+/// stoch_period : int, optional
+///     Stochastic period (default: 14)
+/// k_period : int, optional
+///     %K smoothing period (default: 3)
+/// d_period : int, optional
+///     %D period (default: 3)
+///
+/// Returns
+/// -------
+/// tuple of (list, list) - (StochRSI %K, StochRSI %D)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_stochrsi(
     close: Vec<f64>,
     rsi_period: Option<usize>,
@@ -440,78 +1079,337 @@ fn py_stochrsi(
     k_period: Option<usize>,
     d_period: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::stochrsi(
-        &close,
-        rsi_period.unwrap_or(14),
-        stoch_period.unwrap_or(14),
-        k_period.unwrap_or(3),
-        d_period.unwrap_or(3),
-    ))
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::stochrsi(
+            &close,
+            rsi_period.unwrap_or(14),
+            stoch_period.unwrap_or(14),
+            k_period.unwrap_or(3),
+            d_period.unwrap_or(3),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_cci(high: Vec<f64>, low: Vec<f64>, close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(indicators::cci(&high, &low, &close, period.unwrap_or(20)))
+#[pyo3(text_signature = "(high, low, close, period=20)")]
+/// Calculate Commodity Channel Index (CCI)
+///
+/// Identifies cyclical trends and measures deviation from
+/// statistical mean.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 20)
+///
+/// Returns
+/// -------
+/// list of float - CCI values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+fn py_cci(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    period: Option<usize>,
+) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::cci(&high, &low, &close, period.unwrap_or(20)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_williams_r(high: Vec<f64>, low: Vec<f64>, close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(indicators::williams_r(&high, &low, &close, period.unwrap_or(14)))
+#[pyo3(text_signature = "(high, low, close, period=14)")]
+/// Calculate Williams %R
+///
+/// Momentum indicator showing overbought/oversold levels.
+/// Values range from -100 to 0.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// list of float - Williams %R values (-100 to 0)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+fn py_williams_r(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    period: Option<usize>,
+) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::williams_r(&high, &low, &close, period.unwrap_or(14)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_awesome_oscillator(high: Vec<f64>, low: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(indicators::awesome_oscillator(&high, &low))
+#[pyo3(text_signature = "(high, low, fast_period=5, slow_period=34)")]
+/// Calculate Awesome Oscillator (AO)
+///
+/// Momentum indicator based on difference between 5 and 34 period SMAs
+/// of midpoint prices.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// fast_period : int, optional
+///     Fast period (default: 5)
+/// slow_period : int, optional
+///     Slow period (default: 34)
+///
+/// Returns
+/// -------
+/// list of float - AO values
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+fn py_awesome_oscillator(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    fast_period: Option<usize>,
+    slow_period: Option<usize>,
+) -> PyResult<Vec<f64>> {
+    let len = high.len();
+    ok_or_nan_vec(
+        indicators::awesome_oscillator(
+            &high,
+            &low,
+            fast_period.unwrap_or(5),
+            slow_period.unwrap_or(34),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, period=10)")]
+/// Calculate Fisher Transform
+///
+/// Converts prices to Gaussian normal distribution for clearer
+/// turning points.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// period : int, optional
+///     Lookback period (default: 10)
+///
+/// Returns
+/// -------
+/// tuple of (list, list) - (Fisher Transform, Signal line)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_fisher_transform(
     high: Vec<f64>,
     low: Vec<f64>,
     close: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::fisher_transform(&high, &low, &close, period.unwrap_or(9)))
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::fisher_transform(&high, &low, &close, period.unwrap_or(9)),
+        len,
+    )
 }
 
 // ==================== Trend 指标包装 ====================
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, period=10, multiplier=3.0)")]
+/// Calculate SuperTrend
+///
+/// Trend-following indicator using ATR to identify support/resistance.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     ATR period (default: 10)
+/// multiplier : float, optional
+///     ATR multiplier (default: 3.0)
+///
+/// Returns
+/// -------
+/// tuple of (list, list) - (supertrend values, direction: 1=up, -1=down)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_supertrend(
     high: Vec<f64>,
     low: Vec<f64>,
     close: Vec<f64>,
     period: Option<usize>,
     multiplier: Option<f64>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::supertrend(
-        &high,
-        &low,
-        &close,
-        period.unwrap_or(7),
-        multiplier.unwrap_or(3.0),
-    ))
+) -> PyResult<Vec4F64> {
+    let len = close.len();
+    ok_or_nan_vec4(
+        indicators::supertrend(
+            &high,
+            &low,
+            &close,
+            period.unwrap_or(7),
+            multiplier.unwrap_or(3.0),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_adx(high: Vec<f64>, low: Vec<f64>, close: Vec<f64>, period: Option<usize>) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::adx(&high, &low, &close, period.unwrap_or(14)))
+#[pyo3(text_signature = "(high, low, close, period=14)")]
+/// Calculate Average Directional Index (ADX)
+///
+/// Measures trend strength regardless of direction.
+/// Values above 25 indicate strong trend.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// tuple of (list, list, list) - (ADX, +DI, -DI)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+fn py_adx(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    period: Option<usize>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+    let len = close.len();
+    ok_or_nan_vec3(
+        indicators::adx(&high, &low, &close, period.unwrap_or(14)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_aroon(high: Vec<f64>, low: Vec<f64>, period: Option<usize>) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::aroon(&high, &low, period.unwrap_or(25)))
+#[pyo3(text_signature = "(high, low, period=25)")]
+/// Calculate Aroon Indicator
+///
+/// Identifies trend changes and strength by measuring time
+/// between highs/lows.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// period : int, optional
+///     Lookback period (default: 25)
+///
+/// Returns
+/// -------
+/// tuple of (list, list, list) - (Aroon Up, Aroon Down, Aroon Oscillator)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+fn py_aroon(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    period: Option<usize>,
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+    let len = high.len();
+    ok_or_nan_vec3(indicators::aroon(&high, &low, period.unwrap_or(25)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, af_initial=0.02, af_increment=0.02, af_max=0.2)")]
+/// Calculate Parabolic SAR
+///
+/// Time/price-based trend-following indicator.
+/// Dots below price = uptrend, above = downtrend.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// af_initial : float, optional
+///     Initial acceleration factor (default: 0.02)
+/// af_increment : float, optional
+///     AF increment (default: 0.02)
+/// af_max : float, optional
+///     Maximum AF (default: 0.2)
+///
+/// Returns
+/// -------
+/// tuple of (list, list) - (PSAR values, direction: 1=long, -1=short)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_psar(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -520,26 +1418,148 @@ fn py_psar(
     af_increment: Option<f64>,
     af_max: Option<f64>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::psar(
-        &high,
-        &low,
-        &close,
-        af_init.unwrap_or(0.02),
-        af_increment.unwrap_or(0.02),
-        af_max.unwrap_or(0.2),
-    ))
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::psar(
+            &high,
+            &low,
+            &close,
+            af_init.unwrap_or(0.02),
+            af_increment.unwrap_or(0.02),
+            af_max.unwrap_or(0.2),
+        ),
+        len,
+    )
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (close, period=15))]
+#[pyo3(text_signature = "(close, period=15)")]
+/// Calculate TRIX (Triple Exponential Average)
+///
+/// A momentum oscillator showing the percent rate of change of a triple exponentially
+/// smoothed moving average. Filters out insignificant price movements and identifies
+/// trend direction. Positive values indicate bullish momentum, negative values bearish.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     EMA period (default: 15)
+///
+/// Returns
+/// -------
+/// list of float - TRIX values as percentage, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+///
+/// Examples
+/// --------
+/// >>> trix = py_trix([44.0, 44.5, 45.0, 44.8, 45.5], period=15)
+/// >>> trix[45]  # First valid value after triple EMA warmup
+/// 0.12
+fn py_trix(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(indicators::trix(&close, period.unwrap_or(15)), len)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (close, period=20))]
+#[pyo3(text_signature = "(close, period=20)")]
+/// Calculate Detrended Price Oscillator (DPO)
+///
+/// Removes the trend from prices to isolate cycles. Calculated by shifting a moving
+/// average backward in time and subtracting it from the price. Helps identify
+/// overbought/oversold levels and cycle turning points.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// period : int, optional
+///     Lookback period (default: 20)
+///
+/// Returns
+/// -------
+/// list of float - DPO values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+///
+/// Examples
+/// --------
+/// >>> dpo = py_dpo([44.0, 44.5, 45.0, 44.8, 45.5], period=20)
+/// >>> dpo[20]  # First valid value
+/// 0.35
+fn py_dpo(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(indicators::dpo(&close, period.unwrap_or(20)), len)
 }
 
 // ==================== Volume 指标包装 ====================
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(close, volume)")]
+/// Calculate On-Balance Volume (OBV)
+///
+/// Cumulative volume-based indicator measuring buying/selling pressure.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// volume : list of float
+///     Volume data
+///
+/// Returns
+/// -------
+/// list of float - OBV values
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_obv(close: Vec<f64>, volume: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(indicators::obv(&close, &volume))
+    let len = close.len();
+    ok_or_nan_vec(indicators::obv(&close, &volume), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (high, low, close, volume, period=0))]
+#[pyo3(text_signature = "(high, low, close, volume)")]
+/// Calculate Volume Weighted Average Price (VWAP)
+///
+/// Average price weighted by volume. Used to assess fair value.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// volume : list of float
+///     Volume data
+///
+/// Returns
+/// -------
+/// list of float - VWAP values
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_vwap(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -547,11 +1567,129 @@ fn py_vwap(
     volume: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::volume::vwap(&high, &low, &close, &volume, period.unwrap_or(0)))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::volume::vwap(&high, &low, &close, &volume, period.unwrap_or(0)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (close, volume, period=13))]
+#[pyo3(text_signature = "(close, volume, period=13)")]
+/// Calculate Force Index (Elder's Force Index)
+///
+/// Measures the power behind price movements by combining price change direction
+/// and volume. Positive values indicate bullish force, negative values bearish force.
+/// Uses EMA smoothing to filter out noise and identify significant trend changes.
+///
+/// Parameters
+/// ----------
+/// close : list of float
+///     Closing prices
+/// volume : list of float
+///     Volume data
+/// period : int, optional
+///     EMA smoothing period (default: 13)
+///
+/// Returns
+/// -------
+/// list of float - Force Index values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+///
+/// Examples
+/// --------
+/// >>> fi = py_force_index([44.0, 44.5, 45.0], [1000, 1200, 1500], period=13)
+/// >>> fi[13]  # First valid value
+/// 625.5
+fn py_force_index(close: Vec<f64>, volume: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(indicators::efi(&close, &volume, period.unwrap_or(13)), len)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (volume, short_period=5, long_period=10))]
+#[pyo3(text_signature = "(volume, short_period=5, long_period=10)")]
+/// Calculate Volume Oscillator
+///
+/// Measures the difference between two volume moving averages as a percentage.
+/// Identifies divergences between price and volume trends. Positive values indicate
+/// volume is increasing, negative values indicate decreasing volume.
+///
+/// Parameters
+/// ----------
+/// volume : list of float
+///     Volume data
+/// short_period : int, optional
+///     Short moving average period (default: 5)
+/// long_period : int, optional
+///     Long moving average period (default: 10)
+///
+/// Returns
+/// -------
+/// list of float - Volume Oscillator percentage values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+///
+/// Examples
+/// --------
+/// >>> vo = py_volume_oscillator([1000, 1200, 1500, 1300], short_period=5, long_period=10)
+/// >>> vo[9]  # First valid value
+/// 12.5
+fn py_volume_oscillator(
+    volume: Vec<f64>,
+    short_period: Option<usize>,
+    long_period: Option<usize>,
+) -> PyResult<Vec<f64>> {
+    let len = volume.len();
+    ok_or_nan_vec(
+        indicators::volume_oscillator(
+            &volume,
+            short_period.unwrap_or(5),
+            long_period.unwrap_or(10),
+        ),
+        len,
+    )
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(text_signature = "(high, low, close, volume, period=14)")]
+/// Calculate Money Flow Index (MFI)
+///
+/// Volume-weighted RSI showing money flow momentum.
+/// Overbought >80, oversold <20.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// volume : list of float
+///     Volume data
+/// period : int, optional
+///     Lookback period (default: 14)
+///
+/// Returns
+/// -------
+/// list of float - MFI values (0-100)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_mfi(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -559,11 +1697,42 @@ fn py_mfi(
     volume: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::mfi(&high, &low, &close, &volume, period.unwrap_or(14)))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::mfi(&high, &low, &close, &volume, period.unwrap_or(14)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, volume, period=20)")]
+/// Calculate Chaikin Money Flow (CMF)
+///
+/// Measures money flow volume over a period.
+/// Positive = buying pressure, negative = selling pressure.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// volume : list of float
+///     Volume data
+/// period : int, optional
+///     Lookback period (default: 20)
+///
+/// Returns
+/// -------
+/// list of float - CMF values (-1 to 1)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_cmf(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -571,7 +1740,11 @@ fn py_cmf(
     volume: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::cmf(&high, &low, &close, &volume, period.unwrap_or(20)))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::cmf(&high, &low, &close, &volume, period.unwrap_or(20)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -583,61 +1756,213 @@ fn py_volume_profile(
     volume: Vec<f64>,
     num_bins: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>, f64)> {
-    Ok(indicators::volume_profile(&high, &low, &close, &volume, num_bins.unwrap_or(24)))
+    let len = close.len();
+    ok_or_nan_vec2_f64(
+        indicators::volume_profile(&high, &low, &close, &volume, num_bins.unwrap_or(24)),
+        len,
+    )
 }
 
 // ==================== MA/Overlap 指标包装 ====================
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period)")]
+/// Calculate Simple Moving Average (SMA)
+///
+/// Computes the arithmetic mean of values over a rolling window.
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data (typically close prices)
+/// period : int
+///     Lookback period (default: 20)
+///
+/// Returns
+/// -------
+/// list of float - SMA values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
+///
+/// Examples
+/// --------
+/// >>> sma = py_sma([44.0, 44.25, 44.375, ...], period=20)
 fn py_sma(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(utils::sma(&values, period))
+    let len = values.len();
+    ok_or_nan_vec(utils::sma(&values, period), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period)")]
+/// Calculate Exponential Moving Average (EMA)
+///
+/// Weighted moving average giving more importance to recent prices.
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int
+///     Lookback period (default: 20)
+///
+/// Returns
+/// -------
+/// list of float - EMA values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_ema(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(utils::ema(&values, period))
+    let len = values.len();
+    ok_or_nan_vec(utils::ema(&values, period), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period)")]
+/// Calculate Rolling/Wilder Moving Average (RMA)
+///
+/// Modified EMA used in RSI calculation, smoother than standard EMA.
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - RMA values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_rma(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(utils::rma(&values, period))
+    let len = values.len();
+    ok_or_nan_vec(utils::rma(&values, period), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period)")]
+/// Calculate Weighted Moving Average (WMA)
+///
+/// Linear-weighted moving average giving more weight to recent data.
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - WMA values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_wma(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(utils::wma(&values, period))
+    let len = values.len();
+    ok_or_nan_vec(utils::wma(&values, period), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period)")]
+/// Calculate Hull Moving Average (HMA)
+///
+/// Reduces lag while improving smoothness using weighted moving averages.
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - HMA values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_hma(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(utils::hma(&values, period))
+    let len = values.len();
+    ok_or_nan_vec(utils::hma(&values, period), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period)")]
+/// Calculate Double Exponential Moving Average (DEMA)
+///
+/// Reduced lag EMA using double smoothing technique.
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - DEMA values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_dema(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(utils::dema(&values, period))
+    let len = values.len();
+    ok_or_nan_vec(utils::dema(&values, period), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(values, period)")]
+/// Calculate Triple Exponential Moving Average (TEMA)
+///
+/// Further reduced lag EMA using triple smoothing.
+///
+/// Parameters
+/// ----------
+/// values : list of float
+///     Price data
+/// period : int
+///     Lookback period
+///
+/// Returns
+/// -------
+/// list of float - TEMA values, NaN for warmup period
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_tema(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(utils::tema(&values, period))
+    let len = values.len();
+    ok_or_nan_vec(utils::tema(&values, period), len)
 }
 
 // ==================== Fibonacci 指标包装 ====================
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_fib_retracement(
-    start_price: f64,
-    end_price: f64,
-) -> PyResult<Vec<(String, f64)>> {
+fn py_fib_retracement(start_price: f64, end_price: f64) -> PyResult<Vec<(String, f64)>> {
     let fib = indicators::fibonacci::fib_retracement(start_price, end_price, None);
     let mut levels: Vec<(String, f64)> = fib.levels.into_iter().collect();
     levels.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
@@ -661,6 +1986,34 @@ fn py_fib_extension(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, conversion=9, base=26, span_b=52, displacement=26)")]
+/// Calculate Ichimoku Cloud
+///
+/// Comprehensive trend-following system with support/resistance levels.
+///
+/// Parameters
+/// ----------
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// conversion : int, optional
+///     Conversion line period (default: 9)
+/// base : int, optional
+///     Base line period (default: 26)
+/// span_b : int, optional
+///     Span B period (default: 52)
+/// displacement : int, optional
+///     Cloud displacement (default: 26)
+///
+/// Returns
+/// -------
+/// tuple of (list, list, list, list, list) - (Tenkan, Kijun, Senkou A, Senkou B, Chikou)
+///
+/// Raises
+/// ------
+/// ValueError
+///     If period <= 0 or insufficient data
 fn py_ichimoku_cloud(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -668,7 +2021,7 @@ fn py_ichimoku_cloud(
     tenkan_period: Option<usize>,
     kijun_period: Option<usize>,
     senkou_b_period: Option<usize>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+) -> PyResult<Vec5F64> {
     let ichimoku = indicators::ichimoku::ichimoku_cloud(
         &high,
         &low,
@@ -729,11 +2082,7 @@ fn py_fibonacci_pivots(
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_camarilla_pivots(
-    high: f64,
-    low: f64,
-    close: f64,
-) -> PyResult<(f64, f64, f64, f64, f64, f64, f64, f64, f64)> {
+fn py_camarilla_pivots(high: f64, low: f64, close: f64) -> PyResult<Pivots9F64> {
     let pivots = indicators::pivots::camarilla_pivots(high, low, close);
     Ok((
         pivots.pivot,
@@ -759,7 +2108,17 @@ fn py_kdj(
     k_period: Option<usize>,
     d_period: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::kdj(&high, &low, &close, k_period.unwrap_or(9), d_period.unwrap_or(3)))
+    let len = close.len();
+    ok_or_nan_vec3(
+        indicators::kdj(
+            &high,
+            &low,
+            &close,
+            k_period.unwrap_or(9),
+            d_period.unwrap_or(3),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -770,7 +2129,16 @@ fn py_tsi(
     short_period: Option<usize>,
     signal_period: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::tsi(&close, long_period.unwrap_or(25), short_period.unwrap_or(13), signal_period.unwrap_or(13)))
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::tsi(
+            &close,
+            long_period.unwrap_or(25),
+            short_period.unwrap_or(13),
+            signal_period.unwrap_or(13),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -783,7 +2151,18 @@ fn py_ultimate_oscillator(
     period2: Option<usize>,
     period3: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::ultimate_oscillator(&high, &low, &close, period1.unwrap_or(7), period2.unwrap_or(14), period3.unwrap_or(28)))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::ultimate_oscillator(
+            &high,
+            &low,
+            &close,
+            period1.unwrap_or(7),
+            period2.unwrap_or(14),
+            period3.unwrap_or(28),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -808,7 +2187,11 @@ fn py_vortex(
     close: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::vortex(&high, &low, &close, period.unwrap_or(14)))
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::vortex(&high, &low, &close, period.unwrap_or(14)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -819,54 +2202,58 @@ fn py_choppiness(
     close: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::choppiness_index(&high, &low, &close, period.unwrap_or(14)))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::choppiness_index(&high, &low, &close, period.unwrap_or(14)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_qstick(
-    open: Vec<f64>,
-    close: Vec<f64>,
-    period: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::qstick(&open, &close, period.unwrap_or(14)))
+fn py_qstick(open: Vec<f64>, close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(indicators::qstick(&open, &close, period.unwrap_or(14)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_vhf(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(indicators::vhf(&close, period.unwrap_or(28)))
+    let len = close.len();
+    ok_or_nan_vec(indicators::vhf(&close, period.unwrap_or(28)), len)
 }
 
 // ==================== 扩展 Volume 指标包装 ====================
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_ad(
-    high: Vec<f64>,
-    low: Vec<f64>,
-    close: Vec<f64>,
-    volume: Vec<f64>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::accumulation_distribution(&high, &low, &close, &volume))
+fn py_ad(high: Vec<f64>, low: Vec<f64>, close: Vec<f64>, volume: Vec<f64>) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::accumulation_distribution(&high, &low, &close, &volume),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_pvt(close: Vec<f64>, volume: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(indicators::price_volume_trend(&close, &volume))
+    let len = close.len();
+    ok_or_nan_vec(indicators::price_volume_trend(&close, &volume), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_nvi(close: Vec<f64>, volume: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(indicators::negative_volume_index(&close, &volume))
+    let len = close.len();
+    ok_or_nan_vec(indicators::negative_volume_index(&close, &volume), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_pvi(close: Vec<f64>, volume: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(indicators::positive_volume_index(&close, &volume))
+    let len = close.len();
+    ok_or_nan_vec(indicators::positive_volume_index(&close, &volume), len)
 }
 
 #[cfg(feature = "python")]
@@ -877,7 +2264,11 @@ fn py_eom(
     volume: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::ease_of_movement(&high, &low, &volume, period.unwrap_or(14)))
+    let len = high.len();
+    ok_or_nan_vec(
+        indicators::ease_of_movement(&high, &low, &volume, period.unwrap_or(14)),
+        len,
+    )
 }
 
 // ==================== 扩展 MA 指标包装 ====================
@@ -885,7 +2276,8 @@ fn py_eom(
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_zlma(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(utils::zlma(&values, period))
+    let len = values.len();
+    ok_or_nan_vec(utils::zlma(&values, period), len)
 }
 
 // Note: py_t3 and py_kama are defined later in the file with better Optional parameter support
@@ -893,13 +2285,49 @@ fn py_zlma(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_frama(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(utils::frama(&values, period.unwrap_or(16)))
+    let len = values.len();
+    ok_or_nan_vec(utils::frama(&values, period.unwrap_or(16)), len)
 }
 
 // ==================== 蜡烛图形态识别包装 ====================
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, body_threshold=0.1))]
+#[pyo3(text_signature = "(open, high, low, close, body_threshold=0.1)")]
+/// Detect Doji Candlestick Pattern
+///
+/// Identifies doji patterns where open and close prices are nearly equal, indicating
+/// market indecision. The small body (relative to the range) suggests equilibrium
+/// between buyers and sellers. Often signals potential trend reversals.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// body_threshold : float, optional
+///     Maximum body-to-range ratio to qualify as doji (default: 0.1)
+///
+/// Returns
+/// -------
+/// list of float - 100 where doji detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> doji = py_doji([10.0, 10.5], [10.8, 11.0], [9.8, 10.0], [10.05, 10.48])
+/// >>> doji[0]  # First candle is doji
+/// 100.0
 fn py_doji(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -907,17 +2335,18 @@ fn py_doji(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::doji(&open, &high, &low, &close, body_threshold.unwrap_or(0.1))?)
+    Ok(indicators::doji(
+        &open,
+        &high,
+        &low,
+        &close,
+        body_threshold.unwrap_or(0.1),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_hammer(
-    open: Vec<f64>,
-    high: Vec<f64>,
-    low: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
+fn py_hammer(open: Vec<f64>, high: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::hammer(&open, &high, &low, &close)?)
 }
 
@@ -945,57 +2374,37 @@ fn py_hanging_man(
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_bullish_engulfing(
-    open: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
+fn py_bullish_engulfing(open: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::bullish_engulfing(&open, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_bearish_engulfing(
-    open: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
+fn py_bearish_engulfing(open: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::bearish_engulfing(&open, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_bullish_harami(
-    open: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
+fn py_bullish_harami(open: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::bullish_harami(&open, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_bearish_harami(
-    open: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
+fn py_bearish_harami(open: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::bearish_harami(&open, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_piercing_pattern(
-    open: Vec<f64>,
-    low: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
+fn py_piercing_pattern(open: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::piercing_pattern(&open, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_dark_cloud_cover(
-    open: Vec<f64>,
-    high: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
+fn py_dark_cloud_cover(open: Vec<f64>, high: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::dark_cloud_cover(&open, &high, &close)?)
 }
 
@@ -1023,21 +2432,13 @@ fn py_evening_star(
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_three_white_soldiers(
-    open: Vec<f64>,
-    high: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
+fn py_three_white_soldiers(open: Vec<f64>, high: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::three_white_soldiers(&open, &high, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_three_black_crows(
-    open: Vec<f64>,
-    low: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
+fn py_three_black_crows(open: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::three_black_crows(&open, &low, &close)?)
 }
 
@@ -1054,11 +2455,7 @@ fn py_linear_regression(
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_correlation(
-    x: Vec<f64>,
-    y: Vec<f64>,
-    period: usize,
-) -> PyResult<Vec<f64>> {
+fn py_correlation(x: Vec<f64>, y: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(utils::correlation(&x, &y, period))
 }
 
@@ -1070,11 +2467,7 @@ fn py_zscore(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_covariance(
-    x: Vec<f64>,
-    y: Vec<f64>,
-    period: usize,
-) -> PyResult<Vec<f64>> {
+fn py_covariance(x: Vec<f64>, y: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(utils::covariance(&x, &y, period))
 }
 
@@ -1094,6 +2487,12 @@ fn py_standard_error(y_values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(utils::standard_error(&y_values, period))
 }
 
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_stderr(y_values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    Ok(utils::standard_error(&y_values, period))
+}
+
 // ==================== 价格变换指标包装 ====================
 
 #[cfg(feature = "python")]
@@ -1104,33 +2503,29 @@ fn py_avgprice(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::avgprice(&open, &high, &low, &close))
+    let len = close.len();
+    ok_or_nan_vec(indicators::avgprice(&open, &high, &low, &close), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_medprice(high: Vec<f64>, low: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(indicators::medprice(&high, &low))
+    let len = high.len();
+    ok_or_nan_vec(indicators::medprice(&high, &low), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_typprice(
-    high: Vec<f64>,
-    low: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::typprice(&high, &low, &close))
+fn py_typprice(high: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
+    let len = high.len();
+    ok_or_nan_vec(indicators::typprice(&high, &low, &close), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_wclprice(
-    high: Vec<f64>,
-    low: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::wclprice(&high, &low, &close))
+fn py_wclprice(high: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
+    let len = high.len();
+    ok_or_nan_vec(indicators::wclprice(&high, &low, &close), len)
 }
 
 // ==================== 数学运算函数包装 ====================
@@ -1322,6 +2717,41 @@ fn py_spinning_top(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, body_threshold=0.1))]
+#[pyo3(text_signature = "(open, high, low, close, body_threshold=0.1)")]
+/// Detect Dragonfly Doji Candlestick Pattern
+///
+/// Identifies dragonfly doji patterns characterized by a long lower shadow with
+/// open/close near the high and minimal upper shadow. Forms a "T" shape. Indicates
+/// strong rejection of lower prices and potential bullish reversal at support levels.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// body_threshold : float, optional
+///     Maximum body-to-range ratio (default: 0.1)
+///
+/// Returns
+/// -------
+/// list of float - 100 where dragonfly doji detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> dd = py_dragonfly_doji([10.5], [10.6], [9.8], [10.55])
+/// >>> dd[0]  # Dragonfly doji detected
+/// 100.0
 fn py_dragonfly_doji(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1329,11 +2759,53 @@ fn py_dragonfly_doji(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::dragonfly_doji(&open, &high, &low, &close, body_threshold.unwrap_or(0.1))?)
+    Ok(indicators::dragonfly_doji(
+        &open,
+        &high,
+        &low,
+        &close,
+        body_threshold.unwrap_or(0.1),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, body_threshold=0.1))]
+#[pyo3(text_signature = "(open, high, low, close, body_threshold=0.1)")]
+/// Detect Gravestone Doji Candlestick Pattern
+///
+/// Identifies gravestone doji patterns characterized by a long upper shadow with
+/// open/close near the low and minimal lower shadow. Forms an inverted "T" shape.
+/// Indicates strong rejection of higher prices and potential bearish reversal at
+/// resistance levels.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// body_threshold : float, optional
+///     Maximum body-to-range ratio (default: 0.1)
+///
+/// Returns
+/// -------
+/// list of float - 100 where gravestone doji detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> gd = py_gravestone_doji([10.0], [10.8], [9.95], [10.05])
+/// >>> gd[0]  # Gravestone doji detected
+/// 100.0
 fn py_gravestone_doji(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1341,11 +2813,53 @@ fn py_gravestone_doji(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::gravestone_doji(&open, &high, &low, &close, body_threshold.unwrap_or(0.1))?)
+    Ok(indicators::gravestone_doji(
+        &open,
+        &high,
+        &low,
+        &close,
+        body_threshold.unwrap_or(0.1),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, body_threshold=0.1))]
+#[pyo3(text_signature = "(open, high, low, close, body_threshold=0.1)")]
+/// Detect Long-Legged Doji Candlestick Pattern
+///
+/// Identifies long-legged doji patterns with long shadows both above and below a
+/// small body. Open and close are near the middle of the range. Indicates extreme
+/// indecision and volatility with neither bulls nor bears in control. Often precedes
+/// major price movements.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// body_threshold : float, optional
+///     Maximum body-to-range ratio (default: 0.1)
+///
+/// Returns
+/// -------
+/// list of float - 100 where long-legged doji detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> lld = py_long_legged_doji([10.3], [11.0], [9.5], [10.35])
+/// >>> lld[0]  # Long-legged doji detected
+/// 100.0
 fn py_long_legged_doji(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1353,29 +2867,111 @@ fn py_long_legged_doji(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::long_legged_doji(&open, &high, &low, &close, body_threshold.unwrap_or(0.1))?)
+    Ok(indicators::long_legged_doji(
+        &open,
+        &high,
+        &low,
+        &close,
+        body_threshold.unwrap_or(0.1),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, close, tolerance=0.01))]
+#[pyo3(text_signature = "(open, high, close, tolerance=0.01)")]
+/// Detect Tweezers Top Candlestick Pattern
+///
+/// Identifies tweezers top patterns where two consecutive candles have nearly equal
+/// highs. First candle is bullish, second is bearish. The matching highs suggest
+/// strong resistance and potential bearish reversal at market tops.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// close : list of float
+///     Closing prices
+/// tolerance : float, optional
+///     Maximum price difference ratio for matching highs (default: 0.01)
+///
+/// Returns
+/// -------
+/// list of float - 100 where tweezers top detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> tt = py_tweezers_top([10.0, 10.5], [11.0, 11.02], [10.8, 10.3])
+/// >>> tt[1]  # Tweezers top detected on second candle
+/// 100.0
 fn py_tweezers_top(
     open: Vec<f64>,
     high: Vec<f64>,
     close: Vec<f64>,
     tolerance: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::tweezers_top(&open, &high, &close, tolerance.unwrap_or(0.01))?)
+    Ok(indicators::tweezers_top(
+        &open,
+        &high,
+        &close,
+        tolerance.unwrap_or(0.01),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, low, close, tolerance=0.01))]
+#[pyo3(text_signature = "(open, low, close, tolerance=0.01)")]
+/// Detect Tweezers Bottom Candlestick Pattern
+///
+/// Identifies tweezers bottom patterns where two consecutive candles have nearly
+/// equal lows. First candle is bearish, second is bullish. The matching lows suggest
+/// strong support and potential bullish reversal at market bottoms.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// tolerance : float, optional
+///     Maximum price difference ratio for matching lows (default: 0.01)
+///
+/// Returns
+/// -------
+/// list of float - 100 where tweezers bottom detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> tb = py_tweezers_bottom([10.5, 10.0], [9.0, 8.98], [10.2, 10.7])
+/// >>> tb[1]  # Tweezers bottom detected on second candle
+/// 100.0
 fn py_tweezers_bottom(
     open: Vec<f64>,
     low: Vec<f64>,
     close: Vec<f64>,
     tolerance: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::tweezers_bottom(&open, &low, &close, tolerance.unwrap_or(0.01))?)
+    Ok(indicators::tweezers_bottom(
+        &open,
+        &low,
+        &close,
+        tolerance.unwrap_or(0.01),
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -1386,7 +2982,9 @@ fn py_rising_three_methods(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::rising_three_methods(&open, &high, &low, &close)?)
+    Ok(indicators::rising_three_methods(
+        &open, &high, &low, &close,
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -1397,11 +2995,49 @@ fn py_falling_three_methods(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::falling_three_methods(&open, &high, &low, &close))
+    Ok(indicators::falling_three_methods(
+        &open, &high, &low, &close,
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, body_threshold=0.1))]
+#[pyo3(text_signature = "(open, high, low, close, body_threshold=0.1)")]
+/// Detect Harami Cross Candlestick Pattern
+///
+/// Identifies harami cross patterns where a large candle is followed by a doji
+/// contained within the first candle's body. The doji's indecision after a strong
+/// move suggests potential trend reversal. Bullish harami cross appears in downtrends,
+/// bearish in uptrends.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// body_threshold : float, optional
+///     Maximum body-to-range ratio for doji (default: 0.1)
+///
+/// Returns
+/// -------
+/// list of float - 100 for bullish, -100 for bearish harami cross, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> hc = py_harami_cross([11.0, 10.5], [11.2, 10.6], [10.5, 10.4], [10.6, 10.52])
+/// >>> hc[1]  # Bullish harami cross detected
+/// 100.0
 fn py_harami_cross(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1409,11 +3045,53 @@ fn py_harami_cross(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::harami_cross(&open, &high, &low, &close, body_threshold.unwrap_or(0.1)))
+    Ok(indicators::harami_cross(
+        &open,
+        &high,
+        &low,
+        &close,
+        body_threshold.unwrap_or(0.1),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, body_threshold=0.1))]
+#[pyo3(text_signature = "(open, high, low, close, body_threshold=0.1)")]
+/// Detect Morning Doji Star Candlestick Pattern
+///
+/// Identifies morning doji star patterns, a three-candle bullish reversal formation.
+/// Consists of: (1) long bearish candle, (2) doji gapping down, (3) long bullish
+/// candle closing above the first candle's midpoint. Signals potential trend reversal
+/// from bearish to bullish.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// body_threshold : float, optional
+///     Maximum body-to-range ratio for middle doji (default: 0.1)
+///
+/// Returns
+/// -------
+/// list of float - 100 where morning doji star detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> mds = py_morning_doji_star([11.0, 10.0, 10.1], [11.0, 10.1, 11.2], [10.0, 9.8, 10.0], [10.0, 9.95, 11.0])
+/// >>> mds[2]  # Morning doji star detected
+/// 100.0
 fn py_morning_doji_star(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1421,11 +3099,53 @@ fn py_morning_doji_star(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::morning_doji_star(&open, &high, &low, &close, body_threshold.unwrap_or(0.1)))
+    Ok(indicators::morning_doji_star(
+        &open,
+        &high,
+        &low,
+        &close,
+        body_threshold.unwrap_or(0.1),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, body_threshold=0.1))]
+#[pyo3(text_signature = "(open, high, low, close, body_threshold=0.1)")]
+/// Detect Evening Doji Star Candlestick Pattern
+///
+/// Identifies evening doji star patterns, a three-candle bearish reversal formation.
+/// Consists of: (1) long bullish candle, (2) doji gapping up, (3) long bearish
+/// candle closing below the first candle's midpoint. Signals potential trend reversal
+/// from bullish to bearish.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// body_threshold : float, optional
+///     Maximum body-to-range ratio for middle doji (default: 0.1)
+///
+/// Returns
+/// -------
+/// list of float - -100 where evening doji star detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> eds = py_evening_doji_star([10.0, 11.0, 10.9], [10.0, 11.1, 11.0], [10.0, 10.8, 9.8], [11.0, 11.05, 10.0])
+/// >>> eds[2]  # Evening doji star detected
+/// -100.0
 fn py_evening_doji_star(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1433,7 +3153,13 @@ fn py_evening_doji_star(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::evening_doji_star(&open, &high, &low, &close, body_threshold.unwrap_or(0.1)))
+    Ok(indicators::evening_doji_star(
+        &open,
+        &high,
+        &low,
+        &close,
+        body_threshold.unwrap_or(0.1),
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -1444,7 +3170,7 @@ fn py_three_inside(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::three_inside(&open, &high, &low, &close))
+    Ok(indicators::three_inside(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1455,11 +3181,47 @@ fn py_three_outside(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::three_outside(&open, &high, &low, &close))
+    Ok(indicators::three_outside(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, body_threshold=0.1))]
+#[pyo3(text_signature = "(open, high, low, close, body_threshold=0.1)")]
+/// Detect Abandoned Baby Candlestick Pattern
+///
+/// Identifies abandoned baby patterns, a rare three-candle reversal formation with
+/// gaps. Middle candle is a doji that gaps away from both surrounding candles,
+/// appearing "abandoned". Bullish version signals reversal from down to up trend,
+/// bearish version signals reversal from up to down trend.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// body_threshold : float, optional
+///     Maximum body-to-range ratio for middle doji (default: 0.1)
+///
+/// Returns
+/// -------
+/// list of float - 100 for bullish, -100 for bearish abandoned baby, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> ab = py_abandoned_baby([11.0, 9.5, 9.6], [11.0, 9.6, 10.5], [10.0, 9.4, 9.5], [10.0, 9.5, 10.5])
+/// >>> ab[2]  # Bullish abandoned baby detected
+/// 100.0
 fn py_abandoned_baby(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1467,7 +3229,13 @@ fn py_abandoned_baby(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::abandoned_baby(&open, &high, &low, &close, body_threshold.unwrap_or(0.1)))
+    Ok(indicators::abandoned_baby(
+        &open,
+        &high,
+        &low,
+        &close,
+        body_threshold.unwrap_or(0.1),
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -1478,11 +3246,47 @@ fn py_kicking(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::kicking(&open, &high, &low, &close))
+    Ok(indicators::kicking(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, lookback=10))]
+#[pyo3(text_signature = "(open, high, low, close, lookback=10)")]
+/// Detect Long Line Candlestick Pattern
+///
+/// Identifies candles with exceptionally long bodies relative to recent candles,
+/// indicating strong directional pressure. Long white (bullish) lines show strong
+/// buying, long black (bearish) lines show strong selling. Body length is compared
+/// against the average of recent candles.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// lookback : int, optional
+///     Period to calculate average body length (default: 10)
+///
+/// Returns
+/// -------
+/// list of float - 100 for bullish long line, -100 for bearish, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> ll = py_long_line([10.0, 10.1], [10.5, 11.5], [9.8, 10.0], [10.2, 11.4], lookback=10)
+/// >>> ll[1]  # Long bullish line detected
+/// 100.0
 fn py_long_line(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1490,11 +3294,53 @@ fn py_long_line(
     close: Vec<f64>,
     lookback: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::long_line(&open, &high, &low, &close, lookback.unwrap_or(10)))
+    Ok(indicators::long_line(
+        &open,
+        &high,
+        &low,
+        &close,
+        lookback.unwrap_or(10),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, lookback=10))]
+#[pyo3(text_signature = "(open, high, low, close, lookback=10)")]
+/// Detect Short Line Candlestick Pattern
+///
+/// Identifies candles with exceptionally short bodies relative to recent candles,
+/// indicating weak directional pressure or consolidation. Short bodies suggest
+/// indecision or equilibrium between buyers and sellers. Body length is compared
+/// against the average of recent candles.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// lookback : int, optional
+///     Period to calculate average body length (default: 10)
+///
+/// Returns
+/// -------
+/// list of float - 100 where short line detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> sl = py_short_line([10.0, 10.2], [10.3, 10.5], [9.9, 10.1], [10.1, 10.25], lookback=10)
+/// >>> sl[1]  # Short line detected
+/// 100.0
 fn py_short_line(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1502,11 +3348,53 @@ fn py_short_line(
     close: Vec<f64>,
     lookback: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::short_line(&open, &high, &low, &close, lookback.unwrap_or(10)))
+    Ok(indicators::short_line(
+        &open,
+        &high,
+        &low,
+        &close,
+        lookback.unwrap_or(10),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, body_threshold=0.1))]
+#[pyo3(text_signature = "(open, high, low, close, body_threshold=0.1)")]
+/// Detect Doji Star Candlestick Pattern
+///
+/// Identifies doji star patterns where a doji gaps away from the previous candle's
+/// body. The gap indicates a potential shift in sentiment. Bullish doji star gaps
+/// down after a bearish candle, bearish doji star gaps up after a bullish candle.
+/// Signals potential trend reversal.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// body_threshold : float, optional
+///     Maximum body-to-range ratio for doji (default: 0.1)
+///
+/// Returns
+/// -------
+/// list of float - 100 for bullish, -100 for bearish doji star, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> ds = py_doji_star([11.0, 10.0], [11.0, 10.1], [10.0, 9.8], [10.0, 9.95])
+/// >>> ds[1]  # Bullish doji star detected
+/// 100.0
 fn py_doji_star(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1514,7 +3402,13 @@ fn py_doji_star(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::doji_star(&open, &high, &low, &close, body_threshold.unwrap_or(0.1)))
+    Ok(indicators::doji_star(
+        &open,
+        &high,
+        &low,
+        &close,
+        body_threshold.unwrap_or(0.1),
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -1525,11 +3419,49 @@ fn py_identical_three_crows(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::identical_three_crows(&open, &high, &low, &close))
+    Ok(indicators::identical_three_crows(
+        &open, &high, &low, &close,
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, tolerance=0.01))]
+#[pyo3(text_signature = "(open, high, low, close, tolerance=0.01)")]
+/// Detect Stick Sandwich Candlestick Pattern
+///
+/// Identifies stick sandwich patterns, a three-candle bullish reversal formation.
+/// Two bearish candles with matching closes "sandwich" a bullish middle candle.
+/// The matching closes at support suggest buyers are defending a level, indicating
+/// potential upside reversal.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// tolerance : float, optional
+///     Maximum price difference ratio for matching closes (default: 0.01)
+///
+/// Returns
+/// -------
+/// list of float - 100 where stick sandwich detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> ss = py_stick_sandwich([11.0, 10.0, 10.5], [11.0, 10.8, 11.0], [10.0, 10.0, 10.0], [10.0, 10.5, 10.02])
+/// >>> ss[2]  # Stick sandwich detected
+/// 100.0
 fn py_stick_sandwich(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1537,11 +3469,53 @@ fn py_stick_sandwich(
     close: Vec<f64>,
     tolerance: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::stick_sandwich(&open, &high, &low, &close, tolerance.unwrap_or(0.01)))
+    Ok(indicators::stick_sandwich(
+        &open,
+        &high,
+        &low,
+        &close,
+        tolerance.unwrap_or(0.01),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, body_threshold=0.1))]
+#[pyo3(text_signature = "(open, high, low, close, body_threshold=0.1)")]
+/// Detect Tristar Candlestick Pattern
+///
+/// Identifies tristar patterns consisting of three consecutive doji candles,
+/// forming a reversal signal. The middle doji should gap away from the surrounding
+/// dojis. Bullish tristar appears at bottoms, bearish at tops. Rare pattern indicating
+/// extreme indecision before a trend change.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// body_threshold : float, optional
+///     Maximum body-to-range ratio for doji (default: 0.1)
+///
+/// Returns
+/// -------
+/// list of float - 100 for bullish, -100 for bearish tristar, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> ts = py_tristar([10.0, 9.5, 10.0], [10.2, 9.6, 10.2], [9.8, 9.3, 9.8], [10.05, 9.52, 10.03])
+/// >>> ts[2]  # Bullish tristar detected
+/// 100.0
 fn py_tristar(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1549,7 +3523,13 @@ fn py_tristar(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::tristar(&open, &high, &low, &close, body_threshold.unwrap_or(0.1)))
+    Ok(indicators::tristar(
+        &open,
+        &high,
+        &low,
+        &close,
+        body_threshold.unwrap_or(0.1),
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -1560,7 +3540,9 @@ fn py_upside_gap_two_crows(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::upside_gap_two_crows(&open, &high, &low, &close))
+    Ok(indicators::upside_gap_two_crows(
+        &open, &high, &low, &close,
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -1571,18 +3553,13 @@ fn py_gap_sidesidewhite(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::gap_sidesidewhite(&open, &high, &low, &close))
+    Ok(indicators::gap_sidesidewhite(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_takuri(
-    open: Vec<f64>,
-    high: Vec<f64>,
-    low: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::takuri(&open, &high, &low, &close))
+fn py_takuri(open: Vec<f64>, high: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
+    Ok(indicators::takuri(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1593,11 +3570,47 @@ fn py_homing_pigeon(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::homing_pigeon(&open, &high, &low, &close))
+    Ok(indicators::homing_pigeon(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, tolerance=0.01))]
+#[pyo3(text_signature = "(open, high, low, close, tolerance=0.01)")]
+/// Detect Matching Low Candlestick Pattern
+///
+/// Identifies matching low patterns where two consecutive bearish candles have
+/// nearly equal closing lows. The matching lows suggest a support level is being
+/// tested and may hold, indicating potential bullish reversal. Pattern appears
+/// during downtrends.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// tolerance : float, optional
+///     Maximum price difference ratio for matching closes (default: 0.01)
+///
+/// Returns
+/// -------
+/// list of float - 100 where matching low detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> ml = py_matching_low([10.5, 10.2], [10.5, 10.2], [9.0, 8.98], [9.0, 9.02])
+/// >>> ml[1]  # Matching low detected
+/// 100.0
 fn py_matching_low(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1605,11 +3618,53 @@ fn py_matching_low(
     close: Vec<f64>,
     tolerance: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::matching_low(&open, &high, &low, &close, tolerance.unwrap_or(0.01)))
+    Ok(indicators::matching_low(
+        &open,
+        &high,
+        &low,
+        &close,
+        tolerance.unwrap_or(0.01),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, tolerance=0.005))]
+#[pyo3(text_signature = "(open, high, low, close, tolerance=0.005)")]
+/// Detect Separating Lines Candlestick Pattern
+///
+/// Identifies separating lines patterns where two candles of opposite color have
+/// nearly equal opening prices but close in opposite directions. The second candle's
+/// strong move confirms trend continuation. Bullish version shows uptrend continuation,
+/// bearish version shows downtrend continuation.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// tolerance : float, optional
+///     Maximum price difference ratio for matching opens (default: 0.005)
+///
+/// Returns
+/// -------
+/// list of float - 100 for bullish, -100 for bearish separating lines, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> sl = py_separating_lines([10.0, 10.02], [10.5, 11.0], [9.5, 10.0], [9.8, 10.8])
+/// >>> sl[1]  # Bullish separating lines detected
+/// 100.0
 fn py_separating_lines(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1617,7 +3672,13 @@ fn py_separating_lines(
     close: Vec<f64>,
     tolerance: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::separating_lines(&open, &high, &low, &close, tolerance.unwrap_or(0.005)))
+    Ok(indicators::separating_lines(
+        &open,
+        &high,
+        &low,
+        &close,
+        tolerance.unwrap_or(0.005),
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -1628,11 +3689,47 @@ fn py_thrusting(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::thrusting(&open, &high, &low, &close))
+    Ok(indicators::thrusting(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, tolerance=0.01))]
+#[pyo3(text_signature = "(open, high, low, close, tolerance=0.01)")]
+/// Detect In-Neck Candlestick Pattern
+///
+/// Identifies in-neck patterns, a bearish continuation formation. After a long
+/// bearish candle, a small bullish candle closes near the previous candle's low,
+/// failing to penetrate significantly. The weak bounce suggests continued downside
+/// pressure and trend continuation.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// tolerance : float, optional
+///     Maximum price difference for close matching previous low (default: 0.01)
+///
+/// Returns
+/// -------
+/// list of float - -100 where in-neck pattern detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> inn = py_inneck([11.0, 9.5], [11.0, 10.0], [9.0, 9.5], [9.0, 9.05])
+/// >>> inn[1]  # In-neck pattern detected
+/// -100.0
 fn py_inneck(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1640,11 +3737,53 @@ fn py_inneck(
     close: Vec<f64>,
     tolerance: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::inneck(&open, &high, &low, &close, tolerance.unwrap_or(0.01)))
+    Ok(indicators::inneck(
+        &open,
+        &high,
+        &low,
+        &close,
+        tolerance.unwrap_or(0.01),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, tolerance=0.01))]
+#[pyo3(text_signature = "(open, high, low, close, tolerance=0.01)")]
+/// Detect On-Neck Candlestick Pattern
+///
+/// Identifies on-neck patterns, a bearish continuation formation similar to in-neck.
+/// After a long bearish candle, a small bullish candle closes at or very near the
+/// previous candle's close. The failure to close above suggests sellers remain in
+/// control and downtrend continues.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// tolerance : float, optional
+///     Maximum price difference for matching closes (default: 0.01)
+///
+/// Returns
+/// -------
+/// list of float - -100 where on-neck pattern detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> onn = py_onneck([11.0, 9.5], [11.0, 10.2], [9.0, 9.5], [9.0, 9.02])
+/// >>> onn[1]  # On-neck pattern detected
+/// -100.0
 fn py_onneck(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1652,7 +3791,13 @@ fn py_onneck(
     close: Vec<f64>,
     tolerance: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::onneck(&open, &high, &low, &close, tolerance.unwrap_or(0.01)))
+    Ok(indicators::onneck(
+        &open,
+        &high,
+        &low,
+        &close,
+        tolerance.unwrap_or(0.01),
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -1663,7 +3808,7 @@ fn py_advance_block(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::advance_block(&open, &high, &low, &close))
+    Ok(indicators::advance_block(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1674,7 +3819,7 @@ fn py_stalled_pattern(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::stalled_pattern(&open, &high, &low, &close))
+    Ok(indicators::stalled_pattern(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1685,7 +3830,7 @@ fn py_belthold(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::belthold(&open, &high, &low, &close))
+    Ok(indicators::belthold(&open, &high, &low, &close)?)
 }
 
 // 新增蜡烛图形态（第四批 - TA-Lib 61 完整集合补充）
@@ -1697,11 +3842,49 @@ fn py_concealing_baby_swallow(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::concealing_baby_swallow(&open, &high, &low, &close))
+    Ok(indicators::concealing_baby_swallow(
+        &open, &high, &low, &close,
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, tolerance=0.005))]
+#[pyo3(text_signature = "(open, high, low, close, tolerance=0.005)")]
+/// Detect Counterattack Candlestick Pattern
+///
+/// Identifies counterattack patterns where two opposite-colored candles have matching
+/// closes but move in opposite directions. Bullish counterattack: bearish candle
+/// followed by bullish candle opening lower but closing at same level. Bearish
+/// counterattack: opposite. Signals potential trend reversal.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// tolerance : float, optional
+///     Maximum price difference for matching closes (default: 0.005)
+///
+/// Returns
+/// -------
+/// list of float - 100 for bullish, -100 for bearish counterattack, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> ca = py_counterattack([11.0, 9.5], [11.0, 10.5], [10.0, 9.5], [10.0, 10.02])
+/// >>> ca[1]  # Bullish counterattack detected
+/// 100.0
 fn py_counterattack(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1709,11 +3892,53 @@ fn py_counterattack(
     close: Vec<f64>,
     tolerance: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::counterattack(&open, &high, &low, &close, tolerance.unwrap_or(0.005)))
+    Ok(indicators::counterattack(
+        &open,
+        &high,
+        &low,
+        &close,
+        tolerance.unwrap_or(0.005),
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, body_threshold=0.15))]
+#[pyo3(text_signature = "(open, high, low, close, body_threshold=0.15)")]
+/// Detect High Wave Candlestick Pattern
+///
+/// Identifies high wave candles characterized by long upper and lower shadows with
+/// a very small body. Similar to long-legged doji but allows slightly larger body.
+/// Indicates extreme volatility and market indecision. Often signals potential
+/// reversal or consolidation.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// body_threshold : float, optional
+///     Maximum body-to-range ratio (default: 0.15)
+///
+/// Returns
+/// -------
+/// list of float - 100 where high wave detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> hw = py_highwave([10.3], [11.5], [9.0], [10.5])
+/// >>> hw[0]  # High wave detected
+/// 100.0
 fn py_highwave(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1721,7 +3946,13 @@ fn py_highwave(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::highwave(&open, &high, &low, &close, body_threshold.unwrap_or(0.15)))
+    Ok(indicators::highwave(
+        &open,
+        &high,
+        &low,
+        &close,
+        body_threshold.unwrap_or(0.15),
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -1732,7 +3963,7 @@ fn py_hikkake(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::hikkake(&open, &high, &low, &close))
+    Ok(indicators::hikkake(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1743,7 +3974,7 @@ fn py_hikkake_mod(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::hikkake_mod(&open, &high, &low, &close))
+    Ok(indicators::hikkake_mod(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1754,7 +3985,7 @@ fn py_ladder_bottom(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::ladder_bottom(&open, &high, &low, &close))
+    Ok(indicators::ladder_bottom(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1765,11 +3996,47 @@ fn py_mat_hold(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::mat_hold(&open, &high, &low, &close))
+    Ok(indicators::mat_hold(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(signature = (open, high, low, close, body_threshold=0.1))]
+#[pyo3(text_signature = "(open, high, low, close, body_threshold=0.1)")]
+/// Detect Rickshaw Man Candlestick Pattern
+///
+/// Identifies rickshaw man patterns, a doji with long shadows and open/close near
+/// the middle of the range. Similar to long-legged doji but specifically requires
+/// the body to be centered. Indicates extreme indecision with bulls and bears
+/// fighting to a standstill. Often precedes reversals.
+///
+/// Parameters
+/// ----------
+/// open : list of float
+///     Opening prices
+/// high : list of float
+///     High prices
+/// low : list of float
+///     Low prices
+/// close : list of float
+///     Closing prices
+/// body_threshold : float, optional
+///     Maximum body-to-range ratio (default: 0.1)
+///
+/// Returns
+/// -------
+/// list of float - 100 where rickshaw man detected, 0 otherwise
+///
+/// Raises
+/// ------
+/// ValueError
+///     If input arrays have different lengths or insufficient data
+///
+/// Examples
+/// --------
+/// >>> rm = py_rickshaw_man([10.5], [11.5], [9.5], [10.55])
+/// >>> rm[0]  # Rickshaw man detected
+/// 100.0
 fn py_rickshaw_man(
     open: Vec<f64>,
     high: Vec<f64>,
@@ -1777,7 +4044,13 @@ fn py_rickshaw_man(
     close: Vec<f64>,
     body_threshold: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::rickshaw_man(&open, &high, &low, &close, body_threshold.unwrap_or(0.1)))
+    Ok(indicators::rickshaw_man(
+        &open,
+        &high,
+        &low,
+        &close,
+        body_threshold.unwrap_or(0.1),
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -1788,7 +4061,7 @@ fn py_unique_3_river(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::unique_3_river(&open, &high, &low, &close))
+    Ok(indicators::unique_3_river(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1799,7 +4072,7 @@ fn py_xside_gap_3_methods(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::xside_gap_3_methods(&open, &high, &low, &close))
+    Ok(indicators::xside_gap_3_methods(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1810,7 +4083,7 @@ fn py_closing_marubozu(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::closing_marubozu(&open, &high, &low, &close))
+    Ok(indicators::closing_marubozu(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -1821,26 +4094,26 @@ fn py_breakaway(
     low: Vec<f64>,
     close: Vec<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::breakaway(&open, &high, &low, &close))
+    Ok(indicators::breakaway(&open, &high, &low, &close)?)
 }
 
 // ==================== Overlap Studies 指标包装 ====================
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_midpoint(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(indicators::midpoint(&values, period))
+    Ok(indicators::midpoint(&values, period)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_midprice(high: Vec<f64>, low: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(indicators::midprice(&high, &low, period))
+    Ok(indicators::midprice(&high, &low, period)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_trima(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(indicators::trima(&values, period))
+    Ok(indicators::trima(&values, period)?)
 }
 
 #[cfg(feature = "python")]
@@ -1856,11 +4129,12 @@ fn py_sar(
         &low,
         acceleration.unwrap_or(0.02),
         maximum.unwrap_or(0.2),
-    ))
+    )?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[allow(clippy::too_many_arguments)]
 fn py_sarext(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -1884,7 +4158,7 @@ fn py_sarext(
         af_init_short.unwrap_or(0.02),
         af_short.unwrap_or(0.02),
         af_max_short.unwrap_or(0.2),
-    ))
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -1898,12 +4172,13 @@ fn py_mama(
         &values,
         fast_limit.unwrap_or(0.5),
         slow_limit.unwrap_or(0.05),
-    ))
+    )?)
 }
 
 // ==================== SFG 交易信号指标包装 ====================
 #[cfg(feature = "python")]
 #[pyfunction]
+#[allow(clippy::too_many_arguments)]
 fn py_ai_supertrend(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -1915,17 +4190,21 @@ fn py_ai_supertrend(
     st_length: Option<usize>,
     st_multiplier: Option<f64>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::ai_supertrend(
-        &high,
-        &low,
-        &close,
-        k.unwrap_or(5),
-        n.unwrap_or(100),
-        price_trend.unwrap_or(10),
-        predict_trend.unwrap_or(10),
-        st_length.unwrap_or(10),
-        st_multiplier.unwrap_or(3.0),
-    ))
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::ai_supertrend(
+            &high,
+            &low,
+            &close,
+            k.unwrap_or(5),
+            n.unwrap_or(100),
+            price_trend.unwrap_or(10),
+            predict_trend.unwrap_or(10),
+            st_length.unwrap_or(10),
+            st_multiplier.unwrap_or(3.0),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -1936,12 +4215,16 @@ fn py_ai_momentum_index(
     trend_length: Option<usize>,
     smooth: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::ai_momentum_index(
-        &close,
-        k.unwrap_or(50),
-        trend_length.unwrap_or(14),
-        smooth.unwrap_or(3),
-    ))
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::ai_momentum_index(
+            &close,
+            k.unwrap_or(50),
+            trend_length.unwrap_or(14),
+            smooth.unwrap_or(3),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -1954,16 +4237,20 @@ fn py_dynamic_macd(
     fast_length: Option<usize>,
     slow_length: Option<usize>,
     signal_smooth: Option<usize>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::dynamic_macd(
-        &open,
-        &high,
-        &low,
-        &close,
-        fast_length.unwrap_or(12),
-        slow_length.unwrap_or(26),
-        signal_smooth.unwrap_or(9),
-    ))
+) -> PyResult<Vec5F64> {
+    let len = close.len();
+    ok_or_nan_vec5(
+        indicators::dynamic_macd(
+            &open,
+            &high,
+            &low,
+            &close,
+            fast_length.unwrap_or(12),
+            slow_length.unwrap_or(26),
+            signal_smooth.unwrap_or(9),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -1977,15 +4264,19 @@ fn py_atr2_signals(
     confirmation_threshold: Option<f64>,
     momentum_window: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::atr2_signals(
-        &high,
-        &low,
-        &close,
-        &volume,
-        trend_length.unwrap_or(14),
-        confirmation_threshold.unwrap_or(2.0),
-        momentum_window.unwrap_or(10),
-    ))
+    let len = close.len();
+    ok_or_nan_vec3(
+        indicators::atr2_signals(
+            &high,
+            &low,
+            &close,
+            &volume,
+            trend_length.unwrap_or(14),
+            confirmation_threshold.unwrap_or(2.0),
+            momentum_window.unwrap_or(10),
+        ),
+        len,
+    )
 }
 
 // ==================== SFG ML 增强版指标包装 ====================
@@ -1994,6 +4285,7 @@ fn py_atr2_signals(
 /// 返回: (supertrend, direction, buy_signals, sell_signals, stop_loss, take_profit)
 #[cfg(feature = "python")]
 #[pyfunction]
+#[allow(clippy::too_many_arguments)]
 fn py_ai_supertrend_ml(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -2003,7 +4295,8 @@ fn py_ai_supertrend_ml(
     model_type: Option<String>,
     lookback: Option<usize>,
     train_window: Option<usize>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+) -> PyResult<Vec6F64> {
+    let len = close.len();
     let model_str = model_type.unwrap_or_else(|| "linreg".to_string());
     let result = indicators::ai_supertrend_ml(
         &high,
@@ -2014,21 +4307,25 @@ fn py_ai_supertrend_ml(
         &model_str,
         lookback.unwrap_or(10),
         train_window.unwrap_or(200),
-    );
-    Ok((
-        result.supertrend,
-        result.direction,
-        result.buy_signals,
-        result.sell_signals,
-        result.stop_loss,
-        result.take_profit,
-    ))
+    )
+    .map(|result| {
+        (
+            result.supertrend,
+            result.direction,
+            result.buy_signals,
+            result.sell_signals,
+            result.stop_loss,
+            result.take_profit,
+        )
+    });
+    ok_or_nan_vec6(result, len)
 }
 
 /// ATR2 信号 ML 增强版
 /// 返回: (rsi, buy_signals, sell_signals, signal_strength, stop_loss, take_profit)
 #[cfg(feature = "python")]
 #[pyfunction]
+#[allow(clippy::too_many_arguments)]
 fn py_atr2_signals_ml(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -2038,7 +4335,8 @@ fn py_atr2_signals_ml(
     atr_period: Option<usize>,
     ridge_alpha: Option<f64>,
     momentum_window: Option<usize>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+) -> PyResult<Vec6F64> {
+    let len = close.len();
     let result = indicators::atr2_signals_ml(
         &high,
         &low,
@@ -2048,15 +4346,18 @@ fn py_atr2_signals_ml(
         atr_period.unwrap_or(14),
         ridge_alpha.unwrap_or(1.0),
         momentum_window.unwrap_or(10),
-    );
-    Ok((
-        result.rsi,
-        result.buy_signals,
-        result.sell_signals,
-        result.signal_strength,
-        result.stop_loss,
-        result.take_profit,
-    ))
+    )
+    .map(|result| {
+        (
+            result.rsi,
+            result.buy_signals,
+            result.sell_signals,
+            result.signal_strength,
+            result.stop_loss,
+            result.take_profit,
+        )
+    });
+    ok_or_nan_vec6(result, len)
 }
 
 /// AI Momentum Index ML 增强版
@@ -2070,7 +4371,8 @@ fn py_ai_momentum_index_ml(
     use_polynomial: Option<bool>,
     lookback: Option<usize>,
     train_window: Option<usize>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+) -> PyResult<Vec6F64> {
+    let len = close.len();
     let result = indicators::ai_momentum_index_ml(
         &close,
         rsi_period.unwrap_or(14),
@@ -2078,15 +4380,18 @@ fn py_ai_momentum_index_ml(
         use_polynomial.unwrap_or(false),
         lookback.unwrap_or(5),
         train_window.unwrap_or(200),
-    );
-    Ok((
-        result.rsi,
-        result.predicted_momentum,
-        result.zero_cross_buy,
-        result.zero_cross_sell,
-        result.overbought,
-        result.oversold,
-    ))
+    )
+    .map(|result| {
+        (
+            result.rsi,
+            result.predicted_momentum,
+            result.zero_cross_buy,
+            result.zero_cross_sell,
+            result.overbought,
+            result.oversold,
+        )
+    });
+    ok_or_nan_vec6(result, len)
 }
 
 /// Pivot 买卖信号
@@ -2098,17 +4403,21 @@ fn py_pivot_buy_sell(
     low: Vec<f64>,
     close: Vec<f64>,
     lookback: Option<usize>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
-    let result = indicators::pivot_buy_sell(&high, &low, &close, lookback.unwrap_or(5));
-    Ok((
-        result.pivot,
-        result.r1,
-        result.r2,
-        result.s1,
-        result.s2,
-        result.buy_signals,
-        result.sell_signals,
-    ))
+) -> PyResult<Vec7F64> {
+    let len = close.len();
+    let result =
+        indicators::pivot_buy_sell(&high, &low, &close, lookback.unwrap_or(5)).map(|result| {
+            (
+                result.pivot,
+                result.r1,
+                result.r2,
+                result.s1,
+                result.s2,
+                result.buy_signals,
+                result.sell_signals,
+            )
+        });
+    ok_or_nan_vec7(result, len)
 }
 
 // ==================== SFG 市场结构分析包装 ====================
@@ -2148,7 +4457,7 @@ fn py_detect_divergence(
 /// 返回: (bullish_fvg, bearish_fvg, fvg_upper, fvg_lower)
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_fvg_signals(high: Vec<f64>, low: Vec<f64>) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+fn py_fvg_signals(high: Vec<f64>, low: Vec<f64>) -> PyResult<Vec4F64> {
     let (bullish, bearish, upper, lower) = indicators::fvg_signals(&high, &low);
     Ok((bullish, bearish, upper, lower))
 }
@@ -2157,9 +4466,16 @@ fn py_fvg_signals(high: Vec<f64>, low: Vec<f64>) -> PyResult<(Vec<f64>, Vec<f64>
 /// 返回: (above_average, relative_volume, volume_spike)
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_volume_filter(volume: Vec<f64>, period: Option<usize>) -> PyResult<(Vec<bool>, Vec<f64>, Vec<bool>)> {
+fn py_volume_filter(
+    volume: Vec<f64>,
+    period: Option<usize>,
+) -> PyResult<(Vec<bool>, Vec<f64>, Vec<bool>)> {
     let result = indicators::volume_filter(&volume, period.unwrap_or(20));
-    Ok((result.above_average, result.relative_volume, result.volume_spike))
+    Ok((
+        result.above_average,
+        result.relative_volume,
+        result.volume_spike,
+    ))
 }
 
 // ==================== SFG 信号工具包装 ====================
@@ -2204,9 +4520,15 @@ fn py_calculate_stops(
     let tp_mult = tp_multiplier.unwrap_or(2.5);
 
     let (stop_loss, take_profit) = if is_long {
-        (entry_price - atr_value * sl_mult, entry_price + atr_value * tp_mult)
+        (
+            entry_price - atr_value * sl_mult,
+            entry_price + atr_value * tp_mult,
+        )
     } else {
-        (entry_price + atr_value * sl_mult, entry_price - atr_value * tp_mult)
+        (
+            entry_price + atr_value * sl_mult,
+            entry_price - atr_value * tp_mult,
+        )
     };
 
     Ok((stop_loss, take_profit))
@@ -2223,9 +4545,9 @@ fn py_pd_array_signals(
     low: Vec<f64>,
     close: Vec<f64>,
     swing_lookback: Option<usize>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+) -> PyResult<Vec4F64> {
     // Compute ATR internally for convenience
-    let atr_values = indicators::atr(&high, &low, &close, 14);
+    let atr_values = indicators::atr(&high, &low, &close, 14)?;
     let (buy, sell, sl, tp) = indicators::pd_array_signals(
         &high,
         &low,
@@ -2246,14 +4568,9 @@ fn py_breaker_block_signals(
     low: Vec<f64>,
     close: Vec<f64>,
     lookback: Option<usize>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
-    let (buy, sell, upper, lower) = indicators::breaker_block_signals(
-        &open,
-        &high,
-        &low,
-        &close,
-        lookback.unwrap_or(20),
-    );
+) -> PyResult<Vec4F64> {
+    let (buy, sell, upper, lower) =
+        indicators::breaker_block_signals(&open, &high, &low, &close, lookback.unwrap_or(20));
     Ok((buy, sell, upper, lower))
 }
 
@@ -2269,17 +4586,20 @@ fn py_general_parameters_signals(
     ema_slow: Option<usize>,
     atr_period: Option<usize>,
     grid_multiplier: Option<f64>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
-    let (buy, sell, sl, tp) = indicators::general_parameters_signals(
-        &high,
-        &low,
-        &close,
-        ema_fast.unwrap_or(20),
-        ema_slow.unwrap_or(50),
-        atr_period.unwrap_or(14),
-        grid_multiplier.unwrap_or(1.0),
-    );
-    Ok((buy, sell, sl, tp))
+) -> PyResult<Vec4F64> {
+    let len = close.len();
+    ok_or_nan_vec4(
+        indicators::general_parameters_signals(
+            &high,
+            &low,
+            &close,
+            ema_fast.unwrap_or(20),
+            ema_slow.unwrap_or(50),
+            atr_period.unwrap_or(14),
+            grid_multiplier.unwrap_or(1.0),
+        ),
+        len,
+    )
 }
 
 /// Linear Regression + Supply/Demand Zones 信号
@@ -2293,9 +4613,9 @@ fn py_linreg_supply_demand_signals(
     volume: Vec<f64>,
     linreg_period: Option<usize>,
     tolerance: Option<f64>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+) -> PyResult<Vec4F64> {
     // Compute ATR internally for convenience
-    let atr_values = indicators::atr(&high, &low, &close, 14);
+    let atr_values = indicators::atr(&high, &low, &close, 14)?;
     let (buy, sell, sl, tp) = indicators::linreg_supply_demand_signals(
         &high,
         &low,
@@ -2312,31 +4632,31 @@ fn py_linreg_supply_demand_signals(
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_ht_dcperiod(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(indicators::ht_dcperiod(&values))
+    Ok(indicators::ht_dcperiod(&values)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_ht_dcphase(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(indicators::ht_dcphase(&values))
+    Ok(indicators::ht_dcphase(&values)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_ht_phasor(values: Vec<f64>) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::ht_phasor(&values))
+    Ok(indicators::ht_phasor(&values)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_ht_sine(values: Vec<f64>) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::ht_sine(&values))
+    Ok(indicators::ht_sine(&values)?)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_ht_trendmode(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(indicators::ht_trendmode(&values))
+    Ok(indicators::ht_trendmode(&values)?)
 }
 
 #[cfg(test)]
@@ -2397,14 +4717,18 @@ fn py_adosc(
     fast_period: Option<usize>,
     slow_period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::chaikin_ad_oscillator(
-        &high,
-        &low,
-        &close,
-        &volume,
-        fast_period.unwrap_or(3),
-        slow_period.unwrap_or(10),
-    ))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::chaikin_ad_oscillator(
+            &high,
+            &low,
+            &close,
+            &volume,
+            fast_period.unwrap_or(3),
+            slow_period.unwrap_or(10),
+        ),
+        len,
+    )
 }
 
 // Momentum Indicators
@@ -2415,11 +4739,11 @@ fn py_apo(
     fast_period: Option<usize>,
     slow_period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::apo(
-        &close,
-        fast_period.unwrap_or(12),
-        slow_period.unwrap_or(26),
-    ))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::apo(&close, fast_period.unwrap_or(12), slow_period.unwrap_or(26)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -2429,17 +4753,18 @@ fn py_ppo(
     fast_period: Option<usize>,
     slow_period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::ppo(
-        &close,
-        fast_period.unwrap_or(12),
-        slow_period.unwrap_or(26),
-    ))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::ppo(&close, fast_period.unwrap_or(12), slow_period.unwrap_or(26)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_cmo(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(indicators::cmo(&close, period.unwrap_or(14)))
+    let len = close.len();
+    ok_or_nan_vec(indicators::cmo(&close, period.unwrap_or(14)), len)
 }
 
 // Trend Indicators
@@ -2451,7 +4776,11 @@ fn py_dx(
     close: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::dx(&high, &low, &close, period.unwrap_or(14)))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::dx(&high, &low, &close, period.unwrap_or(14)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -2462,7 +4791,11 @@ fn py_plus_di(
     close: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::plus_di(&high, &low, &close, period.unwrap_or(14)))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::plus_di(&high, &low, &close, period.unwrap_or(14)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -2473,18 +4806,22 @@ fn py_minus_di(
     close: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::minus_di(&high, &low, &close, period.unwrap_or(14)))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::minus_di(&high, &low, &close, period.unwrap_or(14)),
+        len,
+    )
 }
 
 // Overlap Studies (Advanced MA)
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_t3(
-    values: Vec<f64>,
-    period: Option<usize>,
-    vfactor: Option<f64>,
-) -> PyResult<Vec<f64>> {
-    Ok(utils::t3(&values, period.unwrap_or(5), vfactor.unwrap_or(0.7)))
+fn py_t3(values: Vec<f64>, period: Option<usize>, vfactor: Option<f64>) -> PyResult<Vec<f64>> {
+    let len = values.len();
+    ok_or_nan_vec(
+        utils::t3(&values, period.unwrap_or(5), vfactor.unwrap_or(0.7)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -2495,24 +4832,28 @@ fn py_kama(
     fast_period: Option<usize>,
     slow_period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(utils::kama(
-        &values,
-        period.unwrap_or(10),
-        fast_period.unwrap_or(2),
-        slow_period.unwrap_or(30),
-    ))
+    let len = values.len();
+    ok_or_nan_vec(
+        utils::kama(
+            &values,
+            period.unwrap_or(10),
+            fast_period.unwrap_or(2),
+            slow_period.unwrap_or(30),
+        ),
+        len,
+    )
 }
 
 // ==================== Batch 8: pandas-ta 独有指标 (180 → 190) ====================
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_entropy(
-    close: Vec<f64>,
-    period: Option<usize>,
-    bins: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::entropy(&close, period.unwrap_or(10), bins.unwrap_or(10)))
+fn py_entropy(close: Vec<f64>, period: Option<usize>, bins: Option<usize>) -> PyResult<Vec<f64>> {
+    Ok(indicators::entropy(
+        &close,
+        period.unwrap_or(10),
+        bins.unwrap_or(10),
+    )?)
 }
 
 #[cfg(feature = "python")]
@@ -2524,17 +4865,22 @@ fn py_aberration(
     period: Option<usize>,
     atr_period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::aberration(
-        &high,
-        &low,
-        &close,
-        period.unwrap_or(20),
-        atr_period.unwrap_or(20),
-    ))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::aberration(
+            &high,
+            &low,
+            &close,
+            period.unwrap_or(20),
+            atr_period.unwrap_or(20),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[allow(clippy::too_many_arguments)]
 fn py_squeeze(
     high: Vec<f64>,
     low: Vec<f64>,
@@ -2545,16 +4891,20 @@ fn py_squeeze(
     kc_atr_period: Option<usize>,
     kc_mult: Option<f64>,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::squeeze(
-        &high,
-        &low,
-        &close,
-        bb_period.unwrap_or(20),
-        bb_std.unwrap_or(2.0),
-        kc_period.unwrap_or(20),
-        kc_atr_period.unwrap_or(20),
-        kc_mult.unwrap_or(1.5),
-    ))
+    let len = close.len();
+    ok_or_nan_vec3(
+        indicators::squeeze(
+            &high,
+            &low,
+            &close,
+            bb_period.unwrap_or(20),
+            bb_std.unwrap_or(2.0),
+            kc_period.unwrap_or(20),
+            kc_atr_period.unwrap_or(20),
+            kc_mult.unwrap_or(1.5),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -2565,36 +4915,44 @@ fn py_qqe(
     smooth: Option<usize>,
     multiplier: Option<f64>,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::qqe(
-        &close,
-        rsi_period.unwrap_or(14),
-        smooth.unwrap_or(5),
-        multiplier.unwrap_or(4.236),
-    ))
+    let len = close.len();
+    ok_or_nan_vec3(
+        indicators::qqe(
+            &close,
+            rsi_period.unwrap_or(14),
+            smooth.unwrap_or(5),
+            multiplier.unwrap_or(4.236),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_cti(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(indicators::cti(&close, period.unwrap_or(12)))
+    let len = close.len();
+    ok_or_nan_vec(indicators::cti(&close, period.unwrap_or(12)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_er(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(indicators::er(&close, period.unwrap_or(10)))
+    let len = close.len();
+    ok_or_nan_vec(indicators::er(&close, period.unwrap_or(10)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_bias(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(indicators::bias(&close, period.unwrap_or(20)))
+    let len = close.len();
+    ok_or_nan_vec(indicators::bias(&close, period.unwrap_or(20)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_psl(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(indicators::psl(&close, period.unwrap_or(12)))
+    let len = close.len();
+    ok_or_nan_vec(indicators::psl(&close, period.unwrap_or(12)), len)
 }
 
 #[cfg(feature = "python")]
@@ -2607,14 +4965,18 @@ fn py_rvi(
     period: Option<usize>,
     signal_period: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::rvi(
-        &open,
-        &high,
-        &low,
-        &close,
-        period.unwrap_or(10),
-        signal_period.unwrap_or(4),
-    ))
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::rvi(
+            &open,
+            &high,
+            &low,
+            &close,
+            period.unwrap_or(10),
+            signal_period.unwrap_or(4),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -2627,14 +4989,18 @@ fn py_inertia(
     rvi_period: Option<usize>,
     regression_period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::inertia(
-        &open,
-        &high,
-        &low,
-        &close,
-        rvi_period.unwrap_or(14),
-        regression_period.unwrap_or(20),
-    ))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::inertia(
+            &open,
+            &high,
+            &low,
+            &close,
+            rvi_period.unwrap_or(14),
+            regression_period.unwrap_or(20),
+        ),
+        len,
+    )
 }
 
 // ==================== Batch 9: pandas-ta 独有指标（第二批）(190 → 200) ====================
@@ -2648,23 +5014,24 @@ fn py_alligator(
     teeth_period: Option<usize>,
     lips_period: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
-    Ok(indicators::alligator(
-        &high,
-        &low,
-        jaw_period.unwrap_or(13),
-        teeth_period.unwrap_or(8),
-        lips_period.unwrap_or(5),
-    ))
+    let len = high.len();
+    ok_or_nan_vec3(
+        indicators::alligator(
+            &high,
+            &low,
+            jaw_period.unwrap_or(13),
+            teeth_period.unwrap_or(8),
+            lips_period.unwrap_or(5),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_efi(
-    close: Vec<f64>,
-    volume: Vec<f64>,
-    period: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::efi(&close, &volume, period.unwrap_or(13)))
+fn py_efi(close: Vec<f64>, volume: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(indicators::efi(&close, &volume, period.unwrap_or(13)), len)
 }
 
 #[cfg(feature = "python")]
@@ -2677,14 +5044,18 @@ fn py_kst(
     roc4: Option<usize>,
     signal_period: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::kst(
-        &close,
-        roc1.unwrap_or(10),
-        roc2.unwrap_or(15),
-        roc3.unwrap_or(20),
-        roc4.unwrap_or(30),
-        signal_period.unwrap_or(9),
-    ))
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::kst(
+            &close,
+            roc1.unwrap_or(10),
+            roc2.unwrap_or(15),
+            roc3.unwrap_or(20),
+            roc4.unwrap_or(30),
+            signal_period.unwrap_or(9),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -2695,22 +5066,21 @@ fn py_stc(
     slow: Option<usize>,
     cycle: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::stc(
-        &close,
-        fast.unwrap_or(23),
-        slow.unwrap_or(50),
-        cycle.unwrap_or(10),
-    ))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::stc(&close, fast.unwrap_or(23), slow.unwrap_or(50), cycle.unwrap_or(10)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_tdfi(
-    close: Vec<f64>,
-    period: Option<usize>,
-    smooth: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::tdfi(&close, period.unwrap_or(13), smooth.unwrap_or(3)))
+fn py_tdfi(close: Vec<f64>, period: Option<usize>, smooth: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::tdfi(&close, period.unwrap_or(13), smooth.unwrap_or(3)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -2723,14 +5093,18 @@ fn py_wae(
     bb_period: Option<usize>,
     multiplier: Option<f64>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::wae(
-        &close,
-        fast.unwrap_or(20),
-        slow.unwrap_or(40),
-        signal.unwrap_or(9),
-        bb_period.unwrap_or(20),
-        multiplier.unwrap_or(2.0),
-    ))
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::wae(
+            &close,
+            fast.unwrap_or(20),
+            slow.unwrap_or(40),
+            signal.unwrap_or(9),
+            bb_period.unwrap_or(20),
+            multiplier.unwrap_or(2.0),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -2743,14 +5117,18 @@ fn py_smi(
     smooth1: Option<usize>,
     smooth2: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::smi(
-        &high,
-        &low,
-        &close,
-        period.unwrap_or(13),
-        smooth1.unwrap_or(25),
-        smooth2.unwrap_or(2),
-    ))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::smi(
+            &high,
+            &low,
+            &close,
+            period.unwrap_or(13),
+            smooth1.unwrap_or(25),
+            smooth2.unwrap_or(2),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -2761,12 +5139,16 @@ fn py_coppock(
     period2: Option<usize>,
     wma_period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::coppock(
-        &close,
-        period1.unwrap_or(11),
-        period2.unwrap_or(14),
-        wma_period.unwrap_or(10),
-    ))
+    let len = close.len();
+    ok_or_nan_vec(
+        indicators::coppock(
+            &close,
+            period1.unwrap_or(11),
+            period2.unwrap_or(14),
+            wma_period.unwrap_or(10),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -2777,17 +5159,15 @@ fn py_pgo(
     close: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::pgo(&high, &low, &close, period.unwrap_or(14)))
+    let len = close.len();
+    ok_or_nan_vec(indicators::pgo(&high, &low, &close, period.unwrap_or(14)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_vwma(
-    close: Vec<f64>,
-    volume: Vec<f64>,
-    period: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::vwma(&close, &volume, period.unwrap_or(20)))
+fn py_vwma(close: Vec<f64>, volume: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(indicators::vwma(&close, &volume, period.unwrap_or(20)), len)
 }
 
 // Batch 10: 最终批次（202 → 212 指标，达成 100%）
@@ -2800,59 +5180,50 @@ fn py_alma(
     offset: Option<f64>,
     sigma: Option<f64>,
 ) -> PyResult<Vec<f64>> {
-    Ok(indicators::alma(
-        &values,
-        period.unwrap_or(9),
-        offset.unwrap_or(0.85),
-        sigma.unwrap_or(6.0),
-    ))
+    let len = values.len();
+    ok_or_nan_vec(
+        indicators::alma(
+            &values,
+            period.unwrap_or(9),
+            offset.unwrap_or(0.85),
+            sigma.unwrap_or(6.0),
+        ),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_vidya(
-    close: Vec<f64>,
-    period: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::vidya(&close, period.unwrap_or(14)))
+fn py_vidya(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(indicators::vidya(&close, period.unwrap_or(14)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_pwma(
-    values: Vec<f64>,
-    period: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::pwma(&values, period.unwrap_or(5)))
+fn py_pwma(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = values.len();
+    ok_or_nan_vec(indicators::pwma(&values, period.unwrap_or(5)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_sinwma(
-    values: Vec<f64>,
-    period: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::sinwma(&values, period.unwrap_or(14)))
+fn py_sinwma(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = values.len();
+    ok_or_nan_vec(indicators::sinwma(&values, period.unwrap_or(14)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_swma(
-    values: Vec<f64>,
-    period: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::swma(&values, period.unwrap_or(7)))
+fn py_swma(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = values.len();
+    ok_or_nan_vec(indicators::swma(&values, period.unwrap_or(7)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_bop(
-    open: Vec<f64>,
-    high: Vec<f64>,
-    low: Vec<f64>,
-    close: Vec<f64>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::bop(&open, &high, &low, &close))
+fn py_bop(open: Vec<f64>, high: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f64>> {
+    Ok(indicators::bop(&open, &high, &low, &close)?)
 }
 
 #[cfg(feature = "python")]
@@ -2863,34 +5234,32 @@ fn py_ssl_channel(
     close: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(indicators::ssl_channel(&high, &low, &close, period.unwrap_or(10)))
+    let len = close.len();
+    ok_or_nan_vec2(
+        indicators::ssl_channel(&high, &low, &close, period.unwrap_or(10)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_cfo(
-    close: Vec<f64>,
-    period: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::cfo(&close, period.unwrap_or(14)))
+fn py_cfo(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = close.len();
+    ok_or_nan_vec(indicators::cfo(&close, period.unwrap_or(14)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_slope(
-    values: Vec<f64>,
-    period: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::slope(&values, period.unwrap_or(14)))
+fn py_slope(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = values.len();
+    ok_or_nan_vec(indicators::slope(&values, period.unwrap_or(14)), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_percent_rank(
-    values: Vec<f64>,
-    period: Option<usize>,
-) -> PyResult<Vec<f64>> {
-    Ok(indicators::percent_rank(&values, period.unwrap_or(14)))
+fn py_percent_rank(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
+    let len = values.len();
+    ok_or_nan_vec(indicators::percent_rank(&values, period.unwrap_or(14)), len)
 }
 
 // ==================== 谐波形态指标包装 ====================
@@ -2955,7 +5324,7 @@ fn py_harmonics(
     left_bars: Option<usize>,
     right_bars: Option<usize>,
     min_probability: Option<f64>,
-) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)> {
+) -> PyResult<Vec4F64> {
     Ok(indicators::harmonics::harmonics_signal(
         &high,
         &low,
@@ -2986,35 +5355,38 @@ fn py_harmonics_patterns(
         include_forming.unwrap_or(true),
     );
 
-    let result = patterns.iter().map(|p| {
-        let state = match p.state {
-            indicators::harmonics::PatternState::Forming => "forming".to_string(),
-            indicators::harmonics::PatternState::Complete => "complete".to_string(),
-        };
+    let result = patterns
+        .iter()
+        .map(|p| {
+            let state = match p.state {
+                indicators::harmonics::PatternState::Forming => "forming".to_string(),
+                indicators::harmonics::PatternState::Complete => "complete".to_string(),
+            };
 
-        PyHarmonicPattern {
-            pattern_type: p.pattern_type.name_en().to_string(),
-            pattern_type_zh: p.pattern_type.name_zh().to_string(),
-            is_bullish: p.is_bullish,
-            state,
-            x_index: p.x.index,
-            x_price: p.x.price,
-            a_index: p.a.index,
-            a_price: p.a.price,
-            b_index: p.b.index,
-            b_price: p.b.price,
-            c_index: p.c.map(|c| c.index),
-            c_price: p.c.map(|c| c.price),
-            d_index: p.d.map(|d| d.index),
-            d_price: p.d.map(|d| d.price),
-            prz_high: p.prz.as_ref().map(|prz| prz.price_high),
-            prz_low: p.prz.as_ref().map(|prz| prz.price_low),
-            prz_center: p.prz.as_ref().map(|prz| prz.price_center),
-            probability: p.completion_probability,
-            target_prices: p.target_prices.clone(),
-            stop_loss: p.stop_loss,
-        }
-    }).collect();
+            PyHarmonicPattern {
+                pattern_type: p.pattern_type.name_en().to_string(),
+                pattern_type_zh: p.pattern_type.name_zh().to_string(),
+                is_bullish: p.is_bullish,
+                state,
+                x_index: p.x.index,
+                x_price: p.x.price,
+                a_index: p.a.index,
+                a_price: p.a.price,
+                b_index: p.b.index,
+                b_price: p.b.price,
+                c_index: p.c.map(|c| c.index),
+                c_price: p.c.map(|c| c.price),
+                d_index: p.d.map(|d| d.index),
+                d_price: p.d.map(|d| d.price),
+                prz_high: p.prz.as_ref().map(|prz| prz.price_high),
+                prz_low: p.prz.as_ref().map(|prz| prz.price_low),
+                prz_center: p.prz.as_ref().map(|prz| prz.price_center),
+                probability: p.completion_probability,
+                target_prices: p.target_prices.clone(),
+                stop_loss: p.stop_loss,
+            }
+        })
+        .collect();
 
     Ok(result)
 }
@@ -3035,5 +5407,8 @@ fn py_swing_points(
         left_bars.unwrap_or(5),
         right_bars.unwrap_or(5),
     );
-    Ok(swings.iter().map(|s| (s.index, s.price, s.is_high)).collect())
+    Ok(swings
+        .iter()
+        .map(|s| (s.index, s.price, s.is_high))
+        .collect())
 }

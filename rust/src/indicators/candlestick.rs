@@ -1,19 +1,25 @@
+//! Candlestick Pattern Recognition Module
+//!
+//! 实现经典的蜡烛图形态识别，包括：
+//! - Doji (十字星)
+//! - Hammer / Inverted Hammer (锤子线/倒锤子线)
+//! - Hanging Man (上吊线)
+//! - Engulfing (吞没形态)
+//! - Harami (孕线形态)
+//! - Piercing / Dark Cloud (刺透/乌云盖顶)
+//! - Morning/Evening Star (早晨之星/黄昏之星)
+//! - Three White Soldiers / Three Black Crows (三白兵/三黑鸦)
+
 // TA-Lib 兼容 API: 部分函数需要 high/low 参数但未使用
 #![allow(unused_variables)]
+// 数值计算中显式索引比迭代器链更清晰
+#![allow(clippy::needless_range_loop)]
 
-/// Candlestick Pattern Recognition Module
-///
-/// 实现经典的蜡烛图形态识别，包括：
-/// - Doji (十字星)
-/// - Hammer / Inverted Hammer (锤子线/倒锤子线)
-/// - Hanging Man (上吊线)
-/// - Engulfing (吞没形态)
-/// - Harami (孕线形态)
-/// - Piercing / Dark Cloud (刺透/乌云盖顶)
-/// - Morning/Evening Star (早晨之星/黄昏之星)
-/// - Three White Soldiers / Three Black Crows (三白兵/三黑鸦)
+use crate::errors::HazeResult;
+use crate::utils::math::{is_not_zero, is_zero};
+use crate::{init_result, validate_full_ohlc, validate_pair};
 
-/// 辅助函数：计算蜡烛实体长度
+// 辅助函数：计算蜡烛实体长度
 fn body_length(open: f64, close: f64) -> f64 {
     (close - open).abs()
 }
@@ -73,9 +79,9 @@ pub fn doji(
     low: &[f64],
     close: &[f64],
     body_threshold: f64, // 默认 0.1 (10%)
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     for i in 0..n {
         let body = body_length(open[i], close[i]);
@@ -88,7 +94,7 @@ pub fn doji(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Hammer（锤子线）
@@ -99,14 +105,9 @@ pub fn doji(
 /// - 出现在下跌趋势底部
 ///
 /// 返回值：1.0 = Bullish Hammer, -1.0 = Bearish Hammer, 0.0 = 非 Hammer
-pub fn hammer(
-    open: &[f64],
-    high: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn hammer(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     for i in 0..n {
         let body = body_length(open[i], close[i]);
@@ -124,7 +125,7 @@ pub fn hammer(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Inverted Hammer（倒锤子线）
@@ -140,9 +141,9 @@ pub fn inverted_hammer(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     for i in 0..n {
         let body = body_length(open[i], close[i]);
@@ -160,7 +161,7 @@ pub fn inverted_hammer(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Hanging Man（上吊线）
@@ -173,23 +174,21 @@ pub fn inverted_hammer(
 /// - 上影线很小（< 实体长度）
 ///
 /// 返回值：-1.0 = Bearish Hanging Man, 0.0 = 非上吊线
-pub fn hanging_man(
-    open: &[f64],
-    high: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
+pub fn hanging_man(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
     // 形态与 Hammer 相同，只是上下文不同
     // 这里返回形态识别，趋势判断由上层逻辑处理
-    let hammer_result = hammer(open, high, low, close);
+    let hammer_result = hammer(open, high, low, close)?;
 
-    hammer_result.iter().map(|&x| {
-        if x != 0.0 {
-            -1.0 // 潜在的看跌信号
-        } else {
-            0.0
-        }
-    }).collect()
+    Ok(hammer_result
+        .iter()
+        .map(|&x| {
+            if is_not_zero(x) {
+                -1.0 // 潜在的看跌信号
+            } else {
+                0.0
+            }
+        })
+        .collect())
 }
 
 /// Bullish Engulfing（看涨吞没）
@@ -199,27 +198,24 @@ pub fn hanging_man(
 /// - 当前阳线实体完全吞没前一根阴线实体
 ///
 /// 返回值：1.0 = Bullish Engulfing, 0.0 = 非吞没, NaN = 数据不足
-pub fn bullish_engulfing(
-    open: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn bullish_engulfing(open: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_pair!(open, "open", close, "close");
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let prev_bearish = is_bearish(open[i-1], close[i-1]);
+        let prev_bearish = is_bearish(open[i - 1], close[i - 1]);
         let curr_bullish = is_bullish(open[i], close[i]);
 
         if prev_bearish && curr_bullish {
             // 当前阳线的开盘 < 前一阴线的收盘
             // 当前阳线的收盘 > 前一阴线的开盘
-            if open[i] <= close[i-1] && close[i] >= open[i-1] {
+            if open[i] <= close[i - 1] && close[i] >= open[i - 1] {
                 result[i] = 1.0;
             } else {
                 result[i] = 0.0;
@@ -229,7 +225,7 @@ pub fn bullish_engulfing(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Bearish Engulfing（看跌吞没）
@@ -239,27 +235,24 @@ pub fn bullish_engulfing(
 /// - 当前阴线实体完全吞没前一根阳线实体
 ///
 /// 返回值：-1.0 = Bearish Engulfing, 0.0 = 非吞没, NaN = 数据不足
-pub fn bearish_engulfing(
-    open: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn bearish_engulfing(open: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_pair!(open, "open", close, "close");
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let prev_bullish = is_bullish(open[i-1], close[i-1]);
+        let prev_bullish = is_bullish(open[i - 1], close[i - 1]);
         let curr_bearish = is_bearish(open[i], close[i]);
 
         if prev_bullish && curr_bearish {
             // 当前阴线的开盘 > 前一阳线的收盘
             // 当前阴线的收盘 < 前一阳线的开盘
-            if open[i] >= close[i-1] && close[i] <= open[i-1] {
+            if open[i] >= close[i - 1] && close[i] <= open[i - 1] {
                 result[i] = -1.0;
             } else {
                 result[i] = 0.0;
@@ -269,7 +262,7 @@ pub fn bearish_engulfing(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Bullish Harami（看涨孕线）
@@ -279,27 +272,27 @@ pub fn bearish_engulfing(
 /// - 当前为小阳线，实体完全包含在前一根阴线实体内
 ///
 /// 返回值：1.0 = Bullish Harami, 0.0 = 非孕线
-pub fn bullish_harami(
-    open: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn bullish_harami(open: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_pair!(open, "open", close, "close");
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let prev_bearish = is_bearish(open[i-1], close[i-1]);
+        let prev_bearish = is_bearish(open[i - 1], close[i - 1]);
         let curr_bullish = is_bullish(open[i], close[i]);
 
         if prev_bearish && curr_bullish {
             // 当前小阳线完全在前一大阴线内
-            if open[i] > close[i-1] && open[i] < open[i-1] &&
-               close[i] > close[i-1] && close[i] < open[i-1] {
+            if open[i] > close[i - 1]
+                && open[i] < open[i - 1]
+                && close[i] > close[i - 1]
+                && close[i] < open[i - 1]
+            {
                 result[i] = 1.0;
             } else {
                 result[i] = 0.0;
@@ -309,7 +302,7 @@ pub fn bullish_harami(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Bearish Harami（看跌孕线）
@@ -319,27 +312,27 @@ pub fn bullish_harami(
 /// - 当前为小阴线，实体完全包含在前一根阳线实体内
 ///
 /// 返回值：-1.0 = Bearish Harami, 0.0 = 非孕线
-pub fn bearish_harami(
-    open: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn bearish_harami(open: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_pair!(open, "open", close, "close");
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let prev_bullish = is_bullish(open[i-1], close[i-1]);
+        let prev_bullish = is_bullish(open[i - 1], close[i - 1]);
         let curr_bearish = is_bearish(open[i], close[i]);
 
         if prev_bullish && curr_bearish {
             // 当前小阴线完全在前一大阳线内
-            if open[i] < close[i-1] && open[i] > open[i-1] &&
-               close[i] < close[i-1] && close[i] > open[i-1] {
+            if open[i] < close[i - 1]
+                && open[i] > open[i - 1]
+                && close[i] < close[i - 1]
+                && close[i] > open[i - 1]
+            {
                 result[i] = -1.0;
             } else {
                 result[i] = 0.0;
@@ -349,7 +342,7 @@ pub fn bearish_harami(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Piercing Pattern（刺透形态）
@@ -360,30 +353,27 @@ pub fn bearish_harami(
 /// - 收盘价刺入前一阴线实体一半以上
 ///
 /// 返回值：1.0 = Piercing, 0.0 = 非刺透
-pub fn piercing_pattern(
-    open: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn piercing_pattern(open: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_pair!(low, "low", close, "close");
+    crate::errors::validation::validate_same_length(open, "open", close, "close")?;
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let prev_bearish = is_bearish(open[i-1], close[i-1]);
+        let prev_bearish = is_bearish(open[i - 1], close[i - 1]);
         let curr_bullish = is_bullish(open[i], close[i]);
 
         if prev_bearish && curr_bullish {
             // 当前开盘 < 前一最低
             // 当前收盘 > 前一中点（(开盘+收盘)/2）
-            let prev_midpoint = (open[i-1] + close[i-1]) / 2.0;
+            let prev_midpoint = (open[i - 1] + close[i - 1]) / 2.0;
 
-            if open[i] < low[i-1] && close[i] > prev_midpoint && close[i] < open[i-1] {
+            if open[i] < low[i - 1] && close[i] > prev_midpoint && close[i] < open[i - 1] {
                 result[i] = 1.0;
             } else {
                 result[i] = 0.0;
@@ -393,7 +383,7 @@ pub fn piercing_pattern(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Dark Cloud Cover（乌云盖顶）
@@ -404,30 +394,27 @@ pub fn piercing_pattern(
 /// - 收盘价深入前一阳线实体一半以上
 ///
 /// 返回值：-1.0 = Dark Cloud, 0.0 = 非乌云盖顶
-pub fn dark_cloud_cover(
-    open: &[f64],
-    high: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn dark_cloud_cover(open: &[f64], high: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_pair!(high, "high", close, "close");
+    crate::errors::validation::validate_same_length(open, "open", close, "close")?;
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let prev_bullish = is_bullish(open[i-1], close[i-1]);
+        let prev_bullish = is_bullish(open[i - 1], close[i - 1]);
         let curr_bearish = is_bearish(open[i], close[i]);
 
         if prev_bullish && curr_bearish {
             // 当前开盘 > 前一最高
             // 当前收盘 < 前一中点
-            let prev_midpoint = (open[i-1] + close[i-1]) / 2.0;
+            let prev_midpoint = (open[i - 1] + close[i - 1]) / 2.0;
 
-            if open[i] > high[i-1] && close[i] < prev_midpoint && close[i] > open[i-1] {
+            if open[i] > high[i - 1] && close[i] < prev_midpoint && close[i] > open[i - 1] {
                 result[i] = -1.0;
             } else {
                 result[i] = 0.0;
@@ -437,7 +424,7 @@ pub fn dark_cloud_cover(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Morning Star（早晨之星）
@@ -453,27 +440,28 @@ pub fn morning_star(
     _high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, _high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
     result[1] = 0.0;
 
     for i in 2..n {
-        let first_bearish = is_bearish(open[i-2], close[i-2]);
-        let second_small = body_length(open[i-1], close[i-1]) < body_length(open[i-2], close[i-2]) * 0.3;
+        let first_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let second_small =
+            body_length(open[i - 1], close[i - 1]) < body_length(open[i - 2], close[i - 2]) * 0.3;
         let third_bullish = is_bullish(open[i], close[i]);
 
         if first_bearish && second_small && third_bullish {
             // 第二根向下跳空（最高价 < 第一根最低价）
-            let gap_down = low[i-1] < close[i-2];
+            let gap_down = low[i - 1] < close[i - 2];
             // 第三根收盘价 > 第一根中点
-            let first_midpoint = (open[i-2] + close[i-2]) / 2.0;
+            let first_midpoint = (open[i - 2] + close[i - 2]) / 2.0;
 
             if gap_down && close[i] > first_midpoint {
                 result[i] = 1.0;
@@ -485,7 +473,7 @@ pub fn morning_star(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Evening Star（黄昏之星）
@@ -501,27 +489,28 @@ pub fn evening_star(
     high: &[f64],
     _low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, _low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
     result[1] = 0.0;
 
     for i in 2..n {
-        let first_bullish = is_bullish(open[i-2], close[i-2]);
-        let second_small = body_length(open[i-1], close[i-1]) < body_length(open[i-2], close[i-2]) * 0.3;
+        let first_bullish = is_bullish(open[i - 2], close[i - 2]);
+        let second_small =
+            body_length(open[i - 1], close[i - 1]) < body_length(open[i - 2], close[i - 2]) * 0.3;
         let third_bearish = is_bearish(open[i], close[i]);
 
         if first_bullish && second_small && third_bearish {
             // 第二根向上跳空（最低价 > 第一根最高价）
-            let gap_up = high[i-1] > close[i-2];
+            let gap_up = high[i - 1] > close[i - 2];
             // 第三根收盘价 < 第一根中点
-            let first_midpoint = (open[i-2] + close[i-2]) / 2.0;
+            let first_midpoint = (open[i - 2] + close[i - 2]) / 2.0;
 
             if gap_up && close[i] < first_midpoint {
                 result[i] = -1.0;
@@ -533,7 +522,7 @@ pub fn evening_star(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Three White Soldiers（三白兵）
@@ -545,38 +534,39 @@ pub fn evening_star(
 /// - 上影线较短
 ///
 /// 返回值：1.0 = Three White Soldiers, 0.0 = 非三白兵
-pub fn three_white_soldiers(
-    open: &[f64],
-    high: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn three_white_soldiers(open: &[f64], high: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_pair!(high, "high", close, "close");
+    crate::errors::validation::validate_same_length(open, "open", close, "close")?;
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
     result[1] = 0.0;
 
     for i in 2..n {
-        let all_bullish = is_bullish(open[i-2], close[i-2]) &&
-                          is_bullish(open[i-1], close[i-1]) &&
-                          is_bullish(open[i], close[i]);
+        let all_bullish = is_bullish(open[i - 2], close[i - 2])
+            && is_bullish(open[i - 1], close[i - 1])
+            && is_bullish(open[i], close[i]);
 
         if all_bullish {
             // 递增收盘价
-            let rising_close = close[i-1] > close[i-2] && close[i] > close[i-1];
+            let rising_close = close[i - 1] > close[i - 2] && close[i] > close[i - 1];
 
             // 每根开盘在前一根实体内
-            let open_in_body = open[i-1] > open[i-2] && open[i-1] < close[i-2] &&
-                               open[i] > open[i-1] && open[i] < close[i-1];
+            let open_in_body = open[i - 1] > open[i - 2]
+                && open[i - 1] < close[i - 2]
+                && open[i] > open[i - 1]
+                && open[i] < close[i - 1];
 
             // 上影线较短（< 实体的 30%）
-            let short_shadows = upper_shadow(high[i-2], open[i-2], close[i-2]) < body_length(open[i-2], close[i-2]) * 0.3 &&
-                                upper_shadow(high[i-1], open[i-1], close[i-1]) < body_length(open[i-1], close[i-1]) * 0.3 &&
-                                upper_shadow(high[i], open[i], close[i]) < body_length(open[i], close[i]) * 0.3;
+            let short_shadows = upper_shadow(high[i - 2], open[i - 2], close[i - 2])
+                < body_length(open[i - 2], close[i - 2]) * 0.3
+                && upper_shadow(high[i - 1], open[i - 1], close[i - 1])
+                    < body_length(open[i - 1], close[i - 1]) * 0.3
+                && upper_shadow(high[i], open[i], close[i]) < body_length(open[i], close[i]) * 0.3;
 
             if rising_close && open_in_body && short_shadows {
                 result[i] = 1.0;
@@ -588,7 +578,7 @@ pub fn three_white_soldiers(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Three Black Crows（三黑鸦）
@@ -600,38 +590,39 @@ pub fn three_white_soldiers(
 /// - 下影线较短
 ///
 /// 返回值：-1.0 = Three Black Crows, 0.0 = 非三黑鸦
-pub fn three_black_crows(
-    open: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn three_black_crows(open: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_pair!(low, "low", close, "close");
+    crate::errors::validation::validate_same_length(open, "open", close, "close")?;
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
     result[1] = 0.0;
 
     for i in 2..n {
-        let all_bearish = is_bearish(open[i-2], close[i-2]) &&
-                          is_bearish(open[i-1], close[i-1]) &&
-                          is_bearish(open[i], close[i]);
+        let all_bearish = is_bearish(open[i - 2], close[i - 2])
+            && is_bearish(open[i - 1], close[i - 1])
+            && is_bearish(open[i], close[i]);
 
         if all_bearish {
             // 递减收盘价
-            let falling_close = close[i-1] < close[i-2] && close[i] < close[i-1];
+            let falling_close = close[i - 1] < close[i - 2] && close[i] < close[i - 1];
 
             // 每根开盘在前一根实体内
-            let open_in_body = open[i-1] < open[i-2] && open[i-1] > close[i-2] &&
-                               open[i] < open[i-1] && open[i] > close[i-1];
+            let open_in_body = open[i - 1] < open[i - 2]
+                && open[i - 1] > close[i - 2]
+                && open[i] < open[i - 1]
+                && open[i] > close[i - 1];
 
             // 下影线较短（< 实体的 30%）
-            let short_shadows = lower_shadow(low[i-2], open[i-2], close[i-2]) < body_length(open[i-2], close[i-2]) * 0.3 &&
-                                lower_shadow(low[i-1], open[i-1], close[i-1]) < body_length(open[i-1], close[i-1]) * 0.3 &&
-                                lower_shadow(low[i], open[i], close[i]) < body_length(open[i], close[i]) * 0.3;
+            let short_shadows = lower_shadow(low[i - 2], open[i - 2], close[i - 2])
+                < body_length(open[i - 2], close[i - 2]) * 0.3
+                && lower_shadow(low[i - 1], open[i - 1], close[i - 1])
+                    < body_length(open[i - 1], close[i - 1]) * 0.3
+                && lower_shadow(low[i], open[i], close[i]) < body_length(open[i], close[i]) * 0.3;
 
             if falling_close && open_in_body && short_shadows {
                 result[i] = -1.0;
@@ -643,7 +634,7 @@ pub fn three_black_crows(
         }
     }
 
-    result
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -657,7 +648,7 @@ mod tests {
         let low = vec![98.0, 104.5];
         let close = vec![100.5, 105.2]; // 第二根接近 Doji
 
-        let result = doji(&open, &high, &low, &close, 0.1);
+        let result = doji(&open, &high, &low, &close, 0.1).unwrap();
         assert_eq!(result[1], 1.0); // 实体 0.2 / 总长度 5.5 < 10%
     }
 
@@ -668,7 +659,7 @@ mod tests {
         let low = vec![95.0]; // 长下影线
         let close = vec![100.5];
 
-        let result = hammer(&open, &high, &low, &close);
+        let result = hammer(&open, &high, &low, &close).unwrap();
         assert_eq!(result[0], 1.0); // Bullish Hammer
     }
 
@@ -677,7 +668,7 @@ mod tests {
         let open = vec![100.0, 98.0];
         let close = vec![98.0, 102.0]; // 阳线吞没阴线
 
-        let result = bullish_engulfing(&open, &close);
+        let result = bullish_engulfing(&open, &close).unwrap();
         assert_eq!(result[1], 1.0);
     }
 
@@ -688,7 +679,7 @@ mod tests {
         let low = vec![95.0, 94.5, 95.5];
         let close = vec![95.5, 95.5, 100.5]; // 早晨之星
 
-        let result = morning_star(&open, &high, &low, &close);
+        let result = morning_star(&open, &high, &low, &close).unwrap();
         assert_eq!(result[2], 1.0);
     }
 
@@ -698,7 +689,7 @@ mod tests {
         let high = vec![102.0, 103.0, 104.5];
         let close = vec![102.0, 103.0, 104.5];
 
-        let result = three_white_soldiers(&open, &high, &close);
+        let result = three_white_soldiers(&open, &high, &close).unwrap();
         assert_eq!(result[2], 1.0);
     }
 }
@@ -716,17 +707,20 @@ pub fn shooting_star(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
+) -> HazeResult<Vec<f64>> {
     // 形态与 Inverted Hammer 相同，但含义相反（顶部反转）
-    let inverted = inverted_hammer(open, high, low, close);
+    let inverted = inverted_hammer(open, high, low, close)?;
 
-    inverted.iter().map(|&x| {
-        if x != 0.0 {
-            -1.0 // 潜在的看跌信号
-        } else {
-            0.0
-        }
-    }).collect()
+    Ok(inverted
+        .iter()
+        .map(|&x| {
+            if is_not_zero(x) {
+                -1.0 // 潜在的看跌信号
+            } else {
+                0.0
+            }
+        })
+        .collect())
 }
 
 /// Marubozu（光头光脚）
@@ -736,14 +730,9 @@ pub fn shooting_star(
 /// - 上下影线都很短或没有
 ///
 /// 返回值：1.0 = Bullish Marubozu, -1.0 = Bearish Marubozu, 0.0 = 非光头光脚
-pub fn marubozu(
-    open: &[f64],
-    high: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn marubozu(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     for i in 0..n {
         let body = body_length(open[i], close[i]);
@@ -751,14 +740,23 @@ pub fn marubozu(
         let upper = upper_shadow(high[i], open[i], close[i]);
         let lower = lower_shadow(low[i], open[i], close[i]);
 
-        if range > 0.0 && body > 0.0 && body / range > 0.95 && upper < body * 0.05 && lower < body * 0.05 {
-            result[i] = if is_bullish(open[i], close[i]) { 1.0 } else { -1.0 };
+        if range > 0.0
+            && body > 0.0
+            && body / range > 0.95
+            && upper < body * 0.05
+            && lower < body * 0.05
+        {
+            result[i] = if is_bullish(open[i], close[i]) {
+                1.0
+            } else {
+                -1.0
+            };
         } else {
             result[i] = 0.0;
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Spinning Top（陀螺）
@@ -774,9 +772,9 @@ pub fn spinning_top(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     for i in 0..n {
         let body = body_length(open[i], close[i]);
@@ -791,7 +789,7 @@ pub fn spinning_top(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Dragonfly Doji（蜻蜓十字）
@@ -808,9 +806,9 @@ pub fn dragonfly_doji(
     low: &[f64],
     close: &[f64],
     body_threshold: f64,
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     for i in 0..n {
         let body = body_length(open[i], close[i]);
@@ -818,15 +816,18 @@ pub fn dragonfly_doji(
         let upper = upper_shadow(high[i], open[i], close[i]);
         let lower = lower_shadow(low[i], open[i], close[i]);
 
-        if range > 0.0 && body / range < body_threshold && 
-           upper < range * 0.1 && lower > range * 0.6 {
+        if range > 0.0
+            && body / range < body_threshold
+            && upper < range * 0.1
+            && lower > range * 0.6
+        {
             result[i] = 1.0; // Dragonfly Doji
         } else {
             result[i] = 0.0;
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Gravestone Doji（墓碑十字）
@@ -843,9 +844,9 @@ pub fn gravestone_doji(
     low: &[f64],
     close: &[f64],
     body_threshold: f64,
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     for i in 0..n {
         let body = body_length(open[i], close[i]);
@@ -853,15 +854,18 @@ pub fn gravestone_doji(
         let upper = upper_shadow(high[i], open[i], close[i]);
         let lower = lower_shadow(low[i], open[i], close[i]);
 
-        if range > 0.0 && body / range < body_threshold && 
-           lower < range * 0.1 && upper > range * 0.6 {
+        if range > 0.0
+            && body / range < body_threshold
+            && lower < range * 0.1
+            && upper > range * 0.6
+        {
             result[i] = -1.0; // Gravestone Doji
         } else {
             result[i] = 0.0;
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Long Legged Doji（长腿十字）
@@ -877,9 +881,9 @@ pub fn long_legged_doji(
     low: &[f64],
     close: &[f64],
     body_threshold: f64,
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     for i in 0..n {
         let body = body_length(open[i], close[i]);
@@ -887,15 +891,18 @@ pub fn long_legged_doji(
         let upper = upper_shadow(high[i], open[i], close[i]);
         let lower = lower_shadow(low[i], open[i], close[i]);
 
-        if range > 0.0 && body / range < body_threshold && 
-           upper > range * 0.3 && lower > range * 0.3 {
+        if range > 0.0
+            && body / range < body_threshold
+            && upper > range * 0.3
+            && lower > range * 0.3
+        {
             result[i] = 1.0; // Long Legged Doji
         } else {
             result[i] = 0.0;
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Tweezers Top（镊子顶）
@@ -911,24 +918,25 @@ pub fn tweezers_top(
     high: &[f64],
     close: &[f64],
     tolerance: f64,
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_pair!(high, "high", close, "close");
+    crate::errors::validation::validate_same_length(open, "open", close, "close")?;
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let first_bullish = is_bullish(open[i-1], close[i-1]);
+        let first_bullish = is_bullish(open[i - 1], close[i - 1]);
         let second_bearish = is_bearish(open[i], close[i]);
 
         if first_bullish && second_bearish {
             // 两根蜡烛的最高价接近
-            let high_diff = (high[i] - high[i-1]).abs();
-            let avg_high = (high[i] + high[i-1]) / 2.0;
+            let high_diff = (high[i] - high[i - 1]).abs();
+            let avg_high = (high[i] + high[i - 1]) / 2.0;
 
             if avg_high > 0.0 && high_diff / avg_high < tolerance {
                 result[i] = -1.0;
@@ -940,7 +948,7 @@ pub fn tweezers_top(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Tweezers Bottom（镊子底）
@@ -956,24 +964,25 @@ pub fn tweezers_bottom(
     low: &[f64],
     close: &[f64],
     tolerance: f64,
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_pair!(low, "low", close, "close");
+    crate::errors::validation::validate_same_length(open, "open", close, "close")?;
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let first_bearish = is_bearish(open[i-1], close[i-1]);
+        let first_bearish = is_bearish(open[i - 1], close[i - 1]);
         let second_bullish = is_bullish(open[i], close[i]);
 
         if first_bearish && second_bullish {
             // 两根蜡烛的最低价接近
-            let low_diff = (low[i] - low[i-1]).abs();
-            let avg_low = (low[i] + low[i-1]) / 2.0;
+            let low_diff = (low[i] - low[i - 1]).abs();
+            let avg_low = (low[i] + low[i - 1]) / 2.0;
 
             if avg_low > 0.0 && low_diff / avg_low < tolerance {
                 result[i] = 1.0;
@@ -985,7 +994,7 @@ pub fn tweezers_bottom(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Rising Three Methods（上升三法）
@@ -1001,12 +1010,12 @@ pub fn rising_three_methods(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 5 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..4 {
@@ -1014,28 +1023,31 @@ pub fn rising_three_methods(
     }
 
     for i in 4..n {
-        let first_bullish = is_bullish(open[i-4], close[i-4]);
-        let first_body = body_length(open[i-4], close[i-4]);
+        let first_bullish = is_bullish(open[i - 4], close[i - 4]);
+        let first_body = body_length(open[i - 4], close[i - 4]);
 
-        let second_bearish = is_bearish(open[i-3], close[i-3]);
-        let third_bearish = is_bearish(open[i-2], close[i-2]);
-        let fourth_bearish = is_bearish(open[i-1], close[i-1]);
+        let second_bearish = is_bearish(open[i - 3], close[i - 3]);
+        let third_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let fourth_bearish = is_bearish(open[i - 1], close[i - 1]);
 
         let fifth_bullish = is_bullish(open[i], close[i]);
 
         if first_bullish && second_bearish && third_bearish && fourth_bearish && fifth_bullish {
             // 中间三根小阴线在第一根阳线范围内
-            let middle_in_range = high[i-3] < close[i-4] && low[i-3] > open[i-4] &&
-                                  high[i-2] < close[i-4] && low[i-2] > open[i-4] &&
-                                  high[i-1] < close[i-4] && low[i-1] > open[i-4];
+            let middle_in_range = high[i - 3] < close[i - 4]
+                && low[i - 3] > open[i - 4]
+                && high[i - 2] < close[i - 4]
+                && low[i - 2] > open[i - 4]
+                && high[i - 1] < close[i - 4]
+                && low[i - 1] > open[i - 4];
 
             // 第五根收盘高于第一根
-            let fifth_higher = close[i] > close[i-4];
+            let fifth_higher = close[i] > close[i - 4];
 
             // 中间三根都是小实体
-            let small_bodies = body_length(open[i-3], close[i-3]) < first_body * 0.5 &&
-                               body_length(open[i-2], close[i-2]) < first_body * 0.5 &&
-                               body_length(open[i-1], close[i-1]) < first_body * 0.5;
+            let small_bodies = body_length(open[i - 3], close[i - 3]) < first_body * 0.5
+                && body_length(open[i - 2], close[i - 2]) < first_body * 0.5
+                && body_length(open[i - 1], close[i - 1]) < first_body * 0.5;
 
             if middle_in_range && fifth_higher && small_bodies {
                 result[i] = 1.0;
@@ -1047,7 +1059,7 @@ pub fn rising_three_methods(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Falling Three Methods（下降三法）
@@ -1063,12 +1075,12 @@ pub fn falling_three_methods(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 5 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..4 {
@@ -1076,28 +1088,31 @@ pub fn falling_three_methods(
     }
 
     for i in 4..n {
-        let first_bearish = is_bearish(open[i-4], close[i-4]);
-        let first_body = body_length(open[i-4], close[i-4]);
+        let first_bearish = is_bearish(open[i - 4], close[i - 4]);
+        let first_body = body_length(open[i - 4], close[i - 4]);
 
-        let second_bullish = is_bullish(open[i-3], close[i-3]);
-        let third_bullish = is_bullish(open[i-2], close[i-2]);
-        let fourth_bullish = is_bullish(open[i-1], close[i-1]);
+        let second_bullish = is_bullish(open[i - 3], close[i - 3]);
+        let third_bullish = is_bullish(open[i - 2], close[i - 2]);
+        let fourth_bullish = is_bullish(open[i - 1], close[i - 1]);
 
         let fifth_bearish = is_bearish(open[i], close[i]);
 
         if first_bearish && second_bullish && third_bullish && fourth_bullish && fifth_bearish {
             // 中间三根小阳线在第一根阴线范围内
-            let middle_in_range = high[i-3] < open[i-4] && low[i-3] > close[i-4] &&
-                                  high[i-2] < open[i-4] && low[i-2] > close[i-4] &&
-                                  high[i-1] < open[i-4] && low[i-1] > close[i-4];
+            let middle_in_range = high[i - 3] < open[i - 4]
+                && low[i - 3] > close[i - 4]
+                && high[i - 2] < open[i - 4]
+                && low[i - 2] > close[i - 4]
+                && high[i - 1] < open[i - 4]
+                && low[i - 1] > close[i - 4];
 
             // 第五根收盘低于第一根
-            let fifth_lower = close[i] < close[i-4];
+            let fifth_lower = close[i] < close[i - 4];
 
             // 中间三根都是小实体
-            let small_bodies = body_length(open[i-3], close[i-3]) < first_body * 0.5 &&
-                               body_length(open[i-2], close[i-2]) < first_body * 0.5 &&
-                               body_length(open[i-1], close[i-1]) < first_body * 0.5;
+            let small_bodies = body_length(open[i - 3], close[i - 3]) < first_body * 0.5
+                && body_length(open[i - 2], close[i - 2]) < first_body * 0.5
+                && body_length(open[i - 1], close[i - 1]) < first_body * 0.5;
 
             if middle_in_range && fifth_lower && small_bodies {
                 result[i] = -1.0;
@@ -1109,7 +1124,7 @@ pub fn falling_three_methods(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Harami Cross（十字孕线）
@@ -1125,18 +1140,18 @@ pub fn harami_cross(
     low: &[f64],
     close: &[f64],
     body_threshold: f64, // Doji 阈值，默认 0.1
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let first_body = body_length(open[i-1], close[i-1]);
+        let first_body = body_length(open[i - 1], close[i - 1]);
         let second_body = body_length(open[i], close[i]);
         let second_range = total_range(high[i], low[i]);
 
@@ -1144,11 +1159,11 @@ pub fn harami_cross(
         let is_doji = second_range > 0.0 && second_body / second_range < body_threshold;
 
         // 第二根完全在第一根实体内
-        let second_inside = open[i].max(close[i]) < open[i-1].max(close[i-1]) &&
-                           open[i].min(close[i]) > open[i-1].min(close[i-1]);
+        let second_inside = open[i].max(close[i]) < open[i - 1].max(close[i - 1])
+            && open[i].min(close[i]) > open[i - 1].min(close[i - 1]);
 
         if is_doji && second_inside && first_body > 0.0 {
-            if is_bearish(open[i-1], close[i-1]) {
+            if is_bearish(open[i - 1], close[i - 1]) {
                 result[i] = 1.0; // Bullish Harami Cross
             } else {
                 result[i] = -1.0; // Bearish Harami Cross
@@ -1158,7 +1173,7 @@ pub fn harami_cross(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Morning Doji Star（早晨十字星）
@@ -1175,12 +1190,12 @@ pub fn morning_doji_star(
     low: &[f64],
     close: &[f64],
     body_threshold: f64, // Doji 阈值，默认 0.1
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..2 {
@@ -1188,27 +1203,33 @@ pub fn morning_doji_star(
     }
 
     for i in 2..n {
-        let first_bearish = is_bearish(open[i-2], close[i-2]);
-        let first_body = body_length(open[i-2], close[i-2]);
+        let first_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let first_body = body_length(open[i - 2], close[i - 2]);
 
-        let second_body = body_length(open[i-1], close[i-1]);
-        let second_range = total_range(high[i-1], low[i-1]);
+        let second_body = body_length(open[i - 1], close[i - 1]);
+        let second_range = total_range(high[i - 1], low[i - 1]);
         let is_doji = second_range > 0.0 && second_body / second_range < body_threshold;
 
         // 第二根跳空向下
-        let gap_down = high[i-1] < close[i-2].min(open[i-2]);
+        let gap_down = high[i - 1] < close[i - 2].min(open[i - 2]);
 
         let third_bullish = is_bullish(open[i], close[i]);
-        let third_close_high = close[i] > (open[i-2] + close[i-2]) / 2.0;
+        let third_close_high = close[i] > (open[i - 2] + close[i - 2]) / 2.0;
 
-        if first_bearish && is_doji && gap_down && third_bullish && third_close_high && first_body > 0.0 {
+        if first_bearish
+            && is_doji
+            && gap_down
+            && third_bullish
+            && third_close_high
+            && first_body > 0.0
+        {
             result[i] = 1.0;
         } else {
             result[i] = 0.0;
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Evening Doji Star（黄昏十字星）
@@ -1225,12 +1246,12 @@ pub fn evening_doji_star(
     low: &[f64],
     close: &[f64],
     body_threshold: f64, // Doji 阈值，默认 0.1
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..2 {
@@ -1238,27 +1259,33 @@ pub fn evening_doji_star(
     }
 
     for i in 2..n {
-        let first_bullish = is_bullish(open[i-2], close[i-2]);
-        let first_body = body_length(open[i-2], close[i-2]);
+        let first_bullish = is_bullish(open[i - 2], close[i - 2]);
+        let first_body = body_length(open[i - 2], close[i - 2]);
 
-        let second_body = body_length(open[i-1], close[i-1]);
-        let second_range = total_range(high[i-1], low[i-1]);
+        let second_body = body_length(open[i - 1], close[i - 1]);
+        let second_range = total_range(high[i - 1], low[i - 1]);
         let is_doji = second_range > 0.0 && second_body / second_range < body_threshold;
 
         // 第二根跳空向上
-        let gap_up = low[i-1] > close[i-2].max(open[i-2]);
+        let gap_up = low[i - 1] > close[i - 2].max(open[i - 2]);
 
         let third_bearish = is_bearish(open[i], close[i]);
-        let third_close_low = close[i] < (open[i-2] + close[i-2]) / 2.0;
+        let third_close_low = close[i] < (open[i - 2] + close[i - 2]) / 2.0;
 
-        if first_bullish && is_doji && gap_up && third_bearish && third_close_low && first_body > 0.0 {
+        if first_bullish
+            && is_doji
+            && gap_up
+            && third_bearish
+            && third_close_low
+            && first_body > 0.0
+        {
             result[i] = -1.0;
         } else {
             result[i] = 0.0;
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Three Inside Up/Down（三内部上涨/下跌）
@@ -1273,12 +1300,12 @@ pub fn three_inside(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..2 {
@@ -1287,13 +1314,12 @@ pub fn three_inside(
 
     for i in 2..n {
         // Three Inside Up
-        let first_bearish = is_bearish(open[i-2], close[i-2]);
-        let second_bullish = is_bullish(open[i-1], close[i-1]);
-        let harami_bullish = second_bullish &&
-                            open[i-1] > close[i-2] &&
-                            close[i-1] < open[i-2];
+        let first_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let second_bullish = is_bullish(open[i - 1], close[i - 1]);
+        let harami_bullish =
+            second_bullish && open[i - 1] > close[i - 2] && close[i - 1] < open[i - 2];
         let third_bullish = is_bullish(open[i], close[i]);
-        let third_close_above = close[i] > high[i-2];
+        let third_close_above = close[i] > high[i - 2];
 
         if first_bearish && harami_bullish && third_bullish && third_close_above {
             result[i] = 1.0;
@@ -1301,13 +1327,12 @@ pub fn three_inside(
         }
 
         // Three Inside Down
-        let first_bullish = is_bullish(open[i-2], close[i-2]);
-        let second_bearish = is_bearish(open[i-1], close[i-1]);
-        let harami_bearish = second_bearish &&
-                            open[i-1] < close[i-2] &&
-                            close[i-1] > open[i-2];
+        let first_bullish = is_bullish(open[i - 2], close[i - 2]);
+        let second_bearish = is_bearish(open[i - 1], close[i - 1]);
+        let harami_bearish =
+            second_bearish && open[i - 1] < close[i - 2] && close[i - 1] > open[i - 2];
         let third_bearish = is_bearish(open[i], close[i]);
-        let third_close_below = close[i] < low[i-2];
+        let third_close_below = close[i] < low[i - 2];
 
         if first_bullish && harami_bearish && third_bearish && third_close_below {
             result[i] = -1.0;
@@ -1316,7 +1341,7 @@ pub fn three_inside(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Three Outside Up/Down（三外部上涨/下跌）
@@ -1331,12 +1356,12 @@ pub fn three_outside(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..2 {
@@ -1345,13 +1370,12 @@ pub fn three_outside(
 
     for i in 2..n {
         // Three Outside Up
-        let first_bearish = is_bearish(open[i-2], close[i-2]);
-        let second_bullish = is_bullish(open[i-1], close[i-1]);
-        let engulfing_bullish = second_bullish &&
-                               open[i-1] < close[i-2] &&
-                               close[i-1] > open[i-2];
+        let first_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let second_bullish = is_bullish(open[i - 1], close[i - 1]);
+        let engulfing_bullish =
+            second_bullish && open[i - 1] < close[i - 2] && close[i - 1] > open[i - 2];
         let third_bullish = is_bullish(open[i], close[i]);
-        let third_close_above = close[i] > close[i-1];
+        let third_close_above = close[i] > close[i - 1];
 
         if first_bearish && engulfing_bullish && third_bullish && third_close_above {
             result[i] = 1.0;
@@ -1359,13 +1383,12 @@ pub fn three_outside(
         }
 
         // Three Outside Down
-        let first_bullish = is_bullish(open[i-2], close[i-2]);
-        let second_bearish = is_bearish(open[i-1], close[i-1]);
-        let engulfing_bearish = second_bearish &&
-                               open[i-1] > close[i-2] &&
-                               close[i-1] < open[i-2];
+        let first_bullish = is_bullish(open[i - 2], close[i - 2]);
+        let second_bearish = is_bearish(open[i - 1], close[i - 1]);
+        let engulfing_bearish =
+            second_bearish && open[i - 1] > close[i - 2] && close[i - 1] < open[i - 2];
         let third_bearish = is_bearish(open[i], close[i]);
-        let third_close_below = close[i] < close[i-1];
+        let third_close_below = close[i] < close[i - 1];
 
         if first_bullish && engulfing_bearish && third_bearish && third_close_below {
             result[i] = -1.0;
@@ -1374,7 +1397,7 @@ pub fn three_outside(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Abandoned Baby（弃婴）
@@ -1390,12 +1413,12 @@ pub fn abandoned_baby(
     low: &[f64],
     close: &[f64],
     body_threshold: f64, // Doji 阈值，默认 0.1
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..2 {
@@ -1403,15 +1426,15 @@ pub fn abandoned_baby(
     }
 
     for i in 2..n {
-        let second_body = body_length(open[i-1], close[i-1]);
-        let second_range = total_range(high[i-1], low[i-1]);
+        let second_body = body_length(open[i - 1], close[i - 1]);
+        let second_range = total_range(high[i - 1], low[i - 1]);
         let is_doji = second_range > 0.0 && second_body / second_range < body_threshold;
 
         // Bullish Abandoned Baby
-        let first_bearish = is_bearish(open[i-2], close[i-2]);
-        let gap_down = high[i-1] < open[i-2].min(close[i-2]);
+        let first_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let gap_down = high[i - 1] < open[i - 2].min(close[i - 2]);
         let third_bullish = is_bullish(open[i], close[i]);
-        let gap_up = low[i] > high[i-1];
+        let gap_up = low[i] > high[i - 1];
 
         if first_bearish && is_doji && gap_down && third_bullish && gap_up {
             result[i] = 1.0;
@@ -1419,10 +1442,10 @@ pub fn abandoned_baby(
         }
 
         // Bearish Abandoned Baby
-        let first_bullish = is_bullish(open[i-2], close[i-2]);
-        let gap_up_first = low[i-1] > open[i-2].max(close[i-2]);
+        let first_bullish = is_bullish(open[i - 2], close[i - 2]);
+        let gap_up_first = low[i - 1] > open[i - 2].max(close[i - 2]);
         let third_bearish = is_bearish(open[i], close[i]);
-        let gap_down_second = high[i] < low[i-1];
+        let gap_down_second = high[i] < low[i - 1];
 
         if first_bullish && is_doji && gap_up_first && third_bearish && gap_down_second {
             result[i] = -1.0;
@@ -1431,7 +1454,7 @@ pub fn abandoned_baby(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Kicking（踢腿）
@@ -1441,26 +1464,21 @@ pub fn abandoned_baby(
 /// - 看跌版本：第一根光头光脚阳线 + 第二根光头光脚阴线，跳空向下
 ///
 /// 返回值：1.0 = Bullish Kicking, -1.0 = Bearish Kicking, 0.0 = 非踢腿
-pub fn kicking(
-    open: &[f64],
-    high: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn kicking(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let first_body = body_length(open[i-1], close[i-1]);
-        let first_range = total_range(high[i-1], low[i-1]);
-        let first_upper = upper_shadow(high[i-1], open[i-1], close[i-1]);
-        let first_lower = lower_shadow(low[i-1], open[i-1], close[i-1]);
+        let first_body = body_length(open[i - 1], close[i - 1]);
+        let first_range = total_range(high[i - 1], low[i - 1]);
+        let first_upper = upper_shadow(high[i - 1], open[i - 1], close[i - 1]);
+        let first_lower = lower_shadow(low[i - 1], open[i - 1], close[i - 1]);
 
         let second_body = body_length(open[i], close[i]);
         let second_range = total_range(high[i], low[i]);
@@ -1468,20 +1486,20 @@ pub fn kicking(
         let second_lower = lower_shadow(low[i], open[i], close[i]);
 
         // 判断是否为光头光脚（Marubozu）
-        let first_marubozu = first_range > 0.0 &&
-                            first_body / first_range > 0.95 &&
-                            first_upper < first_range * 0.05 &&
-                            first_lower < first_range * 0.05;
+        let first_marubozu = first_range > 0.0
+            && first_body / first_range > 0.95
+            && first_upper < first_range * 0.05
+            && first_lower < first_range * 0.05;
 
-        let second_marubozu = second_range > 0.0 &&
-                             second_body / second_range > 0.95 &&
-                             second_upper < second_range * 0.05 &&
-                             second_lower < second_range * 0.05;
+        let second_marubozu = second_range > 0.0
+            && second_body / second_range > 0.95
+            && second_upper < second_range * 0.05
+            && second_lower < second_range * 0.05;
 
         // Bullish Kicking
-        let first_bearish = is_bearish(open[i-1], close[i-1]);
+        let first_bearish = is_bearish(open[i - 1], close[i - 1]);
         let second_bullish = is_bullish(open[i], close[i]);
-        let gap_up = open[i] > open[i-1];
+        let gap_up = open[i] > open[i - 1];
 
         if first_marubozu && second_marubozu && first_bearish && second_bullish && gap_up {
             result[i] = 1.0;
@@ -1489,9 +1507,9 @@ pub fn kicking(
         }
 
         // Bearish Kicking
-        let first_bullish = is_bullish(open[i-1], close[i-1]);
+        let first_bullish = is_bullish(open[i - 1], close[i - 1]);
         let second_bearish = is_bearish(open[i], close[i]);
-        let gap_down = open[i] < open[i-1];
+        let gap_down = open[i] < open[i - 1];
 
         if first_marubozu && second_marubozu && first_bullish && second_bearish && gap_down {
             result[i] = -1.0;
@@ -1500,7 +1518,7 @@ pub fn kicking(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Long Line Candle（长线蜡烛）
@@ -1516,15 +1534,15 @@ pub fn long_line(
     low: &[f64],
     close: &[f64],
     lookback: usize, // 计算平均实体的回看周期，默认 10
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < lookback + 1 {
         for i in 0..n {
             result[i] = 0.0;
         }
-        return result;
+        return Ok(result);
     }
 
     for i in 0..lookback {
@@ -1545,9 +1563,8 @@ pub fn long_line(
         let lower = lower_shadow(low[i], open[i], close[i]);
 
         // 实体是平均的 2 倍以上，且影线不超过实体的 50%
-        if current_body > avg_body * 2.0 &&
-           upper < current_body * 0.5 &&
-           lower < current_body * 0.5 {
+        if current_body > avg_body * 2.0 && upper < current_body * 0.5 && lower < current_body * 0.5
+        {
             if is_bullish(open[i], close[i]) {
                 result[i] = 1.0;
             } else {
@@ -1558,7 +1575,7 @@ pub fn long_line(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Short Line Candle（短线蜡烛）
@@ -1574,15 +1591,15 @@ pub fn short_line(
     low: &[f64],
     close: &[f64],
     lookback: usize, // 计算平均实体的回看周期，默认 10
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < lookback + 1 {
         for i in 0..n {
             result[i] = 0.0;
         }
-        return result;
+        return Ok(result);
     }
 
     for i in 0..lookback {
@@ -1613,7 +1630,7 @@ pub fn short_line(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Doji Star（十字星）
@@ -1629,18 +1646,18 @@ pub fn doji_star(
     low: &[f64],
     close: &[f64],
     body_threshold: f64, // Doji 阈值，默认 0.1
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let first_body = body_length(open[i-1], close[i-1]);
+        let first_body = body_length(open[i - 1], close[i - 1]);
         let second_body = body_length(open[i], close[i]);
         let second_range = total_range(high[i], low[i]);
 
@@ -1648,8 +1665,8 @@ pub fn doji_star(
         let is_doji = second_range > 0.0 && second_body / second_range < body_threshold;
 
         // Bullish Doji Star (第一根阴线，十字星跳空向下)
-        let first_bearish = is_bearish(open[i-1], close[i-1]);
-        let gap_down = high[i] < open[i-1].min(close[i-1]);
+        let first_bearish = is_bearish(open[i - 1], close[i - 1]);
+        let gap_down = high[i] < open[i - 1].min(close[i - 1]);
 
         if is_doji && first_bearish && gap_down && first_body > 0.0 {
             result[i] = 1.0;
@@ -1657,8 +1674,8 @@ pub fn doji_star(
         }
 
         // Bearish Doji Star (第一根阳线，十字星跳空向上)
-        let first_bullish = is_bullish(open[i-1], close[i-1]);
-        let gap_up = low[i] > open[i-1].max(close[i-1]);
+        let first_bullish = is_bullish(open[i - 1], close[i - 1]);
+        let gap_up = low[i] > open[i - 1].max(close[i - 1]);
 
         if is_doji && first_bullish && gap_up && first_body > 0.0 {
             result[i] = -1.0;
@@ -1667,7 +1684,7 @@ pub fn doji_star(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Identical Three Crows（相同三乌鸦）
@@ -1684,12 +1701,12 @@ pub fn identical_three_crows(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..2 {
@@ -1697,8 +1714,8 @@ pub fn identical_three_crows(
     }
 
     for i in 2..n {
-        let first_bearish = is_bearish(open[i-2], close[i-2]);
-        let second_bearish = is_bearish(open[i-1], close[i-1]);
+        let first_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let second_bearish = is_bearish(open[i - 1], close[i - 1]);
         let third_bearish = is_bearish(open[i], close[i]);
 
         if !first_bearish || !second_bearish || !third_bearish {
@@ -1706,22 +1723,22 @@ pub fn identical_three_crows(
             continue;
         }
 
-        let first_body = body_length(open[i-2], close[i-2]);
-        let second_body = body_length(open[i-1], close[i-1]);
+        let first_body = body_length(open[i - 2], close[i - 2]);
+        let second_body = body_length(open[i - 1], close[i - 1]);
         let third_body = body_length(open[i], close[i]);
 
         // 每根开盘价在前一根实体内
-        let second_opens_inside = open[i-1] < open[i-2] && open[i-1] > close[i-2];
-        let third_opens_inside = open[i] < open[i-1] && open[i] > close[i-1];
+        let second_opens_inside = open[i - 1] < open[i - 2] && open[i - 1] > close[i - 2];
+        let third_opens_inside = open[i] < open[i - 1] && open[i] > close[i - 1];
 
         // 收盘价依次更低
-        let descending_closes = close[i-1] < close[i-2] && close[i] < close[i-1];
+        let descending_closes = close[i - 1] < close[i - 2] && close[i] < close[i - 1];
 
         // 实体大小相近（相差不超过30%）
         let avg_body = (first_body + second_body + third_body) / 3.0;
-        let similar_bodies = (first_body - avg_body).abs() < avg_body * 0.3 &&
-                            (second_body - avg_body).abs() < avg_body * 0.3 &&
-                            (third_body - avg_body).abs() < avg_body * 0.3;
+        let similar_bodies = (first_body - avg_body).abs() < avg_body * 0.3
+            && (second_body - avg_body).abs() < avg_body * 0.3
+            && (third_body - avg_body).abs() < avg_body * 0.3;
 
         if second_opens_inside && third_opens_inside && descending_closes && similar_bodies {
             result[i] = -1.0;
@@ -1730,7 +1747,7 @@ pub fn identical_three_crows(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Stick Sandwich（棍子夹心）
@@ -1747,12 +1764,12 @@ pub fn stick_sandwich(
     low: &[f64],
     close: &[f64],
     tolerance: f64, // 默认 0.01 (1%)
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..2 {
@@ -1760,8 +1777,8 @@ pub fn stick_sandwich(
     }
 
     for i in 2..n {
-        let first_bearish = is_bearish(open[i-2], close[i-2]);
-        let second_bullish = is_bullish(open[i-1], close[i-1]);
+        let first_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let second_bullish = is_bullish(open[i - 1], close[i - 1]);
         let third_bearish = is_bearish(open[i], close[i]);
 
         if !first_bearish || !second_bullish || !third_bearish {
@@ -1770,10 +1787,10 @@ pub fn stick_sandwich(
         }
 
         // 第二根在第一根范围内
-        let second_inside = low[i-1] > close[i-2] && high[i-1] < open[i-2];
+        let second_inside = low[i - 1] > close[i - 2] && high[i - 1] < open[i - 2];
 
         // 第三根收盘价与第一根接近
-        let closes_match = (close[i] - close[i-2]).abs() / close[i-2] < tolerance;
+        let closes_match = (close[i] - close[i - 2]).abs() / close[i - 2] < tolerance;
 
         if second_inside && closes_match {
             result[i] = 1.0;
@@ -1782,7 +1799,7 @@ pub fn stick_sandwich(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Tristar Pattern（三星）
@@ -1798,12 +1815,12 @@ pub fn tristar(
     low: &[f64],
     close: &[f64],
     body_threshold: f64, // Doji 阈值，默认 0.1
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..2 {
@@ -1811,12 +1828,12 @@ pub fn tristar(
     }
 
     for i in 2..n {
-        let first_body = body_length(open[i-2], close[i-2]);
-        let first_range = total_range(high[i-2], low[i-2]);
+        let first_body = body_length(open[i - 2], close[i - 2]);
+        let first_range = total_range(high[i - 2], low[i - 2]);
         let first_doji = first_range > 0.0 && first_body / first_range < body_threshold;
 
-        let second_body = body_length(open[i-1], close[i-1]);
-        let second_range = total_range(high[i-1], low[i-1]);
+        let second_body = body_length(open[i - 1], close[i - 1]);
+        let second_range = total_range(high[i - 1], low[i - 1]);
         let second_doji = second_range > 0.0 && second_body / second_range < body_threshold;
 
         let third_body = body_length(open[i], close[i]);
@@ -1829,14 +1846,14 @@ pub fn tristar(
         }
 
         // Bullish Tristar: 第二根跳空向下
-        let gap_down = high[i-1] < low[i-2].min(low[i]);
+        let gap_down = high[i - 1] < low[i - 2].min(low[i]);
         if gap_down {
             result[i] = 1.0;
             continue;
         }
 
         // Bearish Tristar: 第二根跳空向上
-        let gap_up = low[i-1] > high[i-2].max(high[i]);
+        let gap_up = low[i - 1] > high[i - 2].max(high[i]);
         if gap_up {
             result[i] = -1.0;
         } else {
@@ -1844,7 +1861,7 @@ pub fn tristar(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Upside Gap Two Crows（向上跳空二乌鸦）
@@ -1860,12 +1877,12 @@ pub fn upside_gap_two_crows(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..2 {
@@ -1873,10 +1890,10 @@ pub fn upside_gap_two_crows(
     }
 
     for i in 2..n {
-        let first_bullish = is_bullish(open[i-2], close[i-2]);
-        let first_body = body_length(open[i-2], close[i-2]);
+        let first_bullish = is_bullish(open[i - 2], close[i - 2]);
+        let first_body = body_length(open[i - 2], close[i - 2]);
 
-        let second_bearish = is_bearish(open[i-1], close[i-1]);
+        let second_bearish = is_bearish(open[i - 1], close[i - 1]);
         let third_bearish = is_bearish(open[i], close[i]);
 
         if !first_bullish || !second_bearish || !third_bearish {
@@ -1885,13 +1902,13 @@ pub fn upside_gap_two_crows(
         }
 
         // 第二根跳空向上
-        let gap_up = open[i-1] > close[i-2];
+        let gap_up = open[i - 1] > close[i - 2];
 
         // 第三根吞没第二根
-        let engulfs_second = open[i] > open[i-1] && close[i] < close[i-1];
+        let engulfs_second = open[i] > open[i - 1] && close[i] < close[i - 1];
 
         // 第三根未覆盖第一根
-        let not_covers_first = close[i] > close[i-2];
+        let not_covers_first = close[i] > close[i - 2];
 
         // 第一根是大实体
         let large_first = first_body > 0.0;
@@ -1903,7 +1920,7 @@ pub fn upside_gap_two_crows(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Gap Sidesidewhite（跳空并列白线）
@@ -1918,12 +1935,12 @@ pub fn gap_sidesidewhite(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..2 {
@@ -1931,7 +1948,7 @@ pub fn gap_sidesidewhite(
     }
 
     for i in 2..n {
-        let second_bullish = is_bullish(open[i-1], close[i-1]);
+        let second_bullish = is_bullish(open[i - 1], close[i - 1]);
         let third_bullish = is_bullish(open[i], close[i]);
 
         if !second_bullish || !third_bullish {
@@ -1939,26 +1956,26 @@ pub fn gap_sidesidewhite(
             continue;
         }
 
-        let second_body = body_length(open[i-1], close[i-1]);
+        let second_body = body_length(open[i - 1], close[i - 1]);
         let third_body = body_length(open[i], close[i]);
 
         // 第二、三根实体相似
         let similar_bodies = (second_body - third_body).abs() < second_body * 0.3;
 
         // 第二、三根开盘价接近
-        let similar_opens = (open[i-1] - open[i]).abs() < open[i-1] * 0.02;
+        let similar_opens = (open[i - 1] - open[i]).abs() < open[i - 1] * 0.02;
 
         // Upside Gap
-        let first_bullish = is_bullish(open[i-2], close[i-2]);
-        let gap_up = open[i-1] > close[i-2];
+        let first_bullish = is_bullish(open[i - 2], close[i - 2]);
+        let gap_up = open[i - 1] > close[i - 2];
         if first_bullish && gap_up && similar_bodies && similar_opens {
             result[i] = 1.0;
             continue;
         }
 
         // Downside Gap
-        let first_bearish = is_bearish(open[i-2], close[i-2]);
-        let gap_down = close[i-1] < open[i-2];
+        let first_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let gap_down = close[i - 1] < open[i - 2];
         if first_bearish && gap_down && similar_bodies && similar_opens {
             result[i] = -1.0;
         } else {
@@ -1966,7 +1983,7 @@ pub fn gap_sidesidewhite(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Takuri（探水竿）
@@ -1977,14 +1994,9 @@ pub fn gap_sidesidewhite(
 /// - 几乎没有上影线
 ///
 /// 返回值：1.0 = Takuri, 0.0 = 非探水竿
-pub fn takuri(
-    open: &[f64],
-    high: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn takuri(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     for i in 0..n {
         let body = body_length(open[i], close[i]);
@@ -2005,7 +2017,7 @@ pub fn takuri(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Homing Pigeon（信鸽）
@@ -2020,18 +2032,18 @@ pub fn homing_pigeon(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let first_bearish = is_bearish(open[i-1], close[i-1]);
+        let first_bearish = is_bearish(open[i - 1], close[i - 1]);
         let second_bearish = is_bearish(open[i], close[i]);
 
         if !first_bearish || !second_bearish {
@@ -2039,14 +2051,14 @@ pub fn homing_pigeon(
             continue;
         }
 
-        let first_body = body_length(open[i-1], close[i-1]);
+        let first_body = body_length(open[i - 1], close[i - 1]);
         let second_body = body_length(open[i], close[i]);
 
         // 第二根是小阴线
         let small_second = second_body < first_body * 0.5;
 
         // 第二根完全在第一根实体内
-        let second_inside = open[i] < open[i-1] && close[i] > close[i-1];
+        let second_inside = open[i] < open[i - 1] && close[i] > close[i - 1];
 
         if small_second && second_inside {
             result[i] = 1.0;
@@ -2055,7 +2067,7 @@ pub fn homing_pigeon(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Matching Low（低价匹配）
@@ -2072,18 +2084,18 @@ pub fn matching_low(
     low: &[f64],
     close: &[f64],
     tolerance: f64, // 默认 0.01 (1%)
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let first_bearish = is_bearish(open[i-1], close[i-1]);
+        let first_bearish = is_bearish(open[i - 1], close[i - 1]);
         let second_bearish = is_bearish(open[i], close[i]);
 
         if !first_bearish || !second_bearish {
@@ -2092,7 +2104,7 @@ pub fn matching_low(
         }
 
         // 收盘价接近
-        let closes_match = (close[i] - close[i-1]).abs() / close[i-1] < tolerance;
+        let closes_match = (close[i] - close[i - 1]).abs() / close[i - 1] < tolerance;
 
         if closes_match {
             result[i] = 1.0;
@@ -2101,7 +2113,7 @@ pub fn matching_low(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Separating Lines（分离线）
@@ -2117,19 +2129,19 @@ pub fn separating_lines(
     low: &[f64],
     close: &[f64],
     tolerance: f64, // 默认 0.005 (0.5%)
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
         // 开盘价相同
-        let opens_match = (open[i] - open[i-1]).abs() / open[i-1] < tolerance;
+        let opens_match = (open[i] - open[i - 1]).abs() / open[i - 1] < tolerance;
 
         if !opens_match {
             result[i] = 0.0;
@@ -2137,7 +2149,7 @@ pub fn separating_lines(
         }
 
         // Bullish Separating Lines
-        let first_bearish = is_bearish(open[i-1], close[i-1]);
+        let first_bearish = is_bearish(open[i - 1], close[i - 1]);
         let second_bullish = is_bullish(open[i], close[i]);
         if first_bearish && second_bullish {
             result[i] = 1.0;
@@ -2145,7 +2157,7 @@ pub fn separating_lines(
         }
 
         // Bearish Separating Lines
-        let first_bullish = is_bullish(open[i-1], close[i-1]);
+        let first_bullish = is_bullish(open[i - 1], close[i - 1]);
         let second_bearish = is_bearish(open[i], close[i]);
         if first_bullish && second_bearish {
             result[i] = -1.0;
@@ -2154,7 +2166,7 @@ pub fn separating_lines(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Thrusting Pattern（插入形态）
@@ -2164,23 +2176,18 @@ pub fn separating_lines(
 /// - 第二根：阳线，开盘低于第一根最低，收盘在第一根实体中部以下
 ///
 /// 返回值：-1.0 = Thrusting Pattern, 0.0 = 非插入形态
-pub fn thrusting(
-    open: &[f64],
-    high: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn thrusting(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let first_bearish = is_bearish(open[i-1], close[i-1]);
+        let first_bearish = is_bearish(open[i - 1], close[i - 1]);
         let second_bullish = is_bullish(open[i], close[i]);
 
         if !first_bearish || !second_bullish {
@@ -2189,11 +2196,11 @@ pub fn thrusting(
         }
 
         // 第二根开盘低于第一根最低
-        let opens_below = open[i] < low[i-1];
+        let opens_below = open[i] < low[i - 1];
 
         // 第二根收盘在第一根实体中部以下
-        let midpoint = (open[i-1] + close[i-1]) / 2.0;
-        let closes_below_mid = close[i] < midpoint && close[i] > close[i-1];
+        let midpoint = (open[i - 1] + close[i - 1]) / 2.0;
+        let closes_below_mid = close[i] < midpoint && close[i] > close[i - 1];
 
         if opens_below && closes_below_mid {
             result[i] = -1.0;
@@ -2202,7 +2209,7 @@ pub fn thrusting(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// In-Neck Pattern（颈内线）
@@ -2218,18 +2225,18 @@ pub fn inneck(
     low: &[f64],
     close: &[f64],
     tolerance: f64, // 默认 0.01 (1%)
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let first_bearish = is_bearish(open[i-1], close[i-1]);
+        let first_bearish = is_bearish(open[i - 1], close[i - 1]);
         let second_bullish = is_bullish(open[i], close[i]);
 
         if !first_bearish || !second_bullish {
@@ -2238,7 +2245,7 @@ pub fn inneck(
         }
 
         // 第二根收盘价接近第一根最低
-        let closes_near_low = (close[i] - low[i-1]).abs() / low[i-1] < tolerance;
+        let closes_near_low = (close[i] - low[i - 1]).abs() / low[i - 1] < tolerance;
 
         if closes_near_low {
             result[i] = -1.0;
@@ -2247,7 +2254,7 @@ pub fn inneck(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// On-Neck Pattern（颈上线）
@@ -2263,18 +2270,18 @@ pub fn onneck(
     low: &[f64],
     close: &[f64],
     tolerance: f64, // 默认 0.01 (1%)
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 2 {
-        return result;
+        return Ok(result);
     }
 
     result[0] = 0.0;
 
     for i in 1..n {
-        let first_bearish = is_bearish(open[i-1], close[i-1]);
+        let first_bearish = is_bearish(open[i - 1], close[i - 1]);
         let second_bullish = is_bullish(open[i], close[i]);
 
         if !first_bearish || !second_bullish {
@@ -2283,10 +2290,11 @@ pub fn onneck(
         }
 
         // 第二根收盘价接近第一根收盘价
-        let closes_match = (close[i] - close[i-1]).abs() / close[i-1] < tolerance;
+        let closes_match = (close[i] - close[i - 1]).abs() / close[i - 1] < tolerance;
 
         // 第二根是小实体
-        let small_second = body_length(open[i], close[i]) < body_length(open[i-1], close[i-1]) * 0.3;
+        let small_second =
+            body_length(open[i], close[i]) < body_length(open[i - 1], close[i - 1]) * 0.3;
 
         if closes_match && small_second {
             result[i] = -1.0;
@@ -2295,7 +2303,7 @@ pub fn onneck(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Advance Block（前进阻挡）
@@ -2311,12 +2319,12 @@ pub fn advance_block(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..2 {
@@ -2324,8 +2332,8 @@ pub fn advance_block(
     }
 
     for i in 2..n {
-        let first_bullish = is_bullish(open[i-2], close[i-2]);
-        let second_bullish = is_bullish(open[i-1], close[i-1]);
+        let first_bullish = is_bullish(open[i - 2], close[i - 2]);
+        let second_bullish = is_bullish(open[i - 1], close[i - 1]);
         let third_bullish = is_bullish(open[i], close[i]);
 
         if !first_bullish || !second_bullish || !third_bullish {
@@ -2333,12 +2341,12 @@ pub fn advance_block(
             continue;
         }
 
-        let first_body = body_length(open[i-2], close[i-2]);
-        let second_body = body_length(open[i-1], close[i-1]);
+        let first_body = body_length(open[i - 2], close[i - 2]);
+        let second_body = body_length(open[i - 1], close[i - 1]);
         let third_body = body_length(open[i], close[i]);
 
-        let first_upper = upper_shadow(high[i-2], open[i-2], close[i-2]);
-        let second_upper = upper_shadow(high[i-1], open[i-1], close[i-1]);
+        let first_upper = upper_shadow(high[i - 2], open[i - 2], close[i - 2]);
+        let second_upper = upper_shadow(high[i - 1], open[i - 1], close[i - 1]);
         let third_upper = upper_shadow(high[i], open[i], close[i]);
 
         // 实体递减
@@ -2354,7 +2362,7 @@ pub fn advance_block(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Stalled Pattern（停顿形态）
@@ -2370,12 +2378,12 @@ pub fn stalled_pattern(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     if n < 3 {
-        return result;
+        return Ok(result);
     }
 
     for i in 0..2 {
@@ -2383,8 +2391,8 @@ pub fn stalled_pattern(
     }
 
     for i in 2..n {
-        let first_bullish = is_bullish(open[i-2], close[i-2]);
-        let second_bullish = is_bullish(open[i-1], close[i-1]);
+        let first_bullish = is_bullish(open[i - 2], close[i - 2]);
+        let second_bullish = is_bullish(open[i - 1], close[i - 1]);
         let third_bullish = is_bullish(open[i], close[i]);
 
         if !first_bullish || !second_bullish || !third_bullish {
@@ -2392,8 +2400,8 @@ pub fn stalled_pattern(
             continue;
         }
 
-        let first_body = body_length(open[i-2], close[i-2]);
-        let second_body = body_length(open[i-1], close[i-1]);
+        let first_body = body_length(open[i - 2], close[i - 2]);
+        let second_body = body_length(open[i - 1], close[i - 1]);
         let third_body = body_length(open[i], close[i]);
         let third_upper = upper_shadow(high[i], open[i], close[i]);
 
@@ -2410,7 +2418,7 @@ pub fn stalled_pattern(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Belt Hold（捉腰带）
@@ -2420,14 +2428,9 @@ pub fn stalled_pattern(
 /// - 看跌版本：大阴线，几乎没有上影线
 ///
 /// 返回值：1.0 = Bullish Belt Hold, -1.0 = Bearish Belt Hold, 0.0 = 非捉腰带
-pub fn belthold(
-    open: &[f64],
-    high: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len();
-    let mut result = vec![f64::NAN; n];
+pub fn belthold(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
+    let mut result = init_result!(n);
 
     for i in 0..n {
         let body = body_length(open[i], close[i]);
@@ -2450,7 +2453,7 @@ pub fn belthold(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Concealing Baby Swallow（隐身燕子）- TA-Lib兼容
@@ -2466,44 +2469,46 @@ pub fn concealing_baby_swallow(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len().min(high.len()).min(low.len()).min(close.len());
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
     let mut result = vec![0.0; n];
 
-    if n < 4 { return result; }
+    if n < 4 {
+        return Ok(result);
+    }
 
     for i in 3..n {
-        let first_bearish = is_bearish(open[i-3], close[i-3]);
-        let second_bearish = is_bearish(open[i-2], close[i-2]);
-        let third_bearish = is_bearish(open[i-1], close[i-1]);
+        let first_bearish = is_bearish(open[i - 3], close[i - 3]);
+        let second_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let third_bearish = is_bearish(open[i - 1], close[i - 1]);
         let fourth_bearish = is_bearish(open[i], close[i]);
 
         if !first_bearish || !second_bearish || !third_bearish || !fourth_bearish {
             continue;
         }
 
-        let first_body = body_length(open[i-3], close[i-3]);
-        let second_body = body_length(open[i-2], close[i-2]);
-        let avg_body = average_body_length(open, close, i-3, 2);
+        let first_body = body_length(open[i - 3], close[i - 3]);
+        let second_body = body_length(open[i - 2], close[i - 2]);
+        let avg_body = average_body_length(open, close, i - 3, 2);
 
         // 前两根是大跌蜡烛
         let large_bearish = first_body >= avg_body && second_body >= avg_body;
 
         // 第三根跳空低开
-        let third_gap_down = open[i-1] < close[i-2];
+        let third_gap_down = open[i - 1] < close[i - 2];
 
         // 第四根吞没第三根
-        let fourth_engulfs_third = open[i] > open[i-1] && close[i] < close[i-1];
+        let fourth_engulfs_third = open[i] > open[i - 1] && close[i] < close[i - 1];
 
         // 第四根仍在第二根下方
-        let fourth_below_second = close[i] < close[i-2];
+        let fourth_below_second = close[i] < close[i - 2];
 
         if large_bearish && third_gap_down && fourth_engulfs_third && fourth_below_second {
-            result[i] = 1.0;  // 看涨隐身燕子
+            result[i] = 1.0; // 看涨隐身燕子
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Counterattack（反击线）- TA-Lib兼容
@@ -2517,17 +2522,19 @@ pub fn counterattack(
     _low: &[f64],
     close: &[f64],
     tolerance: f64,
-) -> Vec<f64> {
+) -> HazeResult<Vec<f64>> {
     let n = open.len().min(close.len());
     let mut result = vec![0.0; n];
 
-    if n < 2 { return result; }
+    if n < 2 {
+        return Ok(result);
+    }
 
     for i in 1..n {
-        let first_range = body_length(open[i-1], close[i-1]);
+        let first_range = body_length(open[i - 1], close[i - 1]);
         let second_range = body_length(open[i], close[i]);
 
-        let first_body = body_length(open[i-1], close[i-1]);
+        let first_body = body_length(open[i - 1], close[i - 1]);
         let second_body = body_length(open[i], close[i]);
 
         // 两根都是大实体
@@ -2539,23 +2546,23 @@ pub fn counterattack(
         }
 
         // 收盘价相同（容差范围内）
-        let close_match = (close[i] - close[i-1]).abs() < close[i-1] * tolerance;
+        let close_match = (close[i] - close[i - 1]).abs() < close[i - 1] * tolerance;
 
         if !close_match {
             continue;
         }
 
         // 看涨反击线：第一根大跌，第二根大涨但收盘价相同
-        if is_bearish(open[i-1], close[i-1]) && is_bullish(open[i], close[i]) {
+        if is_bearish(open[i - 1], close[i - 1]) && is_bullish(open[i], close[i]) {
             result[i] = 1.0;
         }
         // 看跌反击线：第一根大涨，第二根大跌但收盘价相同
-        else if is_bullish(open[i-1], close[i-1]) && is_bearish(open[i], close[i]) {
+        else if is_bullish(open[i - 1], close[i - 1]) && is_bearish(open[i], close[i]) {
             result[i] = -1.0;
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// High-Wave Candle（高浪线）- TA-Lib兼容
@@ -2569,8 +2576,8 @@ pub fn highwave(
     low: &[f64],
     close: &[f64],
     body_threshold: f64,
-) -> Vec<f64> {
-    let n = open.len().min(high.len()).min(low.len()).min(close.len());
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
     let mut result = vec![0.0; n];
 
     for i in 0..n {
@@ -2586,11 +2593,11 @@ pub fn highwave(
         let long_shadows = upper > body * 2.0 && lower > body * 2.0;
 
         if small_body && long_shadows {
-            result[i] = 1.0;  // 高浪线（不分方向）
+            result[i] = 1.0; // 高浪线（不分方向）
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Hikkake Pattern（陷阱形态）- TA-Lib兼容
@@ -2601,75 +2608,69 @@ pub fn highwave(
 /// 1. 第一根：普通K线
 /// 2. 第二根：内包于第一根（范围更小）
 /// 3. 第三根：突破第二根但未突破第一根（陷阱）
-pub fn hikkake(
-    _open: &[f64],
-    high: &[f64],
-    low: &[f64],
-    _close: &[f64],
-) -> Vec<f64> {
+pub fn hikkake(_open: &[f64], high: &[f64], low: &[f64], _close: &[f64]) -> HazeResult<Vec<f64>> {
     let n = high.len().min(low.len());
     let mut result = vec![0.0; n];
 
-    if n < 3 { return result; }
+    if n < 3 {
+        return Ok(result);
+    }
 
     for i in 2..n {
         // 第二根内包于第一根
-        let second_inside_first = high[i-1] < high[i-2] && low[i-1] > low[i-2];
+        let second_inside_first = high[i - 1] < high[i - 2] && low[i - 1] > low[i - 2];
 
         if !second_inside_first {
             continue;
         }
 
         // 看涨陷阱：第三根高点突破第二根但未突破第一根
-        let bullish_trap = high[i] > high[i-1] && high[i] < high[i-2];
+        let bullish_trap = high[i] > high[i - 1] && high[i] < high[i - 2];
 
         // 看跌陷阱：第三根低点突破第二根但未突破第一根
-        let bearish_trap = low[i] < low[i-1] && low[i] > low[i-2];
+        let bearish_trap = low[i] < low[i - 1] && low[i] > low[i - 2];
 
         if bullish_trap {
-            result[i] = 1.0;  // 看涨陷阱（假向上突破）
+            result[i] = 1.0; // 看涨陷阱（假向上突破）
         } else if bearish_trap {
-            result[i] = -1.0;  // 看跌陷阱（假向下突破）
+            result[i] = -1.0; // 看跌陷阱（假向下突破）
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Modified Hikkake Pattern（改良陷阱形态）- TA-Lib兼容
 ///
 /// Hikkake的改进版本，要求确认蜡烛
-pub fn hikkake_mod(
-    open: &[f64],
-    high: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len().min(high.len()).min(low.len()).min(close.len());
+pub fn hikkake_mod(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
     let mut result = vec![0.0; n];
 
-    if n < 4 { return result; }
+    if n < 4 {
+        return Ok(result);
+    }
 
     // 先计算基础Hikkake信号
-    let basic_hikkake = hikkake(open, high, low, close);
+    let basic_hikkake = hikkake(open, high, low, close)?;
 
     for i in 3..n {
         // 检查前一根是否有Hikkake信号
-        if basic_hikkake[i-1] == 0.0 {
+        if is_zero(basic_hikkake[i - 1]) {
             continue;
         }
 
         // 看涨确认：当前蜡烛收盘价高于Hikkake蜡烛
-        if basic_hikkake[i-1] == 1.0 && close[i] > close[i-1] {
+        if basic_hikkake[i - 1] == 1.0 && close[i] > close[i - 1] {
             result[i] = 1.0;
         }
         // 看跌确认：当前蜡烛收盘价低于Hikkake蜡烛
-        else if basic_hikkake[i-1] == -1.0 && close[i] < close[i-1] {
+        else if basic_hikkake[i - 1] == -1.0 && close[i] < close[i - 1] {
             result[i] = -1.0;
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Ladder Bottom（梯底）- TA-Lib兼容
@@ -2685,28 +2686,30 @@ pub fn ladder_bottom(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len().min(high.len()).min(low.len()).min(close.len());
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
     let mut result = vec![0.0; n];
 
-    if n < 5 { return result; }
+    if n < 5 {
+        return Ok(result);
+    }
 
     for i in 4..n {
         // 前三根连续下跌的黑色蜡烛
-        let first_three_bearish = is_bearish(open[i-4], close[i-4])
-            && is_bearish(open[i-3], close[i-3])
-            && is_bearish(open[i-2], close[i-2]);
+        let first_three_bearish = is_bearish(open[i - 4], close[i - 4])
+            && is_bearish(open[i - 3], close[i - 3])
+            && is_bearish(open[i - 2], close[i - 2]);
 
-        let descending = close[i-3] < close[i-4] && close[i-2] < close[i-3];
+        let descending = close[i - 3] < close[i - 4] && close[i - 2] < close[i - 3];
 
         if !first_three_bearish || !descending {
             continue;
         }
 
         // 第四根继续下跌，且有下影线
-        let fourth_bearish = is_bearish(open[i-1], close[i-1]);
-        let fourth_has_lower_shadow = lower_shadow(low[i-1], open[i-1], close[i-1]) > 0.0;
-        let fourth_continues_down = close[i-1] < close[i-2];
+        let fourth_bearish = is_bearish(open[i - 1], close[i - 1]);
+        let fourth_has_lower_shadow = lower_shadow(low[i - 1], open[i - 1], close[i - 1]) > 0.0;
+        let fourth_continues_down = close[i - 1] < close[i - 2];
 
         if !fourth_bearish || !fourth_has_lower_shadow || !fourth_continues_down {
             continue;
@@ -2714,35 +2717,32 @@ pub fn ladder_bottom(
 
         // 第五根白色蜡烛，跳空高开
         let fifth_bullish = is_bullish(open[i], close[i]);
-        let fifth_gap_up = open[i] > close[i-1];
+        let fifth_gap_up = open[i] > close[i - 1];
 
         if fifth_bullish && fifth_gap_up {
-            result[i] = 1.0;  // 梯底形态
+            result[i] = 1.0; // 梯底形态
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Mat Hold（垫托）- TA-Lib兼容
 ///
 /// 5根蜡烛的持续形态（上升趋势中的回调确认）
-pub fn mat_hold(
-    open: &[f64],
-    high: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len().min(high.len()).min(low.len()).min(close.len());
+pub fn mat_hold(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
     let mut result = vec![0.0; n];
 
-    if n < 5 { return result; }
+    if n < 5 {
+        return Ok(result);
+    }
 
     for i in 4..n {
         // 第一根：大涨的白色蜡烛
-        let first_bullish = is_bullish(open[i-4], close[i-4]);
-        let first_body = body_length(open[i-4], close[i-4]);
-        let avg_body = average_body_length(open, close, i-4, 5);
+        let first_bullish = is_bullish(open[i - 4], close[i - 4]);
+        let first_body = body_length(open[i - 4], close[i - 4]);
+        let avg_body = average_body_length(open, close, i - 4, 5);
         let first_large = first_body > avg_body * 1.5;
 
         if !first_bullish || !first_large {
@@ -2750,14 +2750,14 @@ pub fn mat_hold(
         }
 
         // 中间三根：小幅回调（可以跳空）
-        let second_small = body_length(open[i-3], close[i-3]) < first_body * 0.5;
-        let third_small = body_length(open[i-2], close[i-2]) < first_body * 0.5;
-        let fourth_small = body_length(open[i-1], close[i-1]) < first_body * 0.5;
+        let second_small = body_length(open[i - 3], close[i - 3]) < first_body * 0.5;
+        let third_small = body_length(open[i - 2], close[i - 2]) < first_body * 0.5;
+        let fourth_small = body_length(open[i - 1], close[i - 1]) < first_body * 0.5;
 
         // 中间三根收盘价低于第一根收盘价
-        let pullback = close[i-3] < close[i-4]
-            && close[i-2] < close[i-4]
-            && close[i-1] < close[i-4];
+        let pullback = close[i - 3] < close[i - 4]
+            && close[i - 2] < close[i - 4]
+            && close[i - 1] < close[i - 4];
 
         if !second_small || !third_small || !fourth_small || !pullback {
             continue;
@@ -2765,14 +2765,14 @@ pub fn mat_hold(
 
         // 第五根：白色蜡烛，收盘价创新高
         let fifth_bullish = is_bullish(open[i], close[i]);
-        let fifth_new_high = close[i] > close[i-4];
+        let fifth_new_high = close[i] > close[i - 4];
 
         if fifth_bullish && fifth_new_high {
-            result[i] = 1.0;  // 垫托形态
+            result[i] = 1.0; // 垫托形态
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Rickshaw Man（黄包车夫）- TA-Lib兼容
@@ -2786,8 +2786,8 @@ pub fn rickshaw_man(
     low: &[f64],
     close: &[f64],
     body_threshold: f64,
-) -> Vec<f64> {
-    let n = open.len().min(high.len()).min(low.len()).min(close.len());
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
     let mut result = vec![0.0; n];
 
     for i in 0..n {
@@ -2809,11 +2809,11 @@ pub fn rickshaw_man(
         let in_middle = (open_close_avg - mid_price).abs() < range * 0.2;
 
         if in_middle {
-            result[i] = 1.0;  // 黄包车夫
+            result[i] = 1.0; // 黄包车夫
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Unique 3 River（独特三川）- TA-Lib兼容
@@ -2829,17 +2829,19 @@ pub fn unique_3_river(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len().min(high.len()).min(low.len()).min(close.len());
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
     let mut result = vec![0.0; n];
 
-    if n < 3 { return result; }
+    if n < 3 {
+        return Ok(result);
+    }
 
     for i in 2..n {
         // 第一根：大跌的黑色蜡烛
-        let first_bearish = is_bearish(open[i-2], close[i-2]);
-        let first_body = body_length(open[i-2], close[i-2]);
-        let avg_body = average_body_length(open, close, i-2, 3);
+        let first_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let first_body = body_length(open[i - 2], close[i - 2]);
+        let avg_body = average_body_length(open, close, i - 2, 3);
         let first_large = first_body > avg_body * 1.5;
 
         if !first_bearish || !first_large {
@@ -2847,11 +2849,11 @@ pub fn unique_3_river(
         }
 
         // 第二根：小黑色蜡烛，类似锤子（长下影线），创新低
-        let second_bearish = is_bearish(open[i-1], close[i-1]);
-        let second_body = body_length(open[i-1], close[i-1]);
-        let second_lower = lower_shadow(low[i-1], open[i-1], close[i-1]);
+        let second_bearish = is_bearish(open[i - 1], close[i - 1]);
+        let second_body = body_length(open[i - 1], close[i - 1]);
+        let second_lower = lower_shadow(low[i - 1], open[i - 1], close[i - 1]);
         let second_hammer_like = second_lower > second_body * 2.0;
-        let second_new_low = low[i-1] < low[i-2];
+        let second_new_low = low[i - 1] < low[i - 2];
 
         if !second_bearish || !second_hammer_like || !second_new_low {
             continue;
@@ -2861,14 +2863,14 @@ pub fn unique_3_river(
         let third_bullish = is_bullish(open[i], close[i]);
         let third_body = body_length(open[i], close[i]);
         let third_small = third_body < avg_body * 0.5;
-        let third_in_first_body = close[i] > close[i-2] && close[i] < open[i-2];
+        let third_in_first_body = close[i] > close[i - 2] && close[i] < open[i - 2];
 
         if third_bullish && third_small && third_in_first_body {
-            result[i] = 1.0;  // 独特三川
+            result[i] = 1.0; // 独特三川
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Upside/Downside Gap Three Methods（跳空三法）- TA-Lib兼容
@@ -2879,43 +2881,45 @@ pub fn xside_gap_3_methods(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len().min(high.len()).min(low.len()).min(close.len());
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
     let mut result = vec![0.0; n];
 
-    if n < 3 { return result; }
+    if n < 3 {
+        return Ok(result);
+    }
 
     for i in 2..n {
-        let first_bullish = is_bullish(open[i-2], close[i-2]);
-        let second_bullish = is_bullish(open[i-1], close[i-1]);
+        let first_bullish = is_bullish(open[i - 2], close[i - 2]);
+        let second_bullish = is_bullish(open[i - 1], close[i - 1]);
         let third_bearish = is_bearish(open[i], close[i]);
 
         // 向上跳空三法：前两根白色蜡烛有缺口，第三根黑色填补缺口
         if first_bullish && second_bullish && third_bearish {
-            let upside_gap = low[i-1] > high[i-2];  // 向上缺口
-            let gap_filled = close[i] < low[i-1] && close[i] > high[i-2];  // 填补缺口
+            let upside_gap = low[i - 1] > high[i - 2]; // 向上缺口
+            let gap_filled = close[i] < low[i - 1] && close[i] > high[i - 2]; // 填补缺口
 
             if upside_gap && gap_filled {
-                result[i] = 1.0;  // 向上跳空三法（看涨持续）
+                result[i] = 1.0; // 向上跳空三法（看涨持续）
             }
         }
 
-        let first_bearish = is_bearish(open[i-2], close[i-2]);
-        let second_bearish = is_bearish(open[i-1], close[i-1]);
+        let first_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let second_bearish = is_bearish(open[i - 1], close[i - 1]);
         let third_bullish = is_bullish(open[i], close[i]);
 
         // 向下跳空三法：前两根黑色蜡烛有缺口，第三根白色填补缺口
         if first_bearish && second_bearish && third_bullish {
-            let downside_gap = high[i-1] < low[i-2];  // 向下缺口
-            let gap_filled = close[i] > high[i-1] && close[i] < low[i-2];  // 填补缺口
+            let downside_gap = high[i - 1] < low[i - 2]; // 向下缺口
+            let gap_filled = close[i] > high[i - 1] && close[i] < low[i - 2]; // 填补缺口
 
             if downside_gap && gap_filled {
-                result[i] = -1.0;  // 向下跳空三法（看跌持续）
+                result[i] = -1.0; // 向下跳空三法（看跌持续）
             }
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Closing Marubozu（收盘光脚）- TA-Lib兼容
@@ -2926,8 +2930,8 @@ pub fn closing_marubozu(
     high: &[f64],
     low: &[f64],
     close: &[f64],
-) -> Vec<f64> {
-    let n = open.len().min(high.len()).min(low.len()).min(close.len());
+) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
     let mut result = vec![0.0; n];
 
     for i in 0..n {
@@ -2951,7 +2955,7 @@ pub fn closing_marubozu(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// Breakaway（脱离）- TA-Lib兼容
@@ -2963,56 +2967,63 @@ pub fn closing_marubozu(
 /// 2. 第二根：跳空同方向
 /// 3. 第三、四根：持续同方向但幅度变小
 /// 4. 第五根：反向大蜡烛，收盘价填补部分缺口
-pub fn breakaway(
-    open: &[f64],
-    high: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> Vec<f64> {
-    let n = open.len().min(high.len()).min(low.len()).min(close.len());
+pub fn breakaway(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<Vec<f64>> {
+    let n = validate_full_ohlc!(open, high, low, close);
     let mut result = vec![0.0; n];
 
-    if n < 5 { return result; }
+    if n < 5 {
+        return Ok(result);
+    }
 
     for i in 4..n {
-        let avg_body = average_body_length(open, close, i-4, 5);
+        let avg_body = average_body_length(open, close, i - 4, 5);
 
         // 看涨脱离
-        let first_bearish_large = is_bearish(open[i-4], close[i-4])
-            && body_length(open[i-4], close[i-4]) > avg_body * 1.2;
-        let second_gap_down = open[i-3] < close[i-4];
-        let second_bearish = is_bearish(open[i-3], close[i-3]);
-        let third_bearish = is_bearish(open[i-2], close[i-2]);
-        let fourth_bearish = is_bearish(open[i-1], close[i-1]);
-        let fifth_bullish_large = is_bullish(open[i], close[i])
-            && body_length(open[i], close[i]) > avg_body * 1.2;
-        let fifth_fills_gap = close[i] > close[i-3] && close[i] < open[i-4];
+        let first_bearish_large = is_bearish(open[i - 4], close[i - 4])
+            && body_length(open[i - 4], close[i - 4]) > avg_body * 1.2;
+        let second_gap_down = open[i - 3] < close[i - 4];
+        let second_bearish = is_bearish(open[i - 3], close[i - 3]);
+        let third_bearish = is_bearish(open[i - 2], close[i - 2]);
+        let fourth_bearish = is_bearish(open[i - 1], close[i - 1]);
+        let fifth_bullish_large =
+            is_bullish(open[i], close[i]) && body_length(open[i], close[i]) > avg_body * 1.2;
+        let fifth_fills_gap = close[i] > close[i - 3] && close[i] < open[i - 4];
 
-        if first_bearish_large && second_gap_down && second_bearish
-            && third_bearish && fourth_bearish
-            && fifth_bullish_large && fifth_fills_gap {
-            result[i] = 1.0;  // 看涨脱离
+        if first_bearish_large
+            && second_gap_down
+            && second_bearish
+            && third_bearish
+            && fourth_bearish
+            && fifth_bullish_large
+            && fifth_fills_gap
+        {
+            result[i] = 1.0; // 看涨脱离
         }
 
         // 看跌脱离
-        let first_bullish_large = is_bullish(open[i-4], close[i-4])
-            && body_length(open[i-4], close[i-4]) > avg_body * 1.2;
-        let second_gap_up = open[i-3] > close[i-4];
-        let second_bullish = is_bullish(open[i-3], close[i-3]);
-        let third_bullish = is_bullish(open[i-2], close[i-2]);
-        let fourth_bullish = is_bullish(open[i-1], close[i-1]);
-        let fifth_bearish_large = is_bearish(open[i], close[i])
-            && body_length(open[i], close[i]) > avg_body * 1.2;
-        let fifth_fills_gap = close[i] < close[i-3] && close[i] > open[i-4];
+        let first_bullish_large = is_bullish(open[i - 4], close[i - 4])
+            && body_length(open[i - 4], close[i - 4]) > avg_body * 1.2;
+        let second_gap_up = open[i - 3] > close[i - 4];
+        let second_bullish = is_bullish(open[i - 3], close[i - 3]);
+        let third_bullish = is_bullish(open[i - 2], close[i - 2]);
+        let fourth_bullish = is_bullish(open[i - 1], close[i - 1]);
+        let fifth_bearish_large =
+            is_bearish(open[i], close[i]) && body_length(open[i], close[i]) > avg_body * 1.2;
+        let fifth_fills_gap = close[i] < close[i - 3] && close[i] > open[i - 4];
 
-        if first_bullish_large && second_gap_up && second_bullish
-            && third_bullish && fourth_bullish
-            && fifth_bearish_large && fifth_fills_gap {
-            result[i] = -1.0;  // 看跌脱离
+        if first_bullish_large
+            && second_gap_up
+            && second_bullish
+            && third_bullish
+            && fourth_bullish
+            && fifth_bearish_large
+            && fifth_fills_gap
+        {
+            result[i] = -1.0; // 看跌脱离
         }
     }
 
-    result
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -3034,7 +3045,7 @@ mod tests_extended {
         let low = vec![99.9]; // 几乎没有下影线
         let close = vec![109.9]; // 几乎没有上影线
 
-        let result = marubozu(&open, &high, &low, &close);
+        let result = marubozu(&open, &high, &low, &close).unwrap();
         assert_eq!(result[0], 1.0); // Bullish Marubozu
     }
 
@@ -3045,7 +3056,7 @@ mod tests_extended {
         let low = vec![90.0];
         let close = vec![101.0]; // 小实体，长影线
 
-        let result = spinning_top(&open, &high, &low, &close);
+        let result = spinning_top(&open, &high, &low, &close).unwrap();
         assert_eq!(result[0], 1.0);
     }
 
@@ -3056,7 +3067,7 @@ mod tests_extended {
         let low = vec![90.0]; // 长下影线
         let close = vec![100.2]; // 接近开盘价
 
-        let result = dragonfly_doji(&open, &high, &low, &close, 0.1);
+        let result = dragonfly_doji(&open, &high, &low, &close, 0.1).unwrap();
         assert_eq!(result[0], 1.0);
     }
 
@@ -3066,7 +3077,7 @@ mod tests_extended {
         let high = vec![110.0, 110.1]; // 最高价接近
         let close = vec![108.0, 103.0]; // 第一根阳线，第二根阴线
 
-        let result = tweezers_top(&open, &high, &close, 0.01);
+        let result = tweezers_top(&open, &high, &close, 0.01).unwrap();
         assert_eq!(result[1], -1.0);
     }
 }

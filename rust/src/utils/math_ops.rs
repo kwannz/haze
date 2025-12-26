@@ -1,8 +1,64 @@
-//! Math Operations Module
-#![allow(dead_code)]
+//! Mathematical Operations Module
 //!
-//! 数学运算函数，对应 TA-Lib 的 Math Operators
-//! 提供向量化的数学运算，支持滚动窗口计算
+//! # Overview
+//! This module provides vectorized mathematical operations compatible with
+//! TA-Lib's Math Operators. All functions operate element-wise on price
+//! vectors and support rolling window calculations where applicable.
+//!
+//! # Available Functions
+//!
+//! ## Rolling Window Operations
+//! - [`max`] - Highest value over a specified period
+//! - [`min`] - Lowest value over a specified period
+//! - [`sum`] - Summation over a specified period
+//! - [`minmax`] - Both min and max in single call
+//! - [`minmaxindex`] - Indices of min and max values
+//!
+//! ## Arithmetic Operations
+//! - [`add`] - Element-wise vector addition
+//! - [`sub`] - Element-wise vector subtraction
+//! - [`mult`] - Element-wise vector multiplication
+//! - [`div`] - Element-wise vector division (NaN-safe)
+//!
+//! ## Unary Math Functions
+//! - [`sqrt`] - Square root
+//! - [`ln`] - Natural logarithm
+//! - [`log10`] - Base-10 logarithm
+//! - [`exp`] - Exponential (e^x)
+//! - [`abs`] - Absolute value
+//! - [`ceil`] - Ceiling (round up)
+//! - [`floor`] - Floor (round down)
+//!
+//! ## Trigonometric Functions
+//! - [`sin`], [`cos`], [`tan`] - Standard trig (radians)
+//! - [`asin`], [`acos`], [`atan`] - Inverse trig (returns radians)
+//! - [`sinh`], [`cosh`], [`tanh`] - Hyperbolic functions
+//!
+//! # Examples
+//! ```rust
+//! use haze_library::utils::math_ops::{add, sqrt, max};
+//!
+//! let a = vec![1.0, 4.0, 9.0, 16.0];
+//! let b = vec![1.0, 1.0, 1.0, 1.0];
+//!
+//! let sum = add(&a, &b);        // [2.0, 5.0, 10.0, 17.0]
+//! let roots = sqrt(&a);         // [1.0, 2.0, 3.0, 4.0]
+//! let rolling_max = max(&a, 2); // [NaN, 4.0, 9.0, 16.0]
+//! ```
+//!
+//! # Performance Characteristics
+//! - Unary operations: O(n) with iterator-based implementation
+//! - Rolling window operations: O(n) using efficient algorithms from stats module
+//! - Division handles zero divisors gracefully (returns NaN)
+//!
+//! # Cross-References
+//! - [`crate::utils::stats`] - Statistical functions (rolling_max, rolling_min, etc.)
+//! - [`crate::utils::simd_ops`] - SIMD-optimized vector operations
+
+#![allow(dead_code)]
+
+use crate::init_result;
+use crate::utils::math::is_not_zero;
 
 /// MAX - Highest value over a specified period
 ///
@@ -332,7 +388,7 @@ pub fn div(values1: &[f64], values2: &[f64]) -> Vec<f64> {
     let mut result = Vec::with_capacity(n);
 
     for i in 0..n {
-        if values2[i] != 0.0 {
+        if is_not_zero(values2[i]) {
             result.push(values1[i] / values2[i]);
         } else {
             result.push(f64::NAN);
@@ -370,8 +426,8 @@ pub fn minmax(values: &[f64], period: usize) -> (Vec<f64>, Vec<f64>) {
 /// - (min_idx, max_idx) 元组（索引相对于窗口起始位置）
 pub fn minmaxindex(values: &[f64], period: usize) -> (Vec<f64>, Vec<f64>) {
     let n = values.len();
-    let mut min_idx = vec![f64::NAN; n];
-    let mut max_idx = vec![f64::NAN; n];
+    let mut min_idx = init_result!(n);
+    let mut max_idx = init_result!(n);
 
     if period == 0 || period > n {
         return (min_idx, max_idx);
