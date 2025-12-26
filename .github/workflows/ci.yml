@@ -302,13 +302,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install maturin
-        run: pip install maturin
-
-      - name: Build source distribution
-        working-directory: ./rust
-        run: maturin sdist -o ../dist
-
       - name: List distributions
         run: ls -la dist/
 
