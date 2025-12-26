@@ -154,6 +154,28 @@ fn bench_stats_hotspots(c: &mut Criterion) {
                     })
                 },
             );
+
+            group.bench_with_input(
+                BenchmarkId::new("sma", format!("{n}_p{period}")),
+                &(&data, period),
+                |b, (values, p)| {
+                    b.iter(|| {
+                        let out = utils::sma(black_box(values), black_box(*p)).unwrap();
+                        black_box(out[n - 1]);
+                    })
+                },
+            );
+
+            group.bench_with_input(
+                BenchmarkId::new("ema", format!("{n}_p{period}")),
+                &(&data, period),
+                |b, (values, p)| {
+                    b.iter(|| {
+                        let out = utils::ema(black_box(values), black_box(*p)).unwrap();
+                        black_box(out[n - 1]);
+                    })
+                },
+            );
         }
     }
 
