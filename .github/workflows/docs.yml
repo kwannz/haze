@@ -80,14 +80,14 @@ jobs:
           echo '```' >> doc-coverage.md
 
       - name: Upload documentation coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: doc-coverage-report
           path: rust/doc-coverage.md
           retention-days: 7
 
       - name: Upload documentation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: rust-docs
           path: rust/target/doc

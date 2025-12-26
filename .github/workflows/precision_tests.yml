@@ -120,7 +120,7 @@ jobs:
 
       - name: Upload precision report
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: precision-report
           path: precision_report.txt
@@ -166,7 +166,7 @@ jobs:
           echo '```' >> benchmark_summary.md
 
       - name: Upload benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: benchmark-results
           path: rust/benchmark_summary.md
@@ -308,7 +308,7 @@ jobs:
           cat reports/benchmark_summary.md >> reports/PRECISION_SUMMARY.md
 
       - name: Upload combined report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: precision-summary
           path: reports/PRECISION_SUMMARY.md

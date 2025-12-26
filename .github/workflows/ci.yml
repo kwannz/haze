@@ -99,7 +99,7 @@ jobs:
         run: maturin build --release --features python -o dist
 
       - name: Upload wheel
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wheel-linux-py${{ matrix.python-version }}
           path: rust/dist/*.whl
@@ -137,7 +137,7 @@ jobs:
         run: maturin build --release --features python --target ${{ matrix.target }} -o dist
 
       - name: Upload wheel
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wheel-macos-${{ matrix.target }}-py${{ matrix.python-version }}
           path: rust/dist/*.whl
@@ -172,7 +172,7 @@ jobs:
         run: maturin build --release --features python -o dist
 
       - name: Upload wheel
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: wheel-windows-py${{ matrix.python-version }}
           path: rust/dist/*.whl
