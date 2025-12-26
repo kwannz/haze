@@ -20,12 +20,15 @@ import warnings
 
 warnings.filterwarnings('ignore')
 
+# pandas-ta 兼容导入（用于 3.13+ 无 numba 环境）
+from pandas_ta_compat import import_pandas_ta
+
 # 导入参考库
-try:
-    import pandas_ta as pta
-    HAS_PANDAS_TA = True
-except ImportError:
-    HAS_PANDAS_TA = False
+pta, _PANDAS_TA_STUB = import_pandas_ta()
+HAS_PANDAS_TA = pta is not None
+if HAS_PANDAS_TA and _PANDAS_TA_STUB:
+    print("⚠️  pandas-ta 使用 numba stub（无 JIT，仅用于对比）")
+elif not HAS_PANDAS_TA:
     print("⚠️  pandas-ta 未安装，跳过 pandas-ta 对比")
 
 try:
@@ -37,12 +40,16 @@ except ImportError:
 
 # 导入 haze-library
 try:
-    import _haze_rust as haze
+    import haze_library as haze
     HAS_HAZE = True
 except ImportError:
-    HAS_HAZE = False
-    print("❌ haze-library 未安装，请先运行 maturin develop")
-    exit(1)
+    try:
+        import _haze_rust as haze
+        HAS_HAZE = True
+    except ImportError:
+        HAS_HAZE = False
+        print("❌ haze-library 未安装，请先运行 maturin develop")
+        exit(1)
 
 
 @dataclass
@@ -165,6 +172,17 @@ class PrecisionValidator:
 
             # 处理返回值（可能是元组或单值）
             if isinstance(haze_result, tuple):
+                if not isinstance(ref_result, (tuple, list)):
+                    raise ValueError(
+                        f"{name}: reference result must be tuple/list, got {type(ref_result).__name__}"
+                    )
+                if isinstance(ref_result, list):
+                    ref_result = tuple(ref_result)
+                if len(haze_result) != len(ref_result):
+                    raise ValueError(
+                        f"{name}: result count mismatch (haze {len(haze_result)}, ref {len(ref_result)})"
+                    )
+
                 # 多返回值指标（如 MACD, Bollinger Bands）
                 metrics_list = []
                 all_passed = True
@@ -172,6 +190,10 @@ class PrecisionValidator:
                 for i, (h, r) in enumerate(zip(haze_result, ref_result)):
                     h_array = np.array(h) if not isinstance(h, np.ndarray) else h
                     r_array = np.array(r) if not isinstance(r, np.ndarray) else r
+                    if h_array.shape != r_array.shape:
+                        raise ValueError(
+                            f"{name}[{i}]: shape mismatch (haze {h_array.shape}, ref {r_array.shape})"
+                        )
 
                     metrics = self.calculate_metrics(h_array, r_array, f"{name}[{i}]")
                     metrics_list.append(metrics)

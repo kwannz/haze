@@ -16,8 +16,11 @@ Author: Haze Team
 Date: 2025-12-25
 """
 
+import inspect
 import sys
-sys.path.insert(0, '/Users/zhaoleon/Desktop/haze/haze-Library/tests')
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from precision_validator import (
     PrecisionValidator,
@@ -26,9 +29,473 @@ from precision_validator import (
     HAS_TALIB,
     HAS_HAZE
 )
+from pandas_ta_compat import import_pandas_ta
+from pandas_ta_kw_compat import import_pandas_ta_kw
 
-import _haze_rust as haze
-import numpy as np
+try:
+    import haze_library as haze
+except ImportError:
+    import _haze_rust as haze
+
+PANDAS_TA_KW, PANDAS_TA_KW_PATH, PANDAS_TA_KW_CUSTOM = import_pandas_ta_kw()
+HAS_PANDAS_TA_KW = PANDAS_TA_KW is not None
+
+
+def _first_param(params, names):
+    for name in names:
+        if name in params:
+            return name
+    return None
+
+
+def _to_numpy(values):
+    if hasattr(values, "to_numpy"):
+        return values.to_numpy()
+    return values
+
+
+def _find_indicator(module, names):
+    for name in names:
+        fn = getattr(module, name, None)
+        if callable(fn):
+            return fn, name
+    return None, None
+
+
+def _select_column(df, tokens):
+    for idx, col in enumerate(getattr(df, "columns", [])):
+        name = str(col).lower()
+        if any(token in name for token in tokens):
+            return idx
+    return None
+
+
+def validate_pandas_ta_exclusive(validator: PrecisionValidator, df):
+    """验证 pandas-ta 独有指标（可对齐的子集）"""
+    print("\n" + "="*70)
+    print("📊 验证 pandas-ta 独有指标 (pandas-ta Exclusive)")
+    print("="*70)
+
+    pta, _ = import_pandas_ta()
+    pta_kw = PANDAS_TA_KW
+
+    if pta is None and pta_kw is None:
+        print("⚠️ pandas-ta / pandas-ta-kw 未安装，跳过 pandas-ta 专用对比")
+        return
+
+    if pta is None:
+        print("⚠️ pandas-ta 未安装，将跳过 pandas-ta 对比项")
+    if pta_kw is None:
+        print("⚠️ pandas-ta-kw 未安装，将跳过 pandas-ta-kw 对比项")
+
+    close = df["close"]
+    high = df["high"]
+    low = df["low"]
+    open_ = df["open"]
+    volume = df["volume"]
+
+    # Entropy 与 pandas-ta 定义不同，跳过精度对比
+    print("\n[1/25] Entropy... (skip: 定义与 pandas-ta 不一致)")
+
+    # Aberration（派生：使用 pandas-ta 的 SMA + ATR 复现 Haze 定义）
+    if pta is None:
+        print("\n[2/25] Aberration... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[2/25] 验证 Aberration... (derived)")
+        pta_ab_sma = pta.sma(close=close, length=20)
+        pta_ab_atr = pta.atr(high=high, low=low, close=close, length=20)
+        validator.validate_indicator(
+            name="Aberration",
+            haze_func=lambda: haze.py_aberration(
+                high.tolist(),
+                low.tolist(),
+                close.tolist(),
+                20,
+                20
+            ),
+            reference_func=lambda: ((close - pta_ab_sma) / pta_ab_atr).to_numpy(),
+            test_data=df.to_dict("list"),
+            params={},
+            reference_lib="pandas-ta (derived)"
+        )
+
+    # Squeeze 与 pandas-ta 动量定义不同，跳过精度对比
+    print("\n[3/25] Squeeze... (skip: 动量定义不同)")
+
+    # QQE 与 pandas-ta 版本不同，跳过精度对比
+    print("\n[4/25] QQE... (skip: 公式实现不同)")
+
+    # CTI
+    if pta is None:
+        print("\n[5/25] CTI... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[5/25] 验证 CTI...")
+        validator.validate_indicator(
+            name="CTI",
+            haze_func=lambda: haze.py_cti(close.tolist(), 12),
+            reference_func=lambda: pta.cti(close=close, length=12).to_numpy(),
+            test_data=df.to_dict("list"),
+            params={},
+            reference_lib="pandas-ta"
+        )
+
+    # ER
+    if pta is None:
+        print("\n[6/25] ER... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[6/25] 验证 ER...")
+        validator.validate_indicator(
+            name="ER",
+            haze_func=lambda: haze.py_er(close.tolist(), 10),
+            reference_func=lambda: pta.er(close=close, length=10).to_numpy(),
+            test_data=df.to_dict("list"),
+            params={},
+            reference_lib="pandas-ta"
+        )
+
+    # Bias（pandas-ta 输出为比例，Haze 为百分比）
+    if pta is None:
+        print("\n[7/25] Bias... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[7/25] 验证 Bias...")
+        validator.validate_indicator(
+            name="BIAS",
+            haze_func=lambda: haze.py_bias(close.tolist(), 20),
+            reference_func=lambda: (pta.bias(close=close, length=20, mamode="sma") * 100.0).to_numpy(),
+            test_data=df.to_dict("list"),
+            params={},
+            reference_lib="pandas-ta"
+        )
+
+    # PSL
+    if pta is None:
+        print("\n[8/25] PSL... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[8/25] 验证 PSL...")
+        validator.validate_indicator(
+            name="PSL",
+            haze_func=lambda: haze.py_psl(close.tolist(), 12),
+            reference_func=lambda: pta.psl(close=close, length=12).to_numpy(),
+            test_data=df.to_dict("list"),
+            params={},
+            reference_lib="pandas-ta"
+        )
+
+    # RVI / Inertia 与 pandas-ta 定义不同，跳过精度对比
+    print("\n[9/25] RVI... (skip: 指标定义不同)")
+    print("\n[10/25] Inertia... (skip: 指标定义不同)")
+
+    # Alligator（使用 HL2 输入并手动偏移对齐）
+    if pta is None:
+        print("\n[11/25] Alligator... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[11/25] 验证 Alligator...")
+        haze_alligator = haze.py_alligator(
+            high.tolist(),
+            low.tolist(),
+            13,
+            8,
+            5
+        )
+        hl2 = (high + low) / 2.0
+        pta_alligator = pta.alligator(close=hl2, jaw=13, teeth=8, lips=5, talib=False)
+        pta_jaw = pta_alligator.iloc[:, 0].shift(8)
+        pta_teeth = pta_alligator.iloc[:, 1].shift(5)
+        pta_lips = pta_alligator.iloc[:, 2].shift(3)
+
+        for i, name in enumerate(["Alligator_Jaw", "Alligator_Teeth", "Alligator_Lips"]):
+            ref_series = [pta_jaw, pta_teeth, pta_lips][i]
+            validator.validate_indicator(
+                name=name,
+                haze_func=lambda idx=i: haze_alligator[idx],
+                reference_func=lambda s=ref_series: s.to_numpy(),
+                test_data=df.to_dict("list"),
+                params={},
+                reference_lib="pandas-ta"
+            )
+
+    # EFI
+    if pta is None:
+        print("\n[12/25] EFI... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[12/25] 验证 EFI...")
+        validator.validate_indicator(
+            name="EFI",
+            haze_func=lambda: haze.py_efi(close.tolist(), volume.tolist(), 13),
+            reference_func=lambda: pta.efi(close=close, volume=volume, length=13, mamode="ema").to_numpy(),
+            test_data=df.to_dict("list"),
+            params={},
+            reference_lib="pandas-ta"
+        )
+
+    # KST（pandas-ta 结果缩放到 Haze 输出）
+    if pta is None:
+        print("\n[13/25] KST... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[13/25] 验证 KST...")
+        haze_kst = haze.py_kst(close.tolist(), 10, 15, 20, 30, 9)
+        pta_kst = pta.kst(
+            close=close,
+            roc1=10,
+            roc2=15,
+            roc3=20,
+            roc4=30,
+            sma1=10,
+            sma2=10,
+            sma3=10,
+            sma4=15,
+            signal=9
+        )
+        pta_kst_line = pta_kst.iloc[:, 0] / 100.0
+        pta_kst_signal = pta_kst.iloc[:, 1] / 100.0
+
+        for i, name in enumerate(["KST", "KST_Signal"]):
+            ref_series = [pta_kst_line, pta_kst_signal][i]
+            validator.validate_indicator(
+                name=name,
+                haze_func=lambda idx=i: haze_kst[idx],
+                reference_func=lambda s=ref_series: s.to_numpy(),
+                test_data=df.to_dict("list"),
+                params={},
+                reference_lib="pandas-ta"
+            )
+
+    # STC / TDFI / WAE 与 pandas-ta 定义不同或缺失
+    print("\n[14/25] STC... (skip: 公式实现不同)")
+
+    if pta_kw is None:
+        print("\n[15/25] TDFI... (skip: pandas-ta-kw 未安装)")
+    else:
+        tdfi_fn, _ = _find_indicator(pta_kw, ["tdfi", "tdf"])
+        if tdfi_fn is None:
+            print("\n[15/25] TDFI... (skip: pandas-ta-kw 未实现)")
+        else:
+            print("\n[15/25] 验证 TDFI... (pandas-ta-kw)")
+            try:
+                params = inspect.signature(tdfi_fn).parameters
+                kwargs = {}
+                close_key = _first_param(params, ["close", "close_", "src", "series", "price"])
+                length_key = _first_param(params, ["length", "period", "n"])
+                smooth_key = _first_param(params, ["signal", "smooth", "smooth_length", "sig"])
+                if close_key:
+                    kwargs[close_key] = close
+                if length_key:
+                    kwargs[length_key] = 13
+                if smooth_key:
+                    kwargs[smooth_key] = 3
+                ref = tdfi_fn(**kwargs)
+            except Exception as exc:
+                print(f"  ⚠️ TDFI 调用失败: {exc}")
+            else:
+                validator.validate_indicator(
+                    name="TDFI",
+                    haze_func=lambda: haze.py_tdfi(close.tolist(), 13, 3),
+                    reference_func=lambda r=ref: _to_numpy(r),
+                    test_data=df.to_dict("list"),
+                    params={},
+                    reference_lib="pandas-ta-kw"
+                )
+
+    if pta_kw is None:
+        print("\n[16/25] WAE... (skip: pandas-ta-kw 未安装)")
+    else:
+        wae_fn, _ = _find_indicator(pta_kw, ["wae", "waddah", "waddah_attar", "waddah_attar_explosion"])
+        if wae_fn is None:
+            print("\n[16/25] WAE... (skip: pandas-ta-kw 未实现)")
+        else:
+            print("\n[16/25] 验证 WAE... (pandas-ta-kw)")
+            try:
+                params = inspect.signature(wae_fn).parameters
+                kwargs = {}
+                close_key = _first_param(params, ["close", "close_", "src", "series", "price"])
+                fast_key = _first_param(params, ["fast", "fast_length"])
+                slow_key = _first_param(params, ["slow", "slow_length"])
+                signal_key = _first_param(params, ["signal", "signal_length"])
+                length_key = _first_param(params, ["length", "bb_length", "bb_period"])
+                mult_key = _first_param(params, ["mult", "multiplier", "bb_mult", "bb_multiplier"])
+                if close_key:
+                    kwargs[close_key] = close
+                if fast_key:
+                    kwargs[fast_key] = 20
+                if slow_key:
+                    kwargs[slow_key] = 40
+                if signal_key:
+                    kwargs[signal_key] = 9
+                if length_key:
+                    kwargs[length_key] = 20
+                if mult_key:
+                    kwargs[mult_key] = 2.0
+                ref = wae_fn(**kwargs)
+                if hasattr(ref, "columns"):
+                    exp_idx = _select_column(ref, ["exp", "expl", "wae"])
+                    dz_idx = _select_column(ref, ["dead", "dz"])
+                    if exp_idx is None or dz_idx is None:
+                        if len(ref.columns) >= 2:
+                            exp_idx, dz_idx = 0, 1
+                        else:
+                            raise ValueError("WAE 输出列不足")
+                    ref_explosion = ref.iloc[:, exp_idx].to_numpy()
+                    ref_dead = ref.iloc[:, dz_idx].to_numpy()
+                elif isinstance(ref, tuple) and len(ref) >= 2:
+                    ref_explosion = _to_numpy(ref[0])
+                    ref_dead = _to_numpy(ref[1])
+                else:
+                    raise ValueError("WAE 输出格式不支持")
+            except Exception as exc:
+                print(f"  ⚠️ WAE 调用失败: {exc}")
+            else:
+                validator.validate_indicator(
+                    name="WAE",
+                    haze_func=lambda: haze.py_wae(close.tolist(), 20, 40, 9, 20, 2.0),
+                    reference_func=lambda e=ref_explosion, d=ref_dead: (e, d),
+                    test_data=df.to_dict("list"),
+                    params={},
+                    reference_lib="pandas-ta-kw"
+                )
+
+    # SMI 定义不同（pandas-ta 为 SMI Ergodic）
+    print("\n[17/25] SMI... (skip: 指标定义不同)")
+
+    # Coppock
+    if pta is None:
+        print("\n[18/25] Coppock... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[18/25] 验证 Coppock...")
+        validator.validate_indicator(
+            name="Coppock",
+            haze_func=lambda: haze.py_coppock(close.tolist(), 11, 14, 10),
+            reference_func=lambda: pta.coppock(close=close, length=10, fast=11, slow=14).to_numpy(),
+            test_data=df.to_dict("list"),
+            params={},
+            reference_lib="pandas-ta"
+        )
+
+    # PGO（派生：使用 pandas-ta SMA + ATR 复现 Haze 定义）
+    if pta is None:
+        print("\n[19/25] PGO... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[19/25] 验证 PGO... (derived)")
+        pta_pgo_sma = pta.sma(close=close, length=14)
+        pta_pgo_atr = pta.atr(high=high, low=low, close=close, length=14)
+        validator.validate_indicator(
+            name="PGO",
+            haze_func=lambda: haze.py_pgo(
+                high.tolist(),
+                low.tolist(),
+                close.tolist(),
+                14
+            ),
+            reference_func=lambda: ((close - pta_pgo_sma) / pta_pgo_atr).to_numpy(),
+            test_data=df.to_dict("list"),
+            params={},
+            reference_lib="pandas-ta (derived)"
+        )
+
+    # VWMA
+    if pta is None:
+        print("\n[20/25] VWMA... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[20/25] 验证 VWMA...")
+        validator.validate_indicator(
+            name="VWMA",
+            haze_func=lambda: haze.py_vwma(close.tolist(), volume.tolist(), 20),
+            reference_func=lambda: pta.vwma(close=close, volume=volume, length=20).to_numpy(),
+            test_data=df.to_dict("list"),
+            params={},
+            reference_lib="pandas-ta"
+        )
+
+    # BOP
+    if pta is None:
+        print("\n[21/25] BOP... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[21/25] 验证 BOP...")
+        validator.validate_indicator(
+            name="BOP",
+            haze_func=lambda: haze.py_bop(
+                open_.tolist(),
+                high.tolist(),
+                low.tolist(),
+                close.tolist()
+            ),
+            reference_func=lambda: pta.bop(open_=open_, high=high, low=low, close=close).to_numpy(),
+            test_data=df.to_dict("list"),
+            params={},
+            reference_lib="pandas-ta"
+        )
+
+    # SSL Channel / CFO / Slope / Percent Rank
+    if pta_kw is None:
+        print("\n[22/25] SSL Channel... (skip: pandas-ta-kw 未安装)")
+    else:
+        ssl_fn, _ = _find_indicator(pta_kw, ["ssl", "ssl_channel", "sslchannel"])
+        if ssl_fn is None:
+            print("\n[22/25] SSL Channel... (skip: pandas-ta-kw 未实现)")
+        else:
+            print("\n[22/25] 验证 SSL Channel... (pandas-ta-kw)")
+            try:
+                params = inspect.signature(ssl_fn).parameters
+                kwargs = {}
+                close_key = _first_param(params, ["close", "close_", "src", "series", "price"])
+                high_key = _first_param(params, ["high"])
+                low_key = _first_param(params, ["low"])
+                length_key = _first_param(params, ["length", "period", "n"])
+                if close_key:
+                    kwargs[close_key] = close
+                if high_key:
+                    kwargs[high_key] = high
+                if low_key:
+                    kwargs[low_key] = low
+                if length_key:
+                    kwargs[length_key] = 10
+                ref = ssl_fn(**kwargs)
+                if hasattr(ref, "columns"):
+                    up_idx = _select_column(ref, ["up", "upper", "sslup"])
+                    down_idx = _select_column(ref, ["down", "lower", "ssldn", "ssldown"])
+                    if up_idx is None or down_idx is None:
+                        if len(ref.columns) >= 2:
+                            up_idx, down_idx = 0, 1
+                        else:
+                            raise ValueError("SSL 输出列不足")
+                    ref_up = ref.iloc[:, up_idx].to_numpy()
+                    ref_down = ref.iloc[:, down_idx].to_numpy()
+                elif isinstance(ref, tuple) and len(ref) >= 2:
+                    ref_up = _to_numpy(ref[0])
+                    ref_down = _to_numpy(ref[1])
+                else:
+                    raise ValueError("SSL 输出格式不支持")
+            except Exception as exc:
+                print(f"  ⚠️ SSL Channel 调用失败: {exc}")
+            else:
+                validator.validate_indicator(
+                    name="SSL_Channel",
+                    haze_func=lambda: haze.py_ssl_channel(
+                        high.tolist(),
+                        low.tolist(),
+                        close.tolist(),
+                        10
+                    ),
+                    reference_func=lambda u=ref_up, d=ref_down: (u, d),
+                    test_data=df.to_dict("list"),
+                    params={},
+                    reference_lib="pandas-ta-kw"
+                )
+
+    if pta is None:
+        print("\n[23/25] CFO... (skip: pandas-ta 未安装)")
+    else:
+        print("\n[23/25] 验证 CFO...")
+        validator.validate_indicator(
+            name="CFO",
+            haze_func=lambda: haze.py_cfo(close.tolist(), 14),
+            reference_func=lambda: pta.cfo(close=close, length=14, scalar=100).to_numpy(),
+            test_data=df.to_dict("list"),
+            params={},
+            reference_lib="pandas-ta"
+        )
+
+    print("\n[24/25] Slope... (skip: 指标定义不同)")
+    print("\n[25/25] Percent Rank... (skip: 指标定义不同)")
 
 
 def validate_volatility_indicators(validator: PrecisionValidator, df):
@@ -331,6 +798,12 @@ def main():
     print(f"   - haze-library: {'✓' if HAS_HAZE else '✗'}")
     print(f"   - pandas-ta:    {'✓' if HAS_PANDAS_TA else '✗'}")
     print(f"   - TA-Lib:       {'✓' if HAS_TALIB else '✗'}")
+    print(f"   - pandas-ta-kw: {'✓' if HAS_PANDAS_TA_KW else '✗'}")
+    if HAS_PANDAS_TA_KW:
+        kw_path = PANDAS_TA_KW_PATH or "site-packages"
+        print(f"   - pandas-ta-kw path: {kw_path}")
+        if PANDAS_TA_KW_CUSTOM:
+            print("   - pandas-ta-kw custom: ✓")
 
     # 生成测试数据
     print("\n📊 生成测试数据（500 个数据点）...")
@@ -346,6 +819,7 @@ def main():
     validate_volatility_indicators(validator, df)
     validate_momentum_indicators(validator, df)
     validate_moving_averages(validator, df)
+    validate_pandas_ta_exclusive(validator, df)
 
     # 生成最终报告
     print("\n" + "="*70)
@@ -355,7 +829,7 @@ def main():
     print(report)
 
     # 保存报告到文件
-    report_path = "/Users/zhaoleon/Desktop/haze/haze-Library/tests/precision_report.txt"
+    report_path = Path(__file__).resolve().parent / "precision_report.txt"
     with open(report_path, 'w', encoding='utf-8') as f:
         f.write(report)
     print(f"\n💾 报告已保存至: {report_path}")
