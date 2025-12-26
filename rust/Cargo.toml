@@ -20,7 +20,7 @@ pyo3 = { version = "0.27", optional = true }
 numpy = { version = "0.27", optional = true }
 rayon = "1.8"
 serde = { version = "1.0", features = ["derive"] }
-thiserror = "1.0"
+thiserror = "2.0"
 
 # Polars 集成（可选）
 # 注意：pyo3-polars 0.23+ 需要 pyo3 0.26，暂时禁用以避免版本冲突
