@@ -336,12 +336,7 @@ fn sum_signed_rolling_deltas(
 // =============================================================================
 
 /// Heikin-Ashi Candles (`pandas-ta: ha`)
-pub fn ha(
-    open: &[f64],
-    high: &[f64],
-    low: &[f64],
-    close: &[f64],
-) -> HazeResult<OhlcResult> {
+pub fn ha(open: &[f64], high: &[f64], low: &[f64], close: &[f64]) -> HazeResult<OhlcResult> {
     validate_not_empty(open, "open")?;
     validate_lengths_match(&[
         (open, "open"),
@@ -3103,9 +3098,7 @@ pub fn long_run(fast: &[f64], slow: &[f64], length: usize) -> HazeResult<Vec<f64
         .iter()
         .zip(&dec_slow)
         .zip(&inc_slow)
-        .map(|((&ifast, &dslow), &islow)| {
-            bool_to_f64(ifast > 0.0 && (dslow > 0.0 || islow > 0.0))
-        })
+        .map(|((&ifast, &dslow), &islow)| bool_to_f64(ifast > 0.0 && (dslow > 0.0 || islow > 0.0)))
         .collect();
 
     Ok(out)
@@ -3125,9 +3118,7 @@ pub fn short_run(fast: &[f64], slow: &[f64], length: usize) -> HazeResult<Vec<f6
         .iter()
         .zip(&inc_slow)
         .zip(&dec_slow)
-        .map(|((&dfast, &islow), &dslow)| {
-            bool_to_f64(dfast > 0.0 && (islow > 0.0 || dslow > 0.0))
-        })
+        .map(|((&dfast, &islow), &dslow)| bool_to_f64(dfast > 0.0 && (islow > 0.0 || dslow > 0.0)))
         .collect();
 
     Ok(out)
