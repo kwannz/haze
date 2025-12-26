@@ -17,13 +17,13 @@ Usage:
     import haze_library
 
     df = pd.read_csv('ohlcv.csv')
-    df['sma_20'] = df.ta.sma(20)
-    df['rsi_14'] = df.ta.rsi(14)
-    upper, middle, lower = df.ta.bollinger_bands(20, 2.0)
+    df['sma_20'] = df.haze.sma(20)
+    df['rsi_14'] = df.haze.rsi(14)
+    upper, middle, lower = df.haze.bollinger_bands(20, 2.0)
 
     # Series accessor
-    df['close'].ta.sma(20)
-    df['close'].ta.rsi(14)
+    df['close'].haze.sma(20)
+    df['close'].haze.rsi(14)
 
 Performance:
 -----------
@@ -34,6 +34,9 @@ Performance:
 
 __version__ = "0.1.0"
 __author__ = "kwannz"
+
+import inspect
+from typing import Any, Callable, Dict
 
 # Import Rust extension
 try:
@@ -49,30 +52,61 @@ except ImportError:
 # Clean API aliases (no `py_` prefix)
 # -----------------------------------------------------------------------------
 
-# Mapping from legacy `py_*` function names to clean names. This is used for
-# backwards compatibility and for tooling/tests that verify the public API.
-_PY_PREFIX_ALIASES = {
-    # Moving averages / overlap
-    "py_sma": "sma",
-    "py_ema": "ema",
-    # Momentum
-    "py_rsi": "rsi",
-    "py_macd": "macd",
-    # Volatility
-    "py_bollinger_bands": "bollinger_bands",
-    "py_atr": "atr",
-    # Trend
-    "py_supertrend": "supertrend",
-    "py_adx": "adx",
-    # Volume
-    "py_obv": "obv",
-    "py_vwap": "vwap",
+_KW_ALIASES: Dict[str, str] = {
+    "close": "values",
+    "std_dev": "std_multiplier",
+    "fast": "fast_period",
+    "slow": "slow_period",
+    "signal": "signal_period",
+    "long": "long_period",
+    "short": "short_period",
 }
 
-# Materialize the clean API names in the module namespace.
-for _legacy_name, _clean_name in _PY_PREFIX_ALIASES.items():
-    if _legacy_name in globals():
-        globals()[_clean_name] = globals()[_legacy_name]
+
+def _make_clean_wrapper(py_func: Callable[..., Any], *, clean_name: str) -> Callable[..., Any]:
+    signature = inspect.signature(py_func)
+    parameter_names = set(signature.parameters)
+
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        for alias_name, real_name in _KW_ALIASES.items():
+            if (
+                alias_name in kwargs
+                and alias_name not in parameter_names
+                and real_name in parameter_names
+                and real_name not in kwargs
+            ):
+                kwargs[real_name] = kwargs.pop(alias_name)
+        return py_func(*args, **kwargs)
+
+    wrapper.__name__ = clean_name
+    wrapper.__qualname__ = clean_name
+    wrapper.__doc__ = getattr(py_func, "__doc__", None)
+    return wrapper
+
+
+def _install_clean_api_aliases() -> Dict[str, str]:
+    mapping: Dict[str, str] = {}
+
+    for name, obj in list(globals().items()):
+        if not name.startswith("py_"):
+            continue
+
+        clean_name = name[3:]
+        if clean_name in globals():
+            mapping[name] = clean_name
+            continue
+
+        if callable(obj):
+            globals()[clean_name] = _make_clean_wrapper(obj, clean_name=clean_name)
+        else:
+            globals()[clean_name] = obj
+        mapping[name] = clean_name
+
+    return mapping
+
+
+# Mapping from legacy `py_*` function names to clean names. Used for tooling/tests.
+_PY_PREFIX_ALIASES = _install_clean_api_aliases()
 
 # Register pandas accessor
 try:

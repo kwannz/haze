@@ -41,10 +41,10 @@ Haze-Library integrates seamlessly with pandas:
        'volume': [1000, 1100, 1200, 1150, 1300],
    })
 
-   # Use the .ta accessor
-   df['sma_3'] = df.ta.sma(3)
-   df['rsi'] = df.ta.rsi(3)
-   df['atr'] = df.ta.atr(3)
+   # Use the .haze accessor (stable even if pandas-ta is installed)
+   df['sma_3'] = df.haze.sma(3)
+   df['rsi'] = df.haze.rsi(3)
+   df['atr'] = df.haze.atr(3)
 
    print(df)
 

@@ -8,7 +8,7 @@ Usage:
 ------
     # Short import
     import haze
-    df.ta.sma(20)  # pandas accessor auto-registered
+    df.haze.sma(20)  # stable accessor auto-registered
 
     # NumPy interface
     from haze import np_ta
@@ -19,19 +19,27 @@ Usage:
     sma = py_sma(close_list, 20)
 """
 
-# Re-export everything from haze_library
-from haze_library import *
-from haze_library import __version__, np_ta
+from __future__ import annotations
+
+import haze_library as _haze_library
+
+__version__ = _haze_library.__version__
+np_ta = _haze_library.np_ta
 
 # DataFrame accessor is auto-registered on import
 try:
-    from haze_library import TechnicalAnalysisAccessor, SeriesTechnicalAnalysisAccessor
-except ImportError:
-    pass
+    TechnicalAnalysisAccessor = _haze_library.TechnicalAnalysisAccessor
+    SeriesTechnicalAnalysisAccessor = _haze_library.SeriesTechnicalAnalysisAccessor
+except Exception:
+    TechnicalAnalysisAccessor = None
+    SeriesTechnicalAnalysisAccessor = None
 
-__all__ = [
-    "__version__",
-    "np_ta",
-    "TechnicalAnalysisAccessor",
-    "SeriesTechnicalAnalysisAccessor",
-]
+def __getattr__(name: str):
+    return getattr(_haze_library, name)
+
+
+def __dir__():
+    return sorted(set(globals()) | set(dir(_haze_library)))
+
+
+__all__ = [name for name in dir(_haze_library) if not name.startswith("_")]
