@@ -37,7 +37,7 @@ linfa-linear = "0.7"
 linfa-preprocessing = "0.7"
 
 # 数值计算
-ndarray-rand = "0.14"
+ndarray-rand = "0.16"
 
 # 模型序列化
 bincode = "1.3"
