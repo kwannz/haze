@@ -107,7 +107,6 @@ class TestStochastic:
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
             k_period=14,
-            smooth_k=3,
             d_period=3
         )
 
@@ -130,7 +129,6 @@ class TestStochastic:
                 empty_array,
                 empty_array,
                 k_period=14,
-                smooth_k=3,
                 d_period=3,
             )
 
@@ -142,7 +140,6 @@ class TestStochastic:
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
             k_period=5,
-            smooth_k=3,
             d_period=3
         )
 
@@ -152,7 +149,6 @@ class TestStochastic:
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
             k_period=14,
-            smooth_k=3,
             d_period=5
         )
 
@@ -522,13 +518,12 @@ class TestKDJ:
         K/D范围：0-100
         J可超出范围
         """
-        # py_kdj takes (high, low, close, k_period, smooth_k, d_period)
+        # py_kdj takes (high, low, close, k_period, d_period)
         k, d, j = haze.py_kdj(
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
             k_period=9,
-            smooth_k=3,
             d_period=3
         )
 
@@ -545,9 +540,9 @@ class TestKDJ:
 
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
-        # 空数组 - py_kdj takes (high, low, close, k_period, smooth_k, d_period)
+        # 空数组 - py_kdj takes (high, low, close, k_period, d_period)
         with pytest.raises(ValueError):
-            haze.py_kdj(empty_array, empty_array, empty_array, 9, 3, 3)
+            haze.py_kdj(empty_array, empty_array, empty_array, 9, 3)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同参数组合"""
@@ -556,7 +551,6 @@ class TestKDJ:
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
             k_period=5,
-            smooth_k=3,
             d_period=3
         )
 
@@ -565,7 +559,6 @@ class TestKDJ:
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
             k_period=14,
-            smooth_k=3,
             d_period=5
         )
 

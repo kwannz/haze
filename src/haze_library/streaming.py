@@ -9,7 +9,6 @@ The underlying implementation uses Rust "Online*" calculators.
 """
 from __future__ import annotations
 
-from collections import deque
 import math
 import threading
 from typing import Any, Iterable, Mapping
@@ -44,8 +43,11 @@ _ENSEMBLE_COMPONENTS = ("rsi", "macd", "stochastic", "supertrend")
 
 def _normalize_weights(weights: Mapping[str, float], keys: Iterable[str]) -> dict[str, float]:
     filtered = {k: float(weights.get(k, 0.0)) for k in keys}
+    for name, weight in filtered.items():
+        if not math.isfinite(weight):
+            raise ValueError(f"weights contains non-finite value for {name}: {weight}")
     weight_sum = sum(filtered.values())
-    if weight_sum == 0.0:
+    if not math.isfinite(weight_sum) or weight_sum == 0.0:
         raise ValueError("weights sum cannot be zero")
     return {k: v / weight_sum for k, v in filtered.items()}
 
@@ -64,16 +66,12 @@ class IncrementalSMA:
         self._lock = threading.Lock()
         self.count = 0
         self._current = _NAN
-        self._nan_window: deque[bool] = deque()
-        self._nan_count = 0
 
     def reset(self) -> None:
         with self._lock:
             self._inner.reset()
             self.count = 0
             self._current = _NAN
-            self._nan_window.clear()
-            self._nan_count = 0
 
     @property
     def is_ready(self) -> bool:
@@ -90,21 +88,9 @@ class IncrementalSMA:
     def update(self, value: float) -> float:
         v = float(value)
         with self._lock:
-            self.count += 1
-            is_nan = not math.isfinite(v)
-            if len(self._nan_window) == self.period:
-                if self._nan_window.popleft():
-                    self._nan_count -= 1
-            self._nan_window.append(is_nan)
-            if is_nan:
-                self._nan_count += 1
-                self._current = _NAN
-                return self._current
-
             result = self._inner.update(v)
+            self.count += 1
             self._current = result if result is not None else _NAN
-            if self._nan_count > 0:
-                self._current = _NAN
             return self._current
 
     def update_batch(self, values: Iterable[float]) -> list[float]:
@@ -146,8 +132,8 @@ class IncrementalEMA:
     def update(self, value: float) -> float:
         v = float(value)
         with self._lock:
-            self.count += 1
             result = self._inner.update(v)
+            self.count += 1
             self._current = result if result is not None else _NAN
             return self._current
 
@@ -187,8 +173,8 @@ class IncrementalRSI:
     def update(self, value: float) -> float:
         v = float(value)
         with self._lock:
-            self.count += 1
             result = self._inner.update(v)
+            self.count += 1
             self._current = result if result is not None else _NAN
             return self._current
 
@@ -231,8 +217,8 @@ class IncrementalMACD:
     def update(self, value: float) -> tuple[float, float, float]:
         v = float(value)
         with self._lock:
-            self.count += 1
             result = self._inner.update(v)
+            self.count += 1
             if result is not None:
                 self._current = result
             else:
@@ -284,8 +270,8 @@ class IncrementalATR:
         lo = float(low)
         c = float(close)
         with self._lock:
-            self.count += 1
             result = self._inner.update(h, lo, c)
+            self.count += 1
             self._atr = result if result is not None else _NAN
             return self._atr
 
@@ -329,8 +315,8 @@ class IncrementalSuperTrend:
         lo = float(low)
         c = float(close)
         with self._lock:
-            self.count += 1
             result = self._inner.update(h, lo, c)
+            self.count += 1
             if result is not None:
                 value, direction = result
                 self._trend = value
@@ -380,8 +366,8 @@ class IncrementalBollingerBands:
     def update(self, value: float) -> tuple[float, float, float]:
         v = float(value)
         with self._lock:
-            self.count += 1
             result = self._inner.update(v)
+            self.count += 1
             if result is not None:
                 self._current = result
             else:
@@ -432,8 +418,8 @@ class IncrementalStochastic:
         lo = float(low)
         c = float(close)
         with self._lock:
-            self.count += 1
             result = self._inner.update(h, lo, c)
+            self.count += 1
             if result is not None:
                 self._current = result
             else:
@@ -465,6 +451,10 @@ class IncrementalAdaptiveRSI:
             raise ValueError("periods must be > 0")
         if min_period > max_period:
             raise ValueError("min_period must be <= max_period")
+        if base_period <= 0:
+            raise ValueError("base_period must be > 0")
+        if not (min_period <= base_period <= max_period):
+            raise ValueError("base_period must be within [min_period, max_period]")
         if volatility_window <= 0:
             raise ValueError("volatility_window must be > 0")
 
@@ -473,7 +463,7 @@ class IncrementalAdaptiveRSI:
         self.min_period = int(min_period)
         self.max_period = int(max_period)
         self.volatility_window = int(volatility_window)
-        self._default_period = int(min(max(self.base_period, self.min_period), self.max_period))
+        self._default_period = self.base_period
 
         self._inner = OnlineAdaptiveRSI(min_period, max_period, volatility_window)
         self._lock = threading.Lock()
@@ -493,13 +483,8 @@ class IncrementalAdaptiveRSI:
     def update(self, price: float) -> tuple[float, int]:
         p = float(price)
         with self._lock:
-            self.count += 1
-            if not math.isfinite(p):
-                self._inner.reset()
-                self._is_ready = False
-                return _NAN, self._default_period
-
             result = self._inner.update(p)
+            self.count += 1
             if result is not None:
                 rsi, period = result
                 self._is_ready = True
@@ -521,7 +506,10 @@ class IncrementalEnsembleSignal:
         self._lock = threading.Lock()
         # Use default parameters - Rust implementation has sensible defaults
         self._inner = OnlineEnsembleSignal.with_defaults()
-        self.weights = dict(weights or {})
+        self.weights = {k: float(v) for k, v in (weights or {}).items()}
+        for name, weight in self.weights.items():
+            if not math.isfinite(weight):
+                raise ValueError(f"weights contains non-finite value for {name}: {weight}")
         self._is_ready = False
         self.count = 0
 
@@ -540,8 +528,8 @@ class IncrementalEnsembleSignal:
         lo = float(low)
         c = float(close)
         with self._lock:
-            self.count += 1
             result = self._inner.update(h, lo, c)
+            self.count += 1
             if result is not None:
                 self._is_ready = True
                 # EnsembleSignalResult has: signal, rsi_contrib, macd_contrib, stoch_contrib, trend_contrib, confidence
@@ -588,6 +576,8 @@ class IncrementalMLSuperTrend:
     ) -> None:
         if period <= 0:
             raise ValueError("period must be > 0")
+        if not math.isfinite(multiplier) or multiplier <= 0.0:
+            raise ValueError("multiplier must be > 0")
         if confirmation_bars <= 0:
             raise ValueError("confirmation_bars must be > 0")
 
@@ -619,8 +609,8 @@ class IncrementalMLSuperTrend:
         lo = float(low)
         c = float(close)
         with self._lock:
-            self.count += 1
             result = self._inner.update(h, lo, c)
+            self.count += 1
             if result is not None:
                 # MLSuperTrendResult has: value, confirmed_trend, raw_trend, confidence, effective_multiplier
                 confirmed = float(result.confirmed_trend)

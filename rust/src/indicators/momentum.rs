@@ -1379,7 +1379,7 @@ mod tests {
         assert_eq!(k.len(), 5);
         assert_eq!(d.len(), 5);
         let valid_k = k.iter().copied().find(|v| !v.is_nan()).expect("valid k");
-        assert!(valid_k >= 0.0 && valid_k <= 100.0);
+        assert!((0.0..=100.0).contains(&valid_k));
     }
 
     #[test]

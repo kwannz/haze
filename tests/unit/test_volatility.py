@@ -279,7 +279,7 @@ class TestKeltnerChannel:
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
             period=20,
-            atr_period=20,
+            atr_period=10,
             multiplier=2.0
         )
 
@@ -297,7 +297,7 @@ class TestKeltnerChannel:
         """测试边界条件"""
         # 空数组
         with pytest.raises(ValueError):
-            haze.py_keltner_channel(empty_array, empty_array, empty_array, 20, 20, 2.0)
+            haze.py_keltner_channel(empty_array, empty_array, empty_array, 20, 10, 2.0)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同参数组合"""
@@ -307,7 +307,7 @@ class TestKeltnerChannel:
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
             period=20,
-            atr_period=20,
+            atr_period=10,
             multiplier=1.0
         )
 
@@ -317,7 +317,7 @@ class TestKeltnerChannel:
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
             period=20,
-            atr_period=20,
+            atr_period=10,
             multiplier=3.0
         )
 
@@ -572,20 +572,21 @@ class TestMassIndex:
     特点：识别趋势反转，范围通常18-45
     """
 
-    def test_basic_calculation(self, ohlcv_data_extended):
+    def test_basic_calculation(self, ohlcv_data_large):
         """测试基本Mass Index计算
 
         MI通常在18-45范围内
+        需要 2*fast + slow - 1 = 41+ 个数据点的预热期
         """
         result = haze.py_mass_index(
-            ohlcv_data_extended['high'],
-            ohlcv_data_extended['low'],
+            ohlcv_data_large['high'],
+            ohlcv_data_large['low'],
             fast=9,
-            slow=18
+            slow=25
         )
 
         # 验证输出长度
-        assert len(result) == len(ohlcv_data_extended['close'])
+        assert len(result) == len(ohlcv_data_large['close'])
 
         # 验证有有效值
         valid_values = [v for v in result if not np.isnan(v)]
@@ -595,25 +596,25 @@ class TestMassIndex:
         """测试边界条件"""
         # 空数组
         with pytest.raises(ValueError):
-            haze.py_mass_index(empty_array, empty_array, fast=9, slow=18)
+            haze.py_mass_index(empty_array, empty_array, fast=9, slow=25)
 
-    def test_different_parameters(self, ohlcv_data_extended):
+    def test_different_parameters(self, ohlcv_data_large):
         """测试不同参数组合"""
         # 短周期
         result_short = haze.py_mass_index(
-            ohlcv_data_extended['high'],
-            ohlcv_data_extended['low'],
-            fast=9,
-            slow=15
+            ohlcv_data_large['high'],
+            ohlcv_data_large['low'],
+            fast=7,
+            slow=20
         )
 
         # 标准周期
         result_standard = haze.py_mass_index(
-            ohlcv_data_extended['high'],
-            ohlcv_data_extended['low'],
+            ohlcv_data_large['high'],
+            ohlcv_data_large['low'],
             fast=9,
-            slow=18
+            slow=25
         )
 
-        assert len(result_short) == len(ohlcv_data_extended['close'])
-        assert len(result_standard) == len(ohlcv_data_extended['close'])
+        assert len(result_short) == len(ohlcv_data_large['close'])
+        assert len(result_standard) == len(ohlcv_data_large['close'])

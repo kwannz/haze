@@ -304,8 +304,14 @@ impl OhlcvFrame {
         let key_d = format!("stoch_d_{k_period}_{smooth_k}_{d_period}");
 
         if !self.cache.contains_key(&key_k) {
-            let (k, d) =
-                momentum::stochastic(&self.high, &self.low, &self.close, k_period, smooth_k, d_period)?;
+            let (k, d) = momentum::stochastic(
+                &self.high,
+                &self.low,
+                &self.close,
+                k_period,
+                smooth_k,
+                d_period,
+            )?;
             self.cache.insert(key_k.clone(), k);
             self.cache.insert(key_d.clone(), d);
         }

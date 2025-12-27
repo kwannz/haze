@@ -619,7 +619,6 @@ impl OnlineBollingerBands {
     }
 }
 
-
 // ==================== 新增流式计算器 ====================
 
 /// 在线 Stochastic 计算器
@@ -1005,20 +1004,10 @@ impl OnlineAdaptiveRSI {
         let effective_period = adaptive_period.clamp(self.min_period, self.gains.len());
 
         // 计算自适应 RSI
-        let recent_gains: f64 = kahan_sum_iter(
-            self.gains
-                .iter()
-                .rev()
-                .take(effective_period)
-                .copied(),
-        );
-        let recent_losses: f64 = kahan_sum_iter(
-            self.losses
-                .iter()
-                .rev()
-                .take(effective_period)
-                .copied(),
-        );
+        let recent_gains: f64 =
+            kahan_sum_iter(self.gains.iter().rev().take(effective_period).copied());
+        let recent_losses: f64 =
+            kahan_sum_iter(self.losses.iter().rev().take(effective_period).copied());
         let avg_gain = recent_gains / effective_period as f64;
         let avg_loss = recent_losses / effective_period as f64;
 
@@ -1259,7 +1248,10 @@ impl OnlineMLSuperTrend {
         volatility_period: usize,
     ) -> HazeResult<Self> {
         if period == 0 {
-            return Err(HazeError::InvalidPeriod { period, data_len: 0 });
+            return Err(HazeError::InvalidPeriod {
+                period,
+                data_len: 0,
+            });
         }
         if confirmation_bars == 0 {
             return Err(HazeError::InvalidPeriod {
@@ -1322,8 +1314,8 @@ impl OnlineMLSuperTrend {
 
         // 计算自适应乘数
         let effective_multiplier = if self.volatility_window.len() >= self.volatility_period {
-            let avg_tr: f64 = kahan_sum(self.volatility_window.make_contiguous())
-                / self.volatility_period as f64;
+            let avg_tr: f64 =
+                kahan_sum(self.volatility_window.make_contiguous()) / self.volatility_period as f64;
             let max_tr: f64 = self
                 .volatility_window
                 .iter()
@@ -1368,8 +1360,8 @@ impl OnlineMLSuperTrend {
         };
 
         let volatility_confidence = if self.volatility_window.len() >= self.volatility_period {
-            let avg_tr: f64 = kahan_sum(self.volatility_window.make_contiguous())
-                / self.volatility_period as f64;
+            let avg_tr: f64 =
+                kahan_sum(self.volatility_window.make_contiguous()) / self.volatility_period as f64;
             let std_tr = {
                 let variance: f64 = self
                     .volatility_window
@@ -1410,7 +1402,6 @@ impl OnlineMLSuperTrend {
         self.confirmed_trend
     }
 }
-
 
 #[cfg(test)]
 mod tests {

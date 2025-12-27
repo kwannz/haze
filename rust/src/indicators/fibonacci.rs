@@ -7,8 +7,8 @@
 
 use std::collections::HashMap;
 
-use crate::errors::{HazeError, HazeResult};
 use crate::errors::validation::{validate_not_empty, validate_range};
+use crate::errors::{HazeError, HazeResult};
 use crate::utils::math::is_zero;
 
 /// Fibonacci Retracement Levels（回撤位）
@@ -309,10 +309,12 @@ pub fn fib_time_zones(start_index: usize, max_zones: usize) -> HazeResult<Vec<us
     let fib_sequence = generate_fibonacci_sequence(max_zones)?;
     let mut zones = Vec::with_capacity(fib_sequence.len());
     for fib in fib_sequence {
-        let idx = start_index.checked_add(fib).ok_or_else(|| HazeError::InvalidValue {
-            index: 0,
-            message: "fib_time_zones index overflow".to_string(),
-        })?;
+        let idx = start_index
+            .checked_add(fib)
+            .ok_or_else(|| HazeError::InvalidValue {
+                index: 0,
+                message: "fib_time_zones index overflow".to_string(),
+            })?;
         zones.push(idx);
     }
     Ok(zones)

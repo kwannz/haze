@@ -489,15 +489,14 @@ class TestEdgeCases:
         assert sma.is_ready
 
     def test_nan_input(self):
-        """NaN input is accepted and propagates through calculation."""
+        """NaN input raises ValueError (fail-fast)."""
         sma = IncrementalSMA(period=3)
         sma.update(100.0)
-        sma.update(float('nan'))
-        # NaN propagates - the result becomes NaN
-        sma.update(100.0)
-        result = sma.current
-        # Result should be NaN since one of the values in window is NaN
-        assert result is None or (result is not None and math.isnan(result))
+        prev_count = sma.count
+        with pytest.raises(ValueError):
+            sma.update(float('nan'))
+        assert sma.count == prev_count
+        assert math.isnan(sma.current)
 
 
 # ==================== AI-Enhanced Streaming Indicators Tests ====================
@@ -652,6 +651,11 @@ class TestIncrementalEnsembleSignal:
         expected = components['rsi'] * 0.5 + components['macd'] * 0.5
         assert abs(signal - expected) < 0.01
 
+    def test_invalid_weights(self):
+        """Test non-finite weights raise ValueError."""
+        with pytest.raises(ValueError, match="non-finite value"):
+            IncrementalEnsembleSignal(weights={"rsi": float("inf")})
+
     def test_reset(self, sample_ohlc):
         """Test reset functionality."""
         ensemble = IncrementalEnsembleSignal()
@@ -805,27 +809,36 @@ class TestStreamingEdgeCases:
         with pytest.raises(ValueError, match="weights sum cannot be zero"):
             _normalize_weights({"a": 0.0, "b": 0.0}, ["a", "b"])
 
+    def test_normalize_weights_nonfinite(self):
+        """Test _normalize_weights raises on non-finite weights."""
+        from haze_library.streaming import _normalize_weights
+        with pytest.raises(ValueError, match="non-finite value"):
+            _normalize_weights({"a": float("inf")}, ["a"])
+
     def test_adaptive_rsi_nonfinite_input(self):
-        """Test IncrementalAdaptiveRSI handles non-finite input."""
+        """Test IncrementalAdaptiveRSI rejects non-finite input."""
         arsi = IncrementalAdaptiveRSI()
         # First add some valid data
         for i in range(30):
             arsi.update(100.0 + i)
         assert arsi.is_ready
-        # Now add inf - should reset and return NaN
-        rsi, period = arsi.update(float('inf'))
-        assert math.isnan(rsi)
-        assert not arsi.is_ready
+        prev_count = arsi.count
+        with pytest.raises(ValueError):
+            arsi.update(float('inf'))
+        assert arsi.count == prev_count
+        assert arsi.is_ready
 
     def test_adaptive_rsi_nan_input(self):
-        """Test IncrementalAdaptiveRSI handles NaN input."""
+        """Test IncrementalAdaptiveRSI rejects NaN input."""
         arsi = IncrementalAdaptiveRSI()
         for i in range(30):
             arsi.update(100.0 + i)
         assert arsi.is_ready
-        rsi, period = arsi.update(float('nan'))
-        assert math.isnan(rsi)
-        assert not arsi.is_ready
+        prev_count = arsi.count
+        with pytest.raises(ValueError):
+            arsi.update(float('nan'))
+        assert arsi.count == prev_count
+        assert arsi.is_ready
 
     def test_ema_reset(self):
         """Test IncrementalEMA reset."""

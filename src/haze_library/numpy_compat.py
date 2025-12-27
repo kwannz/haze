@@ -22,8 +22,6 @@ from __future__ import annotations
 
 from collections import deque
 import numpy as np
-from typing import Tuple, Union
-
 # Import Rust extension
 try:
     from . import haze_library as _lib
@@ -31,7 +29,7 @@ except ImportError:
     import haze_library as _lib
 
 # Type alias for array-like inputs
-ArrayLike = Union[np.ndarray, list]
+ArrayLike = np.ndarray | list
 
 
 def _ensure_float64(arr: ArrayLike) -> np.ndarray:

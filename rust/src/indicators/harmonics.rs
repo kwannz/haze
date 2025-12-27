@@ -11,8 +11,8 @@
 // 4. PRZ Calculation（潜在反转区）- 多Fib投影汇合
 // 5. Probability Estimation（概率估算）- 基于Fib吻合度
 
-use crate::errors::{HazeError, HazeResult};
 use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_range};
+use crate::errors::{HazeError, HazeResult};
 use crate::init_result;
 use crate::types::HarmonicSignals;
 use crate::utils::math::is_zero;

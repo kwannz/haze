@@ -207,19 +207,19 @@ class TestMomentumIndicators(IndicatorTestBase):
     def test_stochastic_empty_input(self):
         """Stochastic should fail-fast on empty input"""
         with pytest.raises(ValueError):
-            haze.py_stochastic([], [], [], 14, 3, 3)
+            haze.py_stochastic([], [], [], 14, 3)
 
     def test_stochastic_length_mismatch(self):
         """Stochastic with length mismatch should raise ValueError"""
         high, low, close, _ = self.valid_ohlc(50)
         # Proper error handling: raise ValueError for length mismatch
         with pytest.raises(ValueError, match="Length mismatch"):
-            haze.py_stochastic(high, low[:40], close, 14, 3, 3)
+            haze.py_stochastic(high, low[:40], close, 14, 3)
 
     def test_stochastic_valid_output(self):
         """Stochastic returns values in [0, 100] range"""
         high, low, close, _ = self.valid_ohlc(50)
-        k, d = haze.py_stochastic(high, low, close, 14, 3, 3)
+        k, d = haze.py_stochastic(high, low, close, 14, 3)
 
         assert len(k) == 50
         assert len(d) == 50
@@ -294,12 +294,12 @@ class TestMomentumIndicators(IndicatorTestBase):
     def test_kdj_empty_input(self):
         """KDJ should fail-fast on empty input"""
         with pytest.raises(ValueError):
-            haze.py_kdj([], [], [], 9, 3, 3)
+            haze.py_kdj([], [], [], 9, 3)
 
     def test_kdj_valid_output(self):
         """KDJ returns correct output format"""
         high, low, close, _ = self.valid_ohlc(50)
-        k, d, j = haze.py_kdj(high, low, close, 9, 3, 3)
+        k, d, j = haze.py_kdj(high, low, close, 9, 3)
 
         assert len(k) == 50
         assert len(d) == 50
@@ -1011,7 +1011,7 @@ class TestIntegration(IndicatorTestBase):
     def test_stochastic_d_is_smoothed_k(self):
         """Verify Stochastic %D is smoothed version of %K"""
         high, low, close, _ = self.valid_ohlc(100)
-        k, d = haze.py_stochastic(high, low, close, 14, 3, 3)
+        k, d = haze.py_stochastic(high, low, close, 14, 3)
 
         # %D should be smoother than %K (verified by visual inspection)
         assert len(k) == len(d) == 100

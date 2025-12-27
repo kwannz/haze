@@ -11,8 +11,8 @@
 
 use std::collections::HashMap;
 
-use crate::errors::{HazeError, HazeResult};
 use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_range};
+use crate::errors::{HazeError, HazeResult};
 use crate::utils::math::is_zero;
 
 /// Pivot 计算结果结构体

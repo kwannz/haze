@@ -9,7 +9,7 @@ Public Workflow Smoke Tests
 
 from __future__ import annotations
 
-import haze
+import haze_library as haze
 import haze_library as haze_library
 
 

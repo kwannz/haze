@@ -59,9 +59,9 @@
 
 use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_period};
 use crate::errors::{HazeError, HazeResult};
-use crate::utils::float_compare::approx_eq;
 use crate::indicators::volatility::{atr, true_range};
 use crate::init_result;
+use crate::utils::float_compare::approx_eq;
 use crate::utils::ma::ema_allow_nan;
 use crate::utils::math::{is_not_zero, is_zero};
 use crate::utils::{ema, rolling_max, rolling_min, rolling_sum, sma};
@@ -1085,16 +1085,16 @@ mod tests {
     fn test_adx() {
         // Need more data for ADX warmup (2 * period for smoothed DX)
         let high = vec![
-            110.0, 111.0, 112.0, 113.0, 114.0, 115.0, 116.0, 117.0, 118.0, 119.0,
-            120.0, 121.0, 122.0, 123.0, 124.0,
+            110.0, 111.0, 112.0, 113.0, 114.0, 115.0, 116.0, 117.0, 118.0, 119.0, 120.0, 121.0,
+            122.0, 123.0, 124.0,
         ];
         let low = vec![
-            100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0,
-            110.0, 111.0, 112.0, 113.0, 114.0,
+            100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0,
+            112.0, 113.0, 114.0,
         ];
         let close = vec![
-            105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0, 113.0, 114.0,
-            115.0, 116.0, 117.0, 118.0, 119.0,
+            105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0, 113.0, 114.0, 115.0, 116.0,
+            117.0, 118.0, 119.0,
         ];
 
         let (adx_values, _plus_di, _minus_di) = adx(&high, &low, &close, 5).unwrap();

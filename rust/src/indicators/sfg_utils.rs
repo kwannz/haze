@@ -7,11 +7,11 @@
 // 提供背离检测、FVG、Order Block 等高级市场结构分析
 // 遵循 KISS 原则: 每个函数只做一件事
 
-use crate::errors::{HazeError, HazeResult};
 use crate::errors::validation::{
     validate_lengths_match, validate_min_length, validate_not_empty, validate_not_empty_allow_nan,
     validate_period, validate_range,
 };
+use crate::errors::{HazeError, HazeResult};
 use crate::types::{TradingSignals, ZoneSignals};
 use crate::utils::math::is_zero;
 
@@ -102,10 +102,12 @@ pub fn detect_divergence(
         strength: vec![0.0; len],
     };
 
-    let required = lookback.checked_mul(2).ok_or_else(|| HazeError::InvalidValue {
-        index: 0,
-        message: "lookback * 2 overflow".to_string(),
-    })?;
+    let required = lookback
+        .checked_mul(2)
+        .ok_or_else(|| HazeError::InvalidValue {
+            index: 0,
+            message: "lookback * 2 overflow".to_string(),
+        })?;
     if len < required {
         return Err(HazeError::InsufficientData {
             required,
@@ -288,10 +290,7 @@ pub fn detect_fvg(high: &[f64], low: &[f64]) -> HazeResult<Vec<FVG>> {
 }
 
 /// 生成 FVG 信号数组
-pub fn fvg_signals(
-    high: &[f64],
-    low: &[f64],
-) -> ZoneSignals {
+pub fn fvg_signals(high: &[f64], low: &[f64]) -> ZoneSignals {
     validate_not_empty(high, "high")?;
     validate_lengths_match(&[(high, "high"), (low, "low")])?;
     let len = high.len();
@@ -360,10 +359,12 @@ pub fn detect_order_block(
         });
     }
     let len = close.len();
-    let required = lookback.checked_add(2).ok_or_else(|| HazeError::InvalidValue {
-        index: 0,
-        message: "lookback + 2 overflow".to_string(),
-    })?;
+    let required = lookback
+        .checked_add(2)
+        .ok_or_else(|| HazeError::InvalidValue {
+            index: 0,
+            message: "lookback + 2 overflow".to_string(),
+        })?;
     if len < required {
         return Err(HazeError::InsufficientData {
             required,
@@ -1191,10 +1192,12 @@ pub fn volume_filter(volume: &[f64], period: usize) -> HazeResult<VolumeFilter> 
         volume_spike: vec![false; len],
     };
 
-    let required = period.checked_add(1).ok_or_else(|| HazeError::InvalidValue {
-        index: 0,
-        message: "period + 1 overflow".to_string(),
-    })?;
+    let required = period
+        .checked_add(1)
+        .ok_or_else(|| HazeError::InvalidValue {
+            index: 0,
+            message: "period + 1 overflow".to_string(),
+        })?;
     if len < required {
         return Err(HazeError::InsufficientData {
             required,
@@ -1454,8 +1457,7 @@ mod tests {
             1000.0, 1200.0, 800.0, 1500.0, 900.0, 1100.0, 1300.0, 700.0, 1400.0, 1000.0,
         ];
 
-        let zones =
-            detect_supply_demand_zones(&high, &low, &close, &volume, 0.02, 5).unwrap();
+        let zones = detect_supply_demand_zones(&high, &low, &close, &volume, 0.02, 5).unwrap();
 
         // 结果取决于数据
         for zone in &zones {

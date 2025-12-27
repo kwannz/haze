@@ -23,7 +23,8 @@ from haze_library.streaming import (
 
 def test_incremental_sma_nan_window() -> None:
     sma = IncrementalSMA(period=2)
-    sma.update(float("nan"))
+    with pytest.raises(ValueError):
+        sma.update(float("nan"))
     sma.update(1.0)
     result = sma.update(1.0)
     assert not math.isnan(result)
@@ -54,7 +55,13 @@ def test_invalid_parameter_checks() -> None:
     with pytest.raises(ValueError):
         IncrementalAdaptiveRSI(min_period=10, max_period=5)
     with pytest.raises(ValueError):
+        IncrementalAdaptiveRSI(base_period=0)
+    with pytest.raises(ValueError):
+        IncrementalAdaptiveRSI(base_period=30, min_period=7, max_period=21)
+    with pytest.raises(ValueError):
         IncrementalMLSuperTrend(period=0)
+    with pytest.raises(ValueError):
+        IncrementalMLSuperTrend(multiplier=0.0)
     with pytest.raises(ValueError):
         IncrementalMLSuperTrend(confirmation_bars=0)
 

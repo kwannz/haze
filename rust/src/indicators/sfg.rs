@@ -226,12 +226,13 @@ pub fn atr2_signals_ml(
     }
 
     let len = close.len();
-    let required = 200usize
-        .checked_add(momentum_window)
-        .ok_or_else(|| HazeError::InvalidValue {
-            index: 0,
-            message: "train_window + momentum_window overflow".to_string(),
-        })?;
+    let required =
+        200usize
+            .checked_add(momentum_window)
+            .ok_or_else(|| HazeError::InvalidValue {
+                index: 0,
+                message: "train_window + momentum_window overflow".to_string(),
+            })?;
     if len < required {
         return Err(HazeError::InsufficientData {
             required,
@@ -1239,9 +1240,9 @@ mod tests {
     fn test_ai_momentum_index() {
         // Need sufficient data: momentum_period + roc_period + smoothing_period - 2 = 10 + 14 + 3 - 2 = 25
         let close = vec![
-            100.0, 102.0, 101.0, 103.0, 105.0, 104.0, 106.0, 108.0, 107.0, 109.0,
-            110.0, 112.0, 111.0, 113.0, 115.0, 114.0, 116.0, 118.0, 117.0, 119.0,
-            120.0, 121.0, 122.0, 123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0,
+            100.0, 102.0, 101.0, 103.0, 105.0, 104.0, 106.0, 108.0, 107.0, 109.0, 110.0, 112.0,
+            111.0, 113.0, 115.0, 114.0, 116.0, 118.0, 117.0, 119.0, 120.0, 121.0, 122.0, 123.0,
+            124.0, 125.0, 126.0, 127.0, 128.0, 129.0,
         ];
 
         let (pred, pred_ma) = ai_momentum_index(&close, 10, 14, 3).unwrap();

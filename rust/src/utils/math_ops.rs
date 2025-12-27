@@ -57,8 +57,8 @@
 
 #![allow(dead_code)]
 
-use crate::errors::{HazeError, HazeResult};
 use crate::errors::validation::{validate_not_empty, validate_period, validate_same_length};
+use crate::errors::{HazeError, HazeResult};
 use crate::init_result;
 use crate::utils::math::is_zero;
 

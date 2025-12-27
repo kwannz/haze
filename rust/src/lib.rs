@@ -16,7 +16,6 @@ pub mod utils;
 #[macro_use]
 mod macros;
 
-
 pub use dataframe::{create_ohlcv_frame, OhlcvFrame};
 pub use errors::{HazeError, HazeResult};
 
@@ -79,7 +78,9 @@ impl PyOhlcvFrame {
         self.inner.get_cached(&name).map(|v| v.to_vec())
     }
 
-    pub fn compute_common_indicators(&mut self) -> PyResult<std::collections::HashMap<String, Vec<f64>>> {
+    pub fn compute_common_indicators(
+        &mut self,
+    ) -> PyResult<std::collections::HashMap<String, Vec<f64>>> {
         Ok(self.inner.compute_common_indicators()?)
     }
 
@@ -156,11 +157,7 @@ impl PyOhlcvFrame {
 
     // -------------------- Trend --------------------
 
-    pub fn supertrend(
-        &mut self,
-        period: usize,
-        multiplier: f64,
-    ) -> types::SuperTrendVecs {
+    pub fn supertrend(&mut self, period: usize, multiplier: f64) -> types::SuperTrendVecs {
         let (st, dir, upper, lower) = self.inner.supertrend(period, multiplier)?;
         Ok((st.to_vec(), dir.to_vec(), upper.to_vec(), lower.to_vec()))
     }
@@ -227,85 +224,69 @@ type Pivots9F64 = (f64, f64, f64, f64, f64, f64, f64, f64, f64);
 #[cfg(feature = "python")]
 macro_rules! ok_or_nan {
     // Single vector case: ok_or_nan!(result, len)
-    ($result:expr, $len:expr) => {
-        {
-            let _ = $len;
-            match $result {
-                Ok(values) => Ok(values),
-                Err(err) => Err(err.into()),
-            }
+    ($result:expr, $len:expr) => {{
+        let _ = $len;
+        match $result {
+            Ok(values) => Ok(values),
+            Err(err) => Err(err.into()),
         }
-    };
+    }};
     // 2-tuple case: ok_or_nan!(result, len, 2)
-    ($result:expr, $len:expr, 2) => {
-        {
-            let _ = $len;
-            match $result {
-                Ok(values) => Ok(values),
-                Err(err) => Err(err.into()),
-            }
+    ($result:expr, $len:expr, 2) => {{
+        let _ = $len;
+        match $result {
+            Ok(values) => Ok(values),
+            Err(err) => Err(err.into()),
         }
-    };
+    }};
     // 3-tuple case: ok_or_nan!(result, len, 3)
-    ($result:expr, $len:expr, 3) => {
-        {
-            let _ = $len;
-            match $result {
-                Ok(values) => Ok(values),
-                Err(err) => Err(err.into()),
-            }
+    ($result:expr, $len:expr, 3) => {{
+        let _ = $len;
+        match $result {
+            Ok(values) => Ok(values),
+            Err(err) => Err(err.into()),
         }
-    };
+    }};
     // 4-tuple case: ok_or_nan!(result, len, 4)
-    ($result:expr, $len:expr, 4) => {
-        {
-            let _ = $len;
-            match $result {
-                Ok(values) => Ok(values),
-                Err(err) => Err(err.into()),
-            }
+    ($result:expr, $len:expr, 4) => {{
+        let _ = $len;
+        match $result {
+            Ok(values) => Ok(values),
+            Err(err) => Err(err.into()),
         }
-    };
+    }};
     // 5-tuple case: ok_or_nan!(result, len, 5)
-    ($result:expr, $len:expr, 5) => {
-        {
-            let _ = $len;
-            match $result {
-                Ok(values) => Ok(values),
-                Err(err) => Err(err.into()),
-            }
+    ($result:expr, $len:expr, 5) => {{
+        let _ = $len;
+        match $result {
+            Ok(values) => Ok(values),
+            Err(err) => Err(err.into()),
         }
-    };
+    }};
     // 6-tuple case: ok_or_nan!(result, len, 6)
-    ($result:expr, $len:expr, 6) => {
-        {
-            let _ = $len;
-            match $result {
-                Ok(values) => Ok(values),
-                Err(err) => Err(err.into()),
-            }
+    ($result:expr, $len:expr, 6) => {{
+        let _ = $len;
+        match $result {
+            Ok(values) => Ok(values),
+            Err(err) => Err(err.into()),
         }
-    };
+    }};
     // 7-tuple case: ok_or_nan!(result, len, 7)
-    ($result:expr, $len:expr, 7) => {
-        {
-            let _ = $len;
-            match $result {
-                Ok(values) => Ok(values),
-                Err(err) => Err(err.into()),
-            }
+    ($result:expr, $len:expr, 7) => {{
+        let _ = $len;
+        match $result {
+            Ok(values) => Ok(values),
+            Err(err) => Err(err.into()),
         }
-    };
+    }};
     // Special case: 2 vectors + 1 f64: ok_or_nan!(result, len, 2, f64)
-    ($result:expr, $len:expr, 2, f64) => {
-        {
-            let _ = $len;
-            match $result {
-                Ok(values) => Ok(values),
-                Err(err) => Err(err.into()),
-            }
+    ($result:expr, $len:expr, 2, f64) => {{
+        let _ = $len;
+        match $result {
+            Ok(values) => Ok(values),
+            Err(err) => Err(err.into()),
         }
-    };
+    }};
 }
 
 // Legacy function wrappers for backward compatibility
@@ -909,14 +890,7 @@ fn py_keltner_channel(
     let len = close.len();
     let atr_period = atr_period.unwrap_or(period);
     ok_or_nan_vec3(
-        indicators::keltner_channel(
-            &high,
-            &low,
-            &close,
-            period,
-            atr_period,
-            multiplier,
-        ),
+        indicators::keltner_channel(&high, &low, &close, period, atr_period, multiplier),
         len,
     )
 }
@@ -1112,17 +1086,9 @@ fn py_ulcer_index(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> 
 /// >>> mi = py_mass_index([10.5, 10.8, 11.0], [10.0, 10.3, 10.5], fast=9, slow=25)
 /// >>> mi[33]  # First valid value after warmup
 /// 26.8
-fn py_mass_index(
-    high: Vec<f64>,
-    low: Vec<f64>,
-    fast: usize,
-    slow: usize,
-) -> PyResult<Vec<f64>> {
+fn py_mass_index(high: Vec<f64>, low: Vec<f64>, fast: usize, slow: usize) -> PyResult<Vec<f64>> {
     let len = high.len();
-    ok_or_nan_vec(
-        indicators::mass_index(&high, &low, fast, slow),
-        len,
-    )
+    ok_or_nan_vec(indicators::mass_index(&high, &low, fast, slow), len)
 }
 
 // ==================== Momentum 指标包装 ====================
@@ -1577,7 +1543,10 @@ fn py_dmi(
     period: Option<usize>,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
     let len = close.len();
-    ok_or_nan_vec2(indicators::dmi(&high, &low, &close, period.unwrap_or(14)), len)
+    ok_or_nan_vec2(
+        indicators::dmi(&high, &low, &close, period.unwrap_or(14)),
+        len,
+    )
 }
 
 #[cfg(feature = "python")]
@@ -2227,7 +2196,8 @@ fn py_fib_extension(
     end_price: f64,
     retracement_price: f64,
 ) -> PyResult<Vec<(String, f64)>> {
-    let ext = indicators::fibonacci::fib_extension(start_price, end_price, retracement_price, None)?;
+    let ext =
+        indicators::fibonacci::fib_extension(start_price, end_price, retracement_price, None)?;
     let mut levels: Vec<(String, f64)> = ext.levels.into_iter().collect();
     levels.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(levels)
@@ -2573,13 +2543,7 @@ fn py_calc_pivot_series(
     close: Vec<f64>,
     method: String,
 ) -> PyResult<Vec<Pivots9F64>> {
-    let pivots = indicators::pivots::calc_pivot_series(
-        &open,
-        &high,
-        &low,
-        &close,
-        &method,
-    )?;
+    let pivots = indicators::pivots::calc_pivot_series(&open, &high, &low, &close, &method)?;
     let mut out = Vec::with_capacity(pivots.len());
     for p in pivots {
         out.push((
@@ -5643,7 +5607,12 @@ fn py_trailing_stop(
     multiplier: Option<f64>,
 ) -> PyResult<Vec<f64>> {
     let mult = multiplier.unwrap_or(2.0);
-    Ok(indicators::trailing_stop(&close, &atr_values, &direction, mult)?)
+    Ok(indicators::trailing_stop(
+        &close,
+        &atr_values,
+        &direction,
+        mult,
+    )?)
 }
 
 // ==================== SFG 新增指标包装 ====================
@@ -6892,9 +6861,8 @@ impl PySFGModel {
             )));
         }
 
-        let features_array =
-            ndarray::Array2::from_shape_vec((n_samples, n_features), features)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{e}")))?;
+        let features_array = ndarray::Array2::from_shape_vec((n_samples, n_features), features)
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{e}")))?;
 
         Ok(self.inner.predict(&features_array).to_vec())
     }
@@ -7021,8 +6989,8 @@ fn py_train_momentum_model(
         use_polynomial: false,
     };
 
-    let result = train_momentum_model(&rsi, &config)
-        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+    let result =
+        train_momentum_model(&rsi, &config).map_err(pyo3::exceptions::PyValueError::new_err)?;
 
     Ok(PySFGModel {
         inner: result.model,
@@ -7070,8 +7038,7 @@ fn py_prepare_atr2_features(
     volume: Vec<f64>,
     lookback: usize,
 ) -> PyResult<(Vec<f64>, usize, usize)> {
-    let (features, _targets) =
-        ml::features::prepare_atr2_features(&close, &atr, &volume, lookback);
+    let (features, _targets) = ml::features::prepare_atr2_features(&close, &atr, &volume, lookback);
     let (n_samples, n_features) = features.dim();
     let flat: Vec<f64> = features.into_iter().collect();
     Ok((flat, n_samples, n_features))

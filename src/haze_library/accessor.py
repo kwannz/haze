@@ -24,7 +24,7 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 import inspect
-from typing import Union, Tuple, List, Any
+from typing import Any
 from .exceptions import ColumnNotFoundError
 
 # Import Rust extension
@@ -34,7 +34,7 @@ except ImportError:
     import haze_library as _lib
 
 
-def _to_list(data: Union[pd.Series, np.ndarray, List[float]]) -> List[float]:
+def _to_list(data: pd.Series | np.ndarray | list[float]) -> list[float]:
     """Convert various input types to Python list."""
     if isinstance(data, pd.Series):
         return data.tolist()
@@ -43,7 +43,7 @@ def _to_list(data: Union[pd.Series, np.ndarray, List[float]]) -> List[float]:
     return list(data)
 
 
-def _to_series(data: List[float], index: pd.Index) -> pd.Series:
+def _to_series(data: list[float], index: pd.Index) -> pd.Series:
     """Convert result list to pandas Series with proper index."""
     return pd.Series(data, index=index)
 
@@ -64,6 +64,15 @@ class TechnicalAnalysisAccessor:
         >>> df.haze.rsi(14)
         >>> df.haze.macd(12, 26, 9)
     """
+
+    # Class-level column aliases (avoids recreation per call)
+    _COLUMN_ALIASES: dict[str, list[str]] = {
+        'close': ['close', 'c', 'adj close', 'adj_close', 'adjclose', 'price'],
+        'open': ['open', 'o'],
+        'high': ['high', 'h', 'hi'],
+        'low': ['low', 'l', 'lo'],
+        'volume': ['volume', 'vol', 'v'],
+    }
 
     def __init__(self, pandas_obj: pd.DataFrame):
         self._obj = pandas_obj
@@ -170,7 +179,7 @@ class TechnicalAnalysisAccessor:
 
         def dynamic(*args: Any, **kwargs: Any) -> Any:
             column = kwargs.pop("column", "close")
-            data_args: List[Any] = []
+            data_args: list[Any] = []
             for p in data_param_names:
                 if p == "values" or (p == "close" and len(data_param_names) == 1):
                     data_args.append(_to_list(self._get_column(column)))
@@ -194,17 +203,9 @@ class TechnicalAnalysisAccessor:
         if normalized in self._col_map:
             return self._obj[self._col_map[normalized]]
 
-        # Try common aliases
-        aliases = {
-            'close': ['close', 'c', 'adj close', 'adj_close', 'adjclose', 'price'],
-            'open': ['open', 'o'],
-            'high': ['high', 'h', 'hi'],
-            'low': ['low', 'l', 'lo'],
-            'volume': ['volume', 'vol', 'v'],
-        }
-
-        if normalized in aliases:
-            for alias in aliases[normalized]:
+        # Try common aliases (using class constant)
+        if normalized in self._COLUMN_ALIASES:
+            for alias in self._COLUMN_ALIASES[normalized]:
                 if alias in self._col_map:
                     return self._obj[self._col_map[alias]]
 
@@ -213,7 +214,7 @@ class TechnicalAnalysisAccessor:
             available_columns=[str(c) for c in self._obj.columns],
         )
 
-    def _get_ohlc(self) -> Tuple[List[float], List[float], List[float], List[float]]:
+    def _get_ohlc(self) -> tuple[list[float], list[float], list[float], list[float]]:
         """Get OHLC data as lists."""
         return (
             _to_list(self._get_column('open')),
@@ -222,7 +223,7 @@ class TechnicalAnalysisAccessor:
             _to_list(self._get_column('close')),
         )
 
-    def _get_hlc(self) -> Tuple[List[float], List[float], List[float]]:
+    def _get_hlc(self) -> tuple[list[float], list[float], list[float]]:
         """Get HLC data as lists."""
         return (
             _to_list(self._get_column('high')),
@@ -389,7 +390,7 @@ class TechnicalAnalysisAccessor:
         return _to_series(result, self.index)
 
     def bollinger_bands(self, period: int = 20, std: float = 2.0,
-                        column: str = 'close') -> Tuple[pd.Series, pd.Series, pd.Series]:
+                        column: str = 'close') -> tuple[pd.Series, pd.Series, pd.Series]:
         """Bollinger Bands. Returns (upper, middle, lower)."""
         if column == "close":
             try:
@@ -411,7 +412,7 @@ class TechnicalAnalysisAccessor:
         )
 
     def keltner_channel(self, period: int = 20, atr_period: int | None = None,
-                        multiplier: float = 2.0) -> Tuple[pd.Series, pd.Series, pd.Series]:
+                        multiplier: float = 2.0) -> tuple[pd.Series, pd.Series, pd.Series]:
         """Keltner Channel. Returns (upper, middle, lower)."""
         if atr_period is None:
             atr_period = period
@@ -425,7 +426,7 @@ class TechnicalAnalysisAccessor:
             _to_series(lower, self.index),
         )
 
-    def donchian_channel(self, period: int = 20) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    def donchian_channel(self, period: int = 20) -> tuple[pd.Series, pd.Series, pd.Series]:
         """Donchian Channel. Returns (upper, middle, lower)."""
         high = _to_list(self._get_column('high'))
         low = _to_list(self._get_column('low'))
@@ -452,7 +453,7 @@ class TechnicalAnalysisAccessor:
         return _to_series(result, self.index)
 
     def macd(self, fast: int = 12, slow: int = 26,
-             signal: int = 9, column: str = 'close') -> Tuple[pd.Series, pd.Series, pd.Series]:
+             signal: int = 9, column: str = 'close') -> tuple[pd.Series, pd.Series, pd.Series]:
         """MACD. Returns (macd_line, signal_line, histogram)."""
         if column == "close":
             try:
@@ -474,7 +475,7 @@ class TechnicalAnalysisAccessor:
         )
 
     def stochastic(self, k_period: int = 14, smooth_k: int = 3,
-                   d_period: int = 3) -> Tuple[pd.Series, pd.Series]:
+                   d_period: int = 3) -> tuple[pd.Series, pd.Series]:
         """Stochastic Oscillator. Returns (%K, %D)."""
         try:
             self._get_column("high")
@@ -487,7 +488,7 @@ class TechnicalAnalysisAccessor:
             return _to_series(k, self.index), _to_series(d, self.index)
 
     def stochrsi(self, period: int = 14, k_period: int = 3, d_period: int = 3,
-                 column: str = 'close') -> Tuple[pd.Series, pd.Series]:
+                 column: str = 'close') -> tuple[pd.Series, pd.Series]:
         """Stochastic RSI. Returns (%K, %D)."""
         data = _to_list(self._get_column(column))
         k, d = _lib.py_stochrsi(data, period, period, k_period, d_period)
@@ -524,14 +525,14 @@ class TechnicalAnalysisAccessor:
         result = _lib.py_awesome_oscillator(high, low, fast, slow)
         return _to_series(result, self.index)
 
-    def fisher_transform(self, period: int = 9) -> Tuple[pd.Series, pd.Series]:
+    def fisher_transform(self, period: int = 9) -> tuple[pd.Series, pd.Series]:
         """Fisher Transform. Returns (fisher, signal)."""
         high, low, close = self._get_hlc()
         fisher, signal = _lib.py_fisher_transform(high, low, close, period)
         return _to_series(fisher, self.index), _to_series(signal, self.index)
 
     def kdj(self, k_period: int = 9, smooth_k: int = 3,
-            d_period: int = 3) -> Tuple[pd.Series, pd.Series, pd.Series]:
+            d_period: int = 3) -> tuple[pd.Series, pd.Series, pd.Series]:
         """KDJ Indicator. Returns (K, D, J)."""
         high, low, close = self._get_hlc()
         k, d, j = _lib.py_kdj(high, low, close, k_period, smooth_k, d_period)
@@ -542,7 +543,7 @@ class TechnicalAnalysisAccessor:
         )
 
     def tsi(self, fast: int = 13, slow: int = 25, signal: int = 13,
-            column: str = 'close') -> Tuple[pd.Series, pd.Series]:
+            column: str = 'close') -> tuple[pd.Series, pd.Series]:
         """True Strength Index. Returns (tsi, signal)."""
         data = _to_list(self._get_column(column))
         tsi, signal_line = _lib.py_tsi(data, slow, fast, signal)
@@ -590,7 +591,7 @@ class TechnicalAnalysisAccessor:
     # ==================== Trend Indicators ====================
 
     def supertrend(self, period: int = 10, multiplier: float = 3.0
-                   ) -> Tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
+                   ) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
         """SuperTrend. Returns (supertrend, direction, upper_band, lower_band)."""
         try:
             self._get_column("high")
@@ -606,7 +607,7 @@ class TechnicalAnalysisAccessor:
             _to_series(lower, self.index),
         )
 
-    def adx(self, period: int = 14) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    def adx(self, period: int = 14) -> tuple[pd.Series, pd.Series, pd.Series]:
         """Average Directional Index. Returns (adx, plus_di, minus_di)."""
         try:
             self._get_column("high")
@@ -621,7 +622,7 @@ class TechnicalAnalysisAccessor:
             _to_series(minus_di, self.index),
         )
 
-    def aroon(self, period: int = 25) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    def aroon(self, period: int = 25) -> tuple[pd.Series, pd.Series, pd.Series]:
         """Aroon. Returns (aroon_up, aroon_down, oscillator)."""
         high = _to_list(self._get_column('high'))
         low = _to_list(self._get_column('low'))
@@ -633,7 +634,7 @@ class TechnicalAnalysisAccessor:
         )
 
     def psar(self, af_start: float = 0.02, af_increment: float = 0.02,
-             af_max: float = 0.2) -> Tuple[pd.Series, pd.Series]:
+             af_max: float = 0.2) -> tuple[pd.Series, pd.Series]:
         """Parabolic SAR. Returns (sar, direction)."""
         high = _to_list(self._get_column('high'))
         low = _to_list(self._get_column('low'))
@@ -641,7 +642,7 @@ class TechnicalAnalysisAccessor:
         sar, direction = _lib.py_psar(high, low, close, af_start, af_increment, af_max)
         return _to_series(sar, self.index), _to_series(direction, self.index)
 
-    def vortex(self, period: int = 14) -> Tuple[pd.Series, pd.Series]:
+    def vortex(self, period: int = 14) -> tuple[pd.Series, pd.Series]:
         """Vortex Indicator. Returns (VI+, VI-)."""
         high, low, close = self._get_hlc()
         vi_plus, vi_minus = _lib.py_vortex(high, low, close, period)
@@ -811,7 +812,7 @@ class TechnicalAnalysisAccessor:
 
     # ==================== Candlestick Patterns ====================
 
-    def heikin_ashi(self) -> Tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
+    def heikin_ashi(self) -> tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
         """Heikin Ashi candles. Returns (ha_open, ha_high, ha_low, ha_close)."""
         open_ = self._get_column("open").astype(np.float64)
         high = self._get_column("high").astype(np.float64)
@@ -914,7 +915,7 @@ class SeriesTechnicalAnalysisAccessor:
     def index(self) -> pd.Index:
         return self._obj.index
 
-    def _to_list(self) -> List[float]:
+    def _to_list(self) -> list[float]:
         return self._obj.tolist()
 
     # Moving Averages

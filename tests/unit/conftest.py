@@ -109,6 +109,40 @@ def ohlcv_data_extended() -> Dict[str, List[float]]:
     }
 
 
+@pytest.fixture
+def ohlcv_data_large() -> Dict[str, List[float]]:
+    """
+    大型 OHLCV 数据（50 个数据点）
+
+    用于需要更长预热期的指标：
+    - Mass Index（需要 2*fast + slow - 1 = 41+ 个数据点）
+    - 长周期均线组合
+    """
+    np.random.seed(42)
+    n = 50
+
+    # 生成随机游走价格
+    returns = np.random.normal(0.0005, 0.015, n)
+    close = 100.0 * np.exp(np.cumsum(returns))
+
+    # 生成 OHLC
+    high = close * (1 + np.abs(np.random.normal(0, 0.008, n)))
+    low = close * (1 - np.abs(np.random.normal(0, 0.008, n)))
+    open_ = np.roll(close, 1)
+    open_[0] = close[0]
+
+    # 生成成交量
+    volume = np.random.lognormal(8, 0.5, n)
+
+    return {
+        'open': open_.tolist(),
+        'high': high.tolist(),
+        'low': low.tolist(),
+        'close': close.tolist(),
+        'volume': volume.tolist()
+    }
+
+
 # ==================== 已知结果（手动计算）====================
 
 @pytest.fixture

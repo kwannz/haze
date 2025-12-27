@@ -11,8 +11,8 @@
 //
 // "云"（Kumo）由先行带 A 和 B 形成，提供动态支撑/阻力区域
 
-use crate::errors::{HazeError, HazeResult};
 use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_period};
+use crate::errors::{HazeError, HazeResult};
 use crate::init_result;
 use crate::utils::stats::{rolling_max, rolling_min};
 
@@ -192,7 +192,10 @@ pub enum IchimokuSignal {
 /// - `ichimoku`: Ichimoku Cloud 结构体
 ///
 /// 返回：每个价格对应的信号向量
-pub fn ichimoku_signals(close: &[f64], ichimoku: &IchimokuCloud) -> HazeResult<Vec<IchimokuSignal>> {
+pub fn ichimoku_signals(
+    close: &[f64],
+    ichimoku: &IchimokuCloud,
+) -> HazeResult<Vec<IchimokuSignal>> {
     validate_not_empty(close, "close")?;
     let n = validate_ichimoku_lengths(ichimoku)?;
     if close.len() != n {

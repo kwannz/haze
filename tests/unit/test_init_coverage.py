@@ -5,7 +5,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
-import haze
+import haze_library as haze
 import haze_library as hl
 
 

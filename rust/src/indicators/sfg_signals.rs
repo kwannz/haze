@@ -6,8 +6,8 @@
 
 use std::collections::HashMap;
 
-use crate::errors::{HazeError, HazeResult};
 use crate::errors::validation::{validate_not_empty, validate_range};
+use crate::errors::{HazeError, HazeResult};
 
 /// SFG 信号结构体
 ///
@@ -220,10 +220,7 @@ impl SignalInput {
 ///
 /// # 返回
 /// - 组合后的信号
-pub fn combine_signals(
-    signals: &[&SFGSignal],
-    weights: Option<&[f64]>,
-) -> HazeResult<SFGSignal> {
+pub fn combine_signals(signals: &[&SFGSignal], weights: Option<&[f64]>) -> HazeResult<SFGSignal> {
     if signals.is_empty() {
         return Err(HazeError::EmptyInput { name: "signals" });
     }

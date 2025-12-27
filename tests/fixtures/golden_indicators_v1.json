@@ -1115,7 +1115,7 @@
       }
     }
   },
-  "haze_library_version": "1.0.0",
+  "haze_library_version": "1.0.2",
   "inputs": {
     "close": [
       100.0,
