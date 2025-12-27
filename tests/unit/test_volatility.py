@@ -576,7 +576,9 @@ class TestMassIndex:
         """测试基本Mass Index计算
 
         MI通常在18-45范围内
-        需要 2*fast + slow - 1 = 41+ 个数据点的预热期
+        Mass Index API: py_mass_index(high, low, fast=9, slow=25)
+        - fast: EMA计算周期（默认9）
+        - slow: 滚动求和周期（默认25）
         """
         result = haze.py_mass_index(
             ohlcv_data_large['high'],

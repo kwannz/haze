@@ -147,9 +147,23 @@ class ExecutionEngine:
         if dry_run:
             return Order(id="DRY_RUN_AMEND", symbol=existing.symbol)
 
-        _ = self.provider.cancel_order(CancelOrderRequest(order_id=req.order_id, symbol=req.symbol))
-        new_order = self.provider.create_order(create_req)
-        return new_order
+        # 原子性保护：取消-重建的竞态条件处理
+        # 如果 create_order 失败，原订单已被取消，需要记录详细信息以便恢复
+        cancel_result = self.provider.cancel_order(
+            CancelOrderRequest(order_id=req.order_id, symbol=req.symbol)
+        )
+        try:
+            new_order = self.provider.create_order(create_req)
+            return new_order
+        except Exception as create_error:
+            # 创建失败但原订单已取消 - 提供详细的错误信息以便手动恢复
+            raise ExecutionProviderError(
+                f"CRITICAL: Order {req.order_id} was cancelled (status={cancel_result.status}) "
+                f"but replacement order failed: {create_error}. "
+                f"Original order details: symbol={existing.symbol}, side={existing.side}, "
+                f"amount={new_amount}, price={new_price}. Manual intervention required.",
+                provider=self.provider.name,
+            ) from create_error
 
     def get_positions(self, *, symbol: str | None = None) -> list[dict[str, Any]]:
         self.permissions.require(Scope.READ)

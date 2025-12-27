@@ -61,7 +61,7 @@ use crate::errors::validation::{
 use crate::errors::{HazeError, HazeResult};
 use crate::init_result;
 use crate::utils::ma::{ema_allow_nan, sma_allow_nan};
-use crate::utils::math::{is_not_zero, is_zero};
+use crate::utils::math::{is_not_zero, is_zero, kahan_sum};
 use crate::utils::{ema, rolling_max, rolling_min, sma};
 
 /// Calculates the Relative Strength Index (RSI).
@@ -416,7 +416,8 @@ fn ema_with_seed(values: &[f64], period: usize, seed_index: usize) -> HazeResult
 
     let mut result = init_result!(n);
     let start = seed_index + 1 - period;
-    let sum: f64 = values[start..=seed_index].iter().sum();
+    // 使用 Kahan 补偿求和提高 EMA 初始化精度
+    let sum: f64 = kahan_sum(&values[start..=seed_index]);
     let alpha = 2.0 / (period as f64 + 1.0);
     result[seed_index] = sum / period as f64;
 
@@ -740,6 +741,15 @@ pub fn awesome_oscillator(
 
     // Validate the larger period
     validate_period(slow, n)?;
+
+    // Post-clipping validation: ensure fast < slow still holds
+    // This catches the case where both get clipped to n (e.g., fast=10, slow=20, n=8 → both become 8)
+    if fast >= slow {
+        return Err(HazeError::InsufficientData {
+            required: slow_period,
+            actual: n,
+        });
+    }
 
     // 中间价
     let median_price: Vec<f64> = (0..n).map(|i| (high[i] + low[i]) / 2.0).collect();
@@ -1099,6 +1109,14 @@ pub fn apo(close: &[f64], fast_period: usize, slow_period: usize) -> HazeResult<
 
     validate_period(slow, n)?;
 
+    // Post-clipping validation: ensure fast < slow still holds
+    if fast >= slow {
+        return Err(HazeError::InsufficientData {
+            required: slow_period,
+            actual: n,
+        });
+    }
+
     let ema_fast = ema(close, fast)?;
     let ema_slow = ema(close, slow)?;
 
@@ -1164,6 +1182,14 @@ pub fn ppo(close: &[f64], fast_period: usize, slow_period: usize) -> HazeResult<
     let slow = slow_period.min(n);
 
     validate_period(slow, n)?;
+
+    // Post-clipping validation: ensure fast < slow still holds
+    if fast >= slow {
+        return Err(HazeError::InsufficientData {
+            required: slow_period,
+            actual: n,
+        });
+    }
 
     let ema_fast = ema(close, fast)?;
     let ema_slow = ema(close, slow)?;
@@ -1265,21 +1291,18 @@ pub fn cmo(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 }
 
 /// UO 辅助函数：计算指定周期的平均 BP/TR 比率
+/// 使用 Kahan 补偿求和提高数值精度
 fn calc_uo_avg(bp: &[f64], tr: &[f64], period: usize) -> Vec<f64> {
     let n = bp.len();
     let mut result = init_result!(n);
 
     for i in period..n {
-        let mut sum_bp = 0.0;
-        let mut sum_tr = 0.0;
+        let start = i - period + 1;
+        let end = i + 1;
 
-        for j in 0..period {
-            let idx = i - period + 1 + j;
-            if !bp[idx].is_nan() && !tr[idx].is_nan() {
-                sum_bp += bp[idx];
-                sum_tr += tr[idx];
-            }
-        }
+        // 使用 Kahan 补偿求和，过滤掉 NaN 值
+        let sum_bp = kahan_sum(&bp[start..end]);
+        let sum_tr = kahan_sum(&tr[start..end]);
 
         if is_not_zero(sum_tr) {
             result[i] = sum_bp / sum_tr;
