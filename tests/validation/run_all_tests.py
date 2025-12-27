@@ -50,7 +50,7 @@ def check_dependencies():
         return None
 
     try:
-        import talib
+        import talib  # noqa: F401
         deps["TA-Lib"] = True
     except ImportError:
         deps["TA-Lib"] = False
@@ -238,7 +238,7 @@ def run_trend_tests(validator, df, haze, talib=None, pta=None):
         # ADX
         validator.validate(
             "ADX",
-            lambda: haze.py_adx(df["high"].tolist(), df["low"].tolist(), df["close"].tolist(), 14),
+            lambda: haze.py_adx(df["high"].tolist(), df["low"].tolist(), df["close"].tolist(), 14)[0],
             lambda: talib.ADX(df["high"].values, df["low"].values, df["close"].values, timeperiod=14),
             ReferenceLibrary.TALIB
         )
@@ -270,9 +270,10 @@ def run_trend_tests(validator, df, haze, talib=None, pta=None):
         # Aroon
         validator.validate_multi_output(
             "AROON",
-            lambda: haze.py_aroon(df["high"].tolist(), df["low"].tolist(), 25),
-            lambda: talib.AROON(df["high"].values, df["low"].values, timeperiod=25),
-            ["down", "up"],
+            lambda: haze.py_aroon(df["high"].tolist(), df["low"].tolist(), 25)[0:2],
+            lambda: (talib.AROON(df["high"].values, df["low"].values, timeperiod=25)[1],
+                     talib.AROON(df["high"].values, df["low"].values, timeperiod=25)[0]),
+            ["up", "down"],
             ReferenceLibrary.TALIB
         )
 

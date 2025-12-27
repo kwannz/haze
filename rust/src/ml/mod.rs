@@ -8,7 +8,8 @@ pub mod manager;
 pub mod models;
 pub mod trainer;
 
-// 内部模块重导出 (供未来扩展使用)
+// 公共 API 重导出 - 允许用户直接 `use haze_library::ml::SomeType`
+// 而不必 `use haze_library::ml::models::SomeType`
 #[allow(unused_imports)]
 pub use features::*;
 #[allow(unused_imports)]

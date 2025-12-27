@@ -39,7 +39,7 @@ def pytest_configure(config):
 def pytest_collection_modifyitems(config, items):
     """自动添加 skip markers"""
     try:
-        import talib
+        import talib  # noqa: F401
         has_talib = True
     except ImportError:
         has_talib = False
@@ -47,7 +47,7 @@ def pytest_collection_modifyitems(config, items):
     has_pandas_ta = _PANDAS_TA_MODULE is not None
 
     try:
-        import haze_library
+        import haze_library  # noqa: F401
         has_haze = True
     except ImportError:
         has_haze = False

@@ -17,7 +17,6 @@ from .core import (
     ReferenceLibrary,
     generate_market_data,
     TOLERANCE_NANO,
-    TOLERANCE_MICRO,
 )
 
 try:
@@ -94,7 +93,7 @@ class TestMomentumVsTaLib:
                 df["high"].tolist(),
                 df["low"].tolist(),
                 df["close"].tolist(),
-                14, 3
+                14, 3, 3
             ),
             ref_fn=lambda: talib.STOCH(
                 df["high"].values,
@@ -113,7 +112,7 @@ class TestMomentumVsTaLib:
             # Stochastic 实现可能与 TA-Lib 有算法差异
             # 验证数据有效性即可
             assert r.metrics is not None, f"Stochastic validation failed: {r}"
-            assert r.metrics.valid_count > 0, f"Stochastic should have valid data"
+            assert r.metrics.valid_count > 0, "Stochastic should have valid data"
 
     def test_williams_r(self, market_data, validator):
         """Williams %R - 威廉指标"""
@@ -244,8 +243,8 @@ class TestMomentumVsTaLib:
             ref_lib=ReferenceLibrary.TALIB,
         )
         # CMO 算法实现可能与 TA-Lib 不同
-        assert result.metrics is not None, f"CMO should return valid metrics"
-        assert result.metrics.valid_count > 0, f"CMO should have valid data"
+        assert result.metrics is not None, "CMO should return valid metrics"
+        assert result.metrics.valid_count > 0, "CMO should have valid data"
 
 
 @pytest.mark.skipif(not HAS_HAZE, reason="haze-library not installed")
@@ -292,13 +291,13 @@ class TestMomentumVsPandasTa:
             pytest.skip("pandas-ta KDJ not available")
 
         # haze KDJ 返回 (K, D, J)
-        results = validator.validate_multi_output(
+        validator.validate_multi_output(
             name="KDJ",
             haze_fn=lambda: haze.py_kdj(
                 df["high"].tolist(),
                 df["low"].tolist(),
                 df["close"].tolist(),
-                9, 3
+                9, 3, 3
             ),
             ref_fn=lambda: (
                 pta_result.iloc[:, 0].values,

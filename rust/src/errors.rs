@@ -71,6 +71,20 @@ pub type HazeResult<T> = Result<T, HazeError>;
 pub mod validation {
     use super::{HazeError, HazeResult};
 
+    /// 验证输入序列是否全部为有限值（非 NaN/Inf）
+    #[inline]
+    pub fn validate_finite(data: &[f64], name: &'static str) -> HazeResult<()> {
+        for (index, value) in data.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(HazeError::InvalidValue {
+                    index,
+                    message: format!("{name} contains non-finite value: {value}"),
+                });
+            }
+        }
+        Ok(())
+    }
+
     /// 验证周期参数
     #[inline]
     pub fn validate_period(period: usize, data_len: usize) -> HazeResult<()> {
@@ -86,6 +100,16 @@ pub mod validation {
         if data.is_empty() {
             return Err(HazeError::EmptyInput { name });
         }
+        validate_finite(data, name)?;
+        Ok(())
+    }
+
+    /// 验证非空输入（允许 NaN/Inf 作为内部暖启动数据）
+    #[inline]
+    pub fn validate_not_empty_allow_nan(data: &[f64], name: &'static str) -> HazeResult<()> {
+        if data.is_empty() {
+            return Err(HazeError::EmptyInput { name });
+        }
         Ok(())
     }
 
@@ -97,6 +121,12 @@ pub mod validation {
         data2: &[f64],
         name2: &'static str,
     ) -> HazeResult<()> {
+        if data1.is_empty() {
+            return Err(HazeError::EmptyInput { name: name1 });
+        }
+        if data2.is_empty() {
+            return Err(HazeError::EmptyInput { name: name2 });
+        }
         if data1.len() != data2.len() {
             return Err(HazeError::LengthMismatch {
                 name1,
@@ -105,6 +135,8 @@ pub mod validation {
                 len2: data2.len(),
             });
         }
+        validate_finite(data1, name1)?;
+        validate_finite(data2, name2)?;
         Ok(())
     }
 
@@ -115,7 +147,14 @@ pub mod validation {
             return Ok(());
         }
         let (first, first_name) = arrays[0];
+        if first.is_empty() {
+            return Err(HazeError::EmptyInput { name: first_name });
+        }
+        validate_finite(first, first_name)?;
         for &(arr, name) in &arrays[1..] {
+            if arr.is_empty() {
+                return Err(HazeError::EmptyInput { name });
+            }
             if arr.len() != first.len() {
                 return Err(HazeError::LengthMismatch {
                     name1: first_name,
@@ -124,6 +163,7 @@ pub mod validation {
                     len2: arr.len(),
                 });
             }
+            validate_finite(arr, name)?;
         }
         Ok(())
     }
@@ -141,7 +181,6 @@ pub mod validation {
     }
 
     /// 验证参数范围
-    #[allow(dead_code)]
     #[inline]
     pub fn validate_range(name: &'static str, value: f64, min: f64, max: f64) -> HazeResult<()> {
         if value < min || value > max {

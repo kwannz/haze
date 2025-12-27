@@ -59,10 +59,12 @@
 
 use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_period};
 use crate::errors::{HazeError, HazeResult};
-use crate::indicators::volatility::atr;
+use crate::utils::float_compare::approx_eq;
+use crate::indicators::volatility::{atr, true_range};
 use crate::init_result;
+use crate::utils::ma::ema_allow_nan;
 use crate::utils::math::{is_not_zero, is_zero};
-use crate::utils::{ema, rma, rolling_max, rolling_min, rolling_sum, sma};
+use crate::utils::{ema, rolling_max, rolling_min, rolling_sum, sma};
 
 /// SuperTrend（超级趋势指标）
 ///
@@ -108,9 +110,9 @@ pub fn supertrend(
             data_len: n,
         });
     }
-    if period > n {
+    if period >= n {
         return Err(HazeError::InsufficientData {
-            required: period,
+            required: period + 1,
             actual: n,
         });
     }
@@ -193,6 +195,12 @@ fn compute_di(
     period: usize,
 ) -> HazeResult<(Vec<f64>, Vec<f64>)> {
     let n = high.len();
+    if period >= n {
+        return Err(HazeError::InsufficientData {
+            required: period + 1,
+            actual: n,
+        });
+    }
 
     // 计算方向移动
     let mut plus_dm = vec![0.0; n];
@@ -210,35 +218,75 @@ fn compute_di(
         }
     }
 
-    // ATR (propagate error)
-    let atr_values = atr(high, low, close, period)?;
+    let tr = true_range(high, low, close, 1)?;
 
-    // 平滑 DM
-    let smooth_plus_dm = rma(&plus_dm, period)?;
-    let smooth_minus_dm = rma(&minus_dm, period)?;
+    let mut plus_di = init_result!(n);
+    let mut minus_di = init_result!(n);
 
-    // 计算 DI
-    let plus_di: Vec<f64> = (0..n)
-        .map(|i| {
-            if atr_values[i].is_nan() || is_zero(atr_values[i]) {
-                f64::NAN
-            } else {
-                100.0 * smooth_plus_dm[i] / atr_values[i]
-            }
-        })
-        .collect();
+    let period_f = period as f64;
+    let mut sum_tr = 0.0;
+    let mut sum_plus = 0.0;
+    let mut sum_minus = 0.0;
 
-    let minus_di: Vec<f64> = (0..n)
-        .map(|i| {
-            if atr_values[i].is_nan() || is_zero(atr_values[i]) {
-                f64::NAN
-            } else {
-                100.0 * smooth_minus_dm[i] / atr_values[i]
-            }
-        })
-        .collect();
+    // TA-Lib 对齐：先累积 1..period-1，再从 period 开始更新并输出
+    for i in 1..period {
+        sum_tr += tr[i];
+        sum_plus += plus_dm[i];
+        sum_minus += minus_dm[i];
+    }
+
+    for i in period..n {
+        sum_tr = sum_tr - (sum_tr / period_f) + tr[i];
+        sum_plus = sum_plus - (sum_plus / period_f) + plus_dm[i];
+        sum_minus = sum_minus - (sum_minus / period_f) + minus_dm[i];
+
+        if is_zero(sum_tr) {
+            plus_di[i] = 0.0;
+            minus_di[i] = 0.0;
+        } else {
+            plus_di[i] = 100.0 * sum_plus / sum_tr;
+            minus_di[i] = 100.0 * sum_minus / sum_tr;
+        }
+    }
 
     Ok((plus_di, minus_di))
+}
+
+/// DMI - Directional Movement Index（趋向指标）
+///
+/// 返回正向与负向指标（+DI, -DI）
+///
+/// # 参数
+/// - `high`: 最高价序列
+/// - `low`: 最低价序列
+/// - `close`: 收盘价序列
+/// - `period`: 周期（默认 14）
+///
+/// # 返回
+/// - `Ok((plus_di, minus_di))`
+///
+/// # 错误
+/// - `HazeError::EmptyInput` - 输入为空
+/// - `HazeError::LengthMismatch` - 数组长度不一致
+/// - `HazeError::InvalidPeriod` - period 无效
+pub fn dmi(
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    period: usize,
+) -> HazeResult<(Vec<f64>, Vec<f64>)> {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
+
+    let n = high.len();
+    if period == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period,
+            data_len: n,
+        });
+    }
+
+    compute_di(high, low, close, period)
 }
 
 /// ADX - Average Directional Index（平均趋向指标）
@@ -284,24 +332,30 @@ pub fn adx(
 
     let (plus_di, minus_di) = compute_di(high, low, close, period)?;
 
-    // 计算 DX（ADX 内部使用 0.0 替代 NaN 以便 RMA 平滑）
-    let dx: Vec<f64> = (0..n)
-        .map(|i| {
-            if plus_di[i].is_nan() || minus_di[i].is_nan() {
-                0.0
-            } else {
-                let sum = plus_di[i] + minus_di[i];
-                if is_zero(sum) {
-                    0.0
-                } else {
-                    100.0 * (plus_di[i] - minus_di[i]).abs() / sum
-                }
-            }
-        })
-        .collect();
+    let mut dx = init_result!(n);
+    for i in period..n {
+        let sum = plus_di[i] + minus_di[i];
+        if is_zero(sum) {
+            dx[i] = 0.0;
+        } else {
+            dx[i] = 100.0 * (plus_di[i] - minus_di[i]).abs() / sum;
+        }
+    }
 
-    // ADX = RMA(DX)
-    let adx_values = rma(&dx, period)?;
+    let mut adx_values = init_result!(n);
+    let start = period * 2;
+    if start <= n {
+        let mut sum_dx = 0.0;
+        for i in period..start {
+            sum_dx += dx[i];
+        }
+        adx_values[start - 1] = sum_dx / period as f64;
+
+        let period_f = period as f64;
+        for i in start..n {
+            adx_values[i] = (adx_values[i - 1] * (period_f - 1.0) + dx[i]) / period_f;
+        }
+    }
 
     Ok((adx_values, plus_di, minus_di))
 }
@@ -438,9 +492,9 @@ pub fn aroon(
             data_len: n,
         });
     }
-    if period > n {
+    if period >= n {
         return Err(HazeError::InsufficientData {
-            required: period,
+            required: period + 1,
             actual: n,
         });
     }
@@ -449,10 +503,10 @@ pub fn aroon(
     let mut aroon_down = init_result!(n);
     let mut aroon_osc = init_result!(n);
 
-    for i in (period - 1)..n {
+    for i in period..n {
         // 找到最高点和最低点的位置
-        let window_high = &high[i + 1 - period..=i];
-        let window_low = &low[i + 1 - period..=i];
+        let window_high = &high[i - period..=i];
+        let window_low = &low[i - period..=i];
 
         // 使用 NaN-safe 的 fold（过滤 NaN 值）
         let highest = window_high
@@ -470,20 +524,21 @@ pub fn aroon(
         }
 
         // 从窗口末尾倒数，找到最高/最低点的位置（跳过 NaN）
+        // 使用 approx_eq 进行浮点数比较，避免精度问题导致找不到匹配
         let bars_since_high = window_high
             .iter()
             .rev()
-            .position(|&x| !x.is_nan() && x == highest)
+            .position(|&x| !x.is_nan() && approx_eq(x, highest, None))
             .unwrap_or(period - 1);
 
         let bars_since_low = window_low
             .iter()
             .rev()
-            .position(|&x| !x.is_nan() && x == lowest)
+            .position(|&x| !x.is_nan() && approx_eq(x, lowest, None))
             .unwrap_or(period - 1);
 
-        aroon_up[i] = ((period - 1 - bars_since_high) as f64 / (period - 1) as f64) * 100.0;
-        aroon_down[i] = ((period - 1 - bars_since_low) as f64 / (period - 1) as f64) * 100.0;
+        aroon_up[i] = ((period - bars_since_high) as f64 / period as f64) * 100.0;
+        aroon_down[i] = ((period - bars_since_low) as f64 / period as f64) * 100.0;
         aroon_osc[i] = aroon_up[i] - aroon_down[i];
     }
 
@@ -835,7 +890,7 @@ pub fn qstick(open: &[f64], close: &[f64], period: usize) -> HazeResult<Vec<f64>
 ///
 /// # 错误
 /// - `HazeError::EmptyInput` - 输入为空
-/// - `HazeError::InsufficientData` - 数据长度小于 2
+/// - `HazeError::InsufficientData` - 数据长度小于 2 或 period >= 数据长度
 /// - `HazeError::InvalidPeriod` - period 为 0
 pub fn vhf(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     validate_not_empty(close, "close")?;
@@ -853,31 +908,28 @@ pub fn vhf(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
             data_len: n,
         });
     }
+    if period >= n {
+        return Err(HazeError::InsufficientData {
+            required: period + 1,
+            actual: n,
+        });
+    }
 
     let mut result = init_result!(n);
+    let max_close = rolling_max(close, period);
+    let min_close = rolling_min(close, period);
+
+    let mut abs_diff = vec![0.0; n];
+    for i in 1..n {
+        abs_diff[i] = (close[i] - close[i - 1]).abs();
+    }
+    let sum_changes = rolling_sum(&abs_diff, period);
 
     for i in period..n {
-        // 1. 找出周期内的最高和最低收盘价 (period 个元素: i-period+1 到 i)
-        let mut max_close = f64::NEG_INFINITY;
-        let mut min_close = f64::INFINITY;
-
-        for j in 0..period {
-            let idx = i - j;
-            max_close = max_close.max(close[idx]);
-            min_close = min_close.min(close[idx]);
-        }
-
-        let numerator = (max_close - min_close).abs();
-
-        // 2. 计算价格变化的累计和
-        let mut sum_changes = 0.0;
-        for j in 0..period {
-            let idx = i - j;
-            sum_changes += (close[idx] - close[idx - 1]).abs();
-        }
-
-        if sum_changes > 0.0 {
-            result[i] = numerator / sum_changes;
+        let numerator = (max_close[i] - min_close[i]).abs();
+        let denom = sum_changes[i];
+        if numerator.is_finite() && denom.is_finite() && denom > 0.0 {
+            result[i] = numerator / denom;
         }
     }
 
@@ -908,9 +960,9 @@ pub fn trix(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
         });
     }
 
-    let ema1 = ema(close, period)?;
-    let ema2 = ema(&ema1, period)?;
-    let ema3 = ema(&ema2, period)?;
+    let ema1 = ema_allow_nan(close, period)?;
+    let ema2 = ema_allow_nan(&ema1, period)?;
+    let ema3 = ema_allow_nan(&ema2, period)?;
 
     let mut result = init_result!(n);
     for i in 1..n {
@@ -1031,14 +1083,26 @@ mod tests {
 
     #[test]
     fn test_adx() {
-        let high = vec![110.0, 111.0, 112.0, 113.0, 114.0, 115.0, 116.0, 117.0];
-        let low = vec![100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0];
-        let close = vec![105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0];
+        // Need more data for ADX warmup (2 * period for smoothed DX)
+        let high = vec![
+            110.0, 111.0, 112.0, 113.0, 114.0, 115.0, 116.0, 117.0, 118.0, 119.0,
+            120.0, 121.0, 122.0, 123.0, 124.0,
+        ];
+        let low = vec![
+            100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0,
+            110.0, 111.0, 112.0, 113.0, 114.0,
+        ];
+        let close = vec![
+            105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0, 112.0, 113.0, 114.0,
+            115.0, 116.0, 117.0, 118.0, 119.0,
+        ];
 
         let (adx_values, _plus_di, _minus_di) = adx(&high, &low, &close, 5).unwrap();
 
-        assert_eq!(adx_values.len(), 8);
-        assert!(adx_values[4..].iter().all(|&x| !x.is_nan()));
+        assert_eq!(adx_values.len(), 15);
+        // ADX warmup: first (2*period - 1) values may be NaN
+        // Valid values start from index >= 2*period - 1 = 9
+        assert!(adx_values[10..].iter().all(|&x| !x.is_nan()));
     }
 
     #[test]
@@ -1093,14 +1157,21 @@ mod tests {
 
     #[test]
     fn test_aroon() {
-        let high = vec![110.0, 111.0, 112.0, 113.0, 114.0, 113.0, 112.0, 111.0];
-        let low = vec![100.0, 101.0, 102.0, 103.0, 104.0, 103.0, 102.0, 101.0];
+        // Need enough data for warmup: period + 1 elements minimum
+        let high = vec![
+            110.0, 111.0, 112.0, 113.0, 114.0, 113.0, 112.0, 111.0, 115.0, 116.0, 117.0,
+        ];
+        let low = vec![
+            100.0, 101.0, 102.0, 103.0, 104.0, 103.0, 102.0, 101.0, 105.0, 106.0, 107.0,
+        ];
 
         let (aroon_up, aroon_down, _aroon_osc) = aroon(&high, &low, 5).unwrap();
 
-        assert_eq!(aroon_up.len(), 8);
-        assert!(aroon_up[4..].iter().all(|&x| (0.0..=100.0).contains(&x)));
-        assert!(aroon_down[4..].iter().all(|&x| (0.0..=100.0).contains(&x)));
+        assert_eq!(aroon_up.len(), 11);
+        // Aroon values after warmup period should be in [0, 100]
+        // Warmup period = period, so valid from index >= period
+        assert!(aroon_up[5..].iter().all(|&x| (0.0..=100.0).contains(&x)));
+        assert!(aroon_down[5..].iter().all(|&x| (0.0..=100.0).contains(&x)));
     }
 
     #[test]

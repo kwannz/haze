@@ -171,26 +171,6 @@ macro_rules! init_results {
     };
 }
 
-/// 提前返回空结果（用于空输入的快速路径）
-///
-/// # 用法
-/// ```rust,ignore
-/// early_return_if_empty!(data);
-/// ```
-#[macro_export]
-macro_rules! early_return_if_empty {
-    ($data:expr) => {
-        if $data.is_empty() {
-            return Ok(vec![]);
-        }
-    };
-    ($data:expr, $result:expr) => {
-        if $data.is_empty() {
-            return Ok($result);
-        }
-    };
-}
-
 #[cfg(test)]
 mod tests {
     use crate::errors::HazeResult;

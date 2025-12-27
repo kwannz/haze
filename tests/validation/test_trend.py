@@ -76,7 +76,7 @@ class TestTrendVsTaLib:
         )
         # ADX 有双重平滑, 热身期较长
         if result.metrics is not None:
-            assert result.metrics.valid_count > 0, f"ADX should have valid data"
+            assert result.metrics.valid_count > 0, "ADX should have valid data"
         else:
             # 如果 metrics 为 None, 检查是否有错误
             assert result.error is None, f"ADX validation error: {result.error}"
@@ -168,9 +168,8 @@ class TestTrendVsTaLib:
             ref_lib=ReferenceLibrary.TALIB,
         )
         for r in results:
-            # Aroon 是离散指标 (0-100), 算法实现可能有差异
-            # haze 使用 period-1 作为分母, TA-Lib 使用 period
-            assert r.metrics.correlation > 0.95, f"Aroon validation failed: {r}"
+            # Aroon 需对齐 TA-Lib 输出
+            assert r.metrics.correlation > 0.999, f"Aroon validation failed: {r}"
 
     def test_trix(self, market_data, validator):
         """TRIX - 三重指数平滑 ROC"""
@@ -233,8 +232,8 @@ class TestTrendVsPandasTa:
         assert len(haze_result) == 4, "SuperTrend should return 4 elements"
         trend = np.array(haze_result[0])
         direction = np.array(haze_result[1])
-        upper = np.array(haze_result[2])
-        lower = np.array(haze_result[3])
+        np.array(haze_result[2])
+        np.array(haze_result[3])
 
         # 验证有有效数据
         valid_trend = trend[~np.isnan(trend)]
@@ -265,7 +264,7 @@ class TestTrendVsPandasTa:
         if pta_result is None:
             pytest.skip("Vortex not available")
 
-        results = validator.validate_multi_output(
+        validator.validate_multi_output(
             name="VORTEX",
             haze_fn=lambda: haze.py_vortex(
                 df["high"].tolist(),

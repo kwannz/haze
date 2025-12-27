@@ -6,7 +6,7 @@ Tests edge cases involving:
 - Large numbers + small increments
 - Catastrophic cancellation
 - Precision loss in long sequences
-- NaN propagation
+- NaN/Inf fail-fast validation
 - Division by zero safety
 
 These tests ensure that Haze indicators maintain numerical stability
@@ -41,8 +41,8 @@ class TestNumericalStability:
         low = [100.0] * 50
         close = [100.0] * 50
 
-        k, d = haze.stochastic(high, low, close, k_period=5, d_period=3)
-        kdj_k, kdj_d, kdj_j = haze.kdj(high, low, close, k_period=5, d_period=3)
+        k, d = haze.stochastic(high, low, close, k_period=5, smooth_k=3, d_period=3)
+        kdj_k, kdj_d, kdj_j = haze.kdj(high, low, close, k_period=5, smooth_k=3, d_period=3)
 
         # Stochastic: finite results should be exactly 50.0 (with rounding tolerance)
         for value in [*k, *d]:
@@ -168,20 +168,13 @@ class TestNumericalStability:
         - Challenge: NaN can propagate through calculations
 
         Expected:
-        - Function should handle NaN input without crashing
-        - May skip NaN values or return NaN for affected periods
+        - Function should raise ValueError on NaN input (fail-fast)
         """
         # Create data with NaN - note: some implementations may filter NaN
         data_with_nan = [1.0, 2.0, np.nan, 4.0, 5.0, 6.0, 7.0, 8.0] * 10
 
-        # Should not crash with NaN input
-        try:
-            result = haze.sma(data_with_nan, period=5)
-            # If it returns a result, check it's reasonable
-            assert len(result) > 0, "Should return some result"
-        except (ValueError, TypeError):
-            # Some implementations may reject NaN - that's also acceptable
-            pass
+        with pytest.raises(ValueError):
+            haze.sma(data_with_nan, period=5)
 
         # Test with clean data to ensure basic functionality works
         clean_data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0] * 10
@@ -388,7 +381,7 @@ class TestKahanSummation:
         # Actual implementation depends on Rust backend
 
         # Check if naive summation has error
-        naive_error = abs(naive_sum - expected)
+        abs(naive_sum - expected)
 
         # Document the precision issue
         # In production, Kahan summation should reduce this error
@@ -433,13 +426,8 @@ class TestEdgeCaseParameters:
         data = [10.0, 11.0, 12.0, 13.0, 14.0]
         period = 100
 
-        result = haze.sma(data, period=period)
-
-        # All results should be NaN (insufficient data)
-        valid_results = [r for r in result if not np.isnan(r)]
-        assert len(valid_results) == 0, (
-            f"Should have no valid results with period > length, got {len(valid_results)}"
-        )
+        with pytest.raises(ValueError):
+            haze.sma(data, period=period)
 
 
 class TestMemoryEfficiency:

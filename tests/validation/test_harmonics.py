@@ -80,7 +80,7 @@ def generate_ideal_gartley_bullish() -> Tuple[List[float], List[float], List[flo
     for i in range(1, 21):
         prices.append(121.4 + 2 * i)
 
-    n = len(prices)
+    len(prices)
     high = [p + 1.0 for p in prices]
     low = [p - 1.0 for p in prices]
     close = prices.copy()
@@ -122,7 +122,7 @@ def generate_ideal_bat_bullish() -> Tuple[List[float], List[float], List[float]]
     for i in range(1, 21):
         prices.append(111.4 + 2 * i)  # D之后
 
-    n = len(prices)
+    len(prices)
     high = [p + 1.0 for p in prices]
     low = [p - 1.0 for p in prices]
     close = prices.copy()
@@ -180,12 +180,12 @@ class TestSwingPointDetection:
                 f"Swing points should alternate: {filtered[i-1]} -> {filtered[i]}"
 
     def test_swing_detection_empty_short(self):
-        """短数据应返回空或少量摆动点"""
+        """短数据应抛出 ValueError (数据不足)"""
         high = [100.0, 101.0, 102.0]
         low = [99.0, 100.0, 101.0]
 
-        swings = haze.py_swing_points(high, low, 3, 3)
-        assert len(swings) == 0, "Short data should have no swing points"
+        with pytest.raises(ValueError, match="Insufficient data"):
+            haze.py_swing_points(high, low, 3, 3)
 
 
 @pytest.mark.skipif(not HAS_HAZE, reason="haze-library not installed")
@@ -205,7 +205,7 @@ class TestHarmonicPatternDetection:
         for p in gartley_patterns:
             assert p.pattern_type == "Gartley"
             assert p.pattern_type_zh == "伽利形态"
-            assert p.is_bullish == True  # 看涨形态
+            assert p.is_bullish  # 看涨形态
 
     def test_pattern_attributes(self):
         """验证形态属性完整性"""
@@ -402,7 +402,7 @@ class TestFormingPatterns:
         patterns_with = haze.py_harmonics_patterns(high, low, 3, 3, True)
         patterns_without = haze.py_harmonics_patterns(high, low, 3, 3, False)
 
-        forming_with = [p for p in patterns_with if p.state == "forming"]
+        [p for p in patterns_with if p.state == "forming"]
         forming_without = [p for p in patterns_without if p.state == "forming"]
 
         # include_forming=False 不应返回 forming 形态
@@ -434,25 +434,41 @@ class TestEdgeCases:
         low = []
         close = []
 
-        signals, prz_u, prz_l, prob = haze.py_harmonics(high, low, close)
-        assert len(signals) == 0
+        with pytest.raises(ValueError):
+            haze.py_harmonics(high, low, close)
+
+        with pytest.raises(ValueError):
+            haze.py_harmonics_patterns(high, low)
+
+        with pytest.raises(ValueError):
+            haze.py_swing_points(high, low)
 
     def test_short_data(self):
-        """短数据处理"""
+        """短数据处理 - 数据不足抛出 ValueError"""
         high = [100.0, 101.0, 102.0, 103.0, 104.0]
         low = [99.0, 100.0, 101.0, 102.0, 103.0]
-        close = [99.5, 100.5, 101.5, 102.5, 103.5]
 
-        patterns = haze.py_harmonics_patterns(high, low, 2, 2, True)
-        # 短数据应该没有足够的摆动点形成形态
-        assert len(patterns) == 0 or all(p.state != "complete" for p in patterns)
+        with pytest.raises(ValueError, match="Insufficient data"):
+            haze.py_harmonics_patterns(high, low, 2, 2, True)
+
+    def test_insufficient_data(self):
+        """不足窗口数据应抛出 ValueError"""
+        high = [100.0, 101.0, 102.0, 103.0]
+        low = [99.0, 100.0, 101.0, 102.0]
+
+        # 数据不足时抛出 ValueError
+        with pytest.raises(ValueError, match="Insufficient data"):
+            haze.py_swing_points(high, low, 3, 3)
+
+        with pytest.raises(ValueError, match="Insufficient data"):
+            haze.py_harmonics_patterns(high, low, 3, 3, True)
 
     def test_constant_price(self):
         """常数价格处理"""
         n = 50
         high = [100.0] * n
         low = [100.0] * n
-        close = [100.0] * n
+        [100.0] * n
 
         # 常数价格时，由于使用 >= 和 <= 比较，技术上所有点都满足 swing 条件
         # 但不应该形成有效的谐波形态（因为所有比率无意义）

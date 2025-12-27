@@ -100,7 +100,7 @@
 //! let close = vec![/* ... */];
 //!
 //! let rsi_vals = rsi(&close, 14)?;
-//! let (stoch_k, stoch_d) = stochastic(&high, &low, &close, 14, 3)?;
+//! let (stoch_k, stoch_d) = stochastic(&high, &low, &close, 14, 3, 3)?;
 //! let cci_vals = cci(&high, &low, &close, 20)?;
 //!
 //! // Triple confirmation for oversold bounce

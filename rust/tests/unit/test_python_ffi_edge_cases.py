@@ -2,8 +2,7 @@
 Integration tests for Python FFI edge cases
 
 These tests verify that the PyO3 bindings handle edge cases correctly:
-- NaN propagation
-- Infinity handling
+- Fail-fast validation for NaN/Inf inputs
 - Empty inputs
 - Invalid parameters
 - Type conversions
@@ -23,47 +22,32 @@ class TestNaNHandling:
     """Test how NaN values in input are handled"""
 
     def test_sma_with_nan_in_middle(self):
-        """NaN in the middle of data should propagate correctly"""
+        """NaN in input should raise ValueError"""
         data = [1.0, 2.0, float('nan'), 4.0, 5.0, 6.0, 7.0, 8.0]
-        result = haze.py_sma(data, period=3)
-
-        assert len(result) == 8
-        # First 2 are warmup
-        assert np.isnan(result[0])
-        assert np.isnan(result[1])
-        # Index 2 contains NaN in window
-        # Behavior: sum with NaN = NaN
-        assert np.isnan(result[2])
+        with pytest.raises(ValueError):
+            haze.py_sma(data, period=3)
 
     def test_rsi_with_nan_in_data(self):
-        """RSI should handle NaN values gracefully"""
+        """RSI should fail-fast on NaN input"""
         data = [100.0, 102.0, float('nan'), 101.0, 103.0, 105.0] + [104.0] * 20
-        result = haze.py_rsi(data, period=14)
-
-        assert len(result) == 26
-        # Result should be computable after warmup (may have NaN near the NaN input)
+        with pytest.raises(ValueError):
+            haze.py_rsi(data, period=14)
 
 
 class TestInfinityHandling:
     """Test how infinity values are handled"""
 
     def test_sma_with_infinity(self):
-        """Infinity in input should not crash"""
+        """Infinity in input should raise ValueError"""
         data = [1.0, 2.0, float('inf'), 4.0, 5.0, 6.0, 7.0, 8.0]
-        result = haze.py_sma(data, period=3)
-
-        assert len(result) == 8
-        # Should not crash, infinity propagates
-        assert result[2] == float('inf') or np.isinf(result[2])
+        with pytest.raises(ValueError):
+            haze.py_sma(data, period=3)
 
     def test_bollinger_with_negative_infinity(self):
-        """Negative infinity should be handled"""
+        """Negative infinity should raise ValueError"""
         data = [100.0, 102.0, float('-inf'), 101.0, 103.0] + [100.0] * 20
-        upper, middle, lower = haze.py_bollinger_bands(data, period=14, std_dev=2.0)
-
-        assert len(upper) == 25
-        assert len(middle) == 25
-        assert len(lower) == 25
+        with pytest.raises(ValueError):
+            haze.py_bollinger_bands(data, period=14, std_dev=2.0)
 
 
 class TestEmptyInputs:
@@ -267,18 +251,14 @@ class TestEdgeCaseValues:
         assert all(np.isnan(result[i]) or 40.0 <= result[i] <= 60.0 for i in range(14, 30))
 
 
-class TestBackwardCompatibility:
-    """Test that ok_or_nan_vec provides backward compatibility"""
+class TestFailFastBehavior:
+    """Fail-fast validation should raise errors for invalid inputs"""
 
-    def test_invalid_input_returns_nan_not_error(self):
-        """Invalid inputs should return NaN-filled vectors (backward compatibility)"""
-        # This behavior is from ok_or_nan_vec helper in lib.rs
-        # EmptyInput, InsufficientData, InvalidPeriod → NaN-filled vectors
-        # Other errors → raised as ValueError
-
-        # NOTE: This test depends on whether ok_or_nan_vec is used
-        # Based on lib.rs code, validation errors return NaN vectors
-        pass  # Behavior verified in other tests
+    def test_invalid_input_raises(self):
+        with pytest.raises(ValueError):
+            haze.py_sma([], period=3)
+        with pytest.raises(ValueError):
+            haze.py_sma([1.0, 2.0, 3.0], period=0)
 
 
 class TestConcurrentCalls:

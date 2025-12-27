@@ -1,0 +1,104 @@
+```mermaid
+graph TD
+    LIB["lib.rs<br/>PyO3 入口点<br/>61K+ tokens"]
+
+    IND_MOD["indicators/mod.rs<br/>模块索引"]
+    IND_MOM["momentum.rs<br/>14 函数"]
+    IND_VOL["volatility.rs<br/>10 函数"]
+    IND_TREND["trend.rs<br/>14 函数"]
+    IND_VOLUME["volume.rs<br/>11 函数"]
+    IND_OVERLAP["overlap.rs<br/>16 函数"]
+    IND_CANDLE["candlestick.rs<br/>61 函数"]
+    IND_OTHER["其他 6 个模块<br/>fibonacci, ichimoku,<br/>pivots, harmonics,<br/>cycle, sfg..."]
+
+    UTILS_MOD["utils/mod.rs<br/>工具模块索引"]
+    UTILS_MA["ma.rs<br/>移动平均实现<br/>SMA, EMA, WMA..."]
+    UTILS_STATS["stats.rs<br/>统计工具<br/>rolling_max/min..."]
+    UTILS_MATH["math.rs<br/>数学工具<br/>Kahan summation"]
+    UTILS_STREAM["streaming.rs<br/>流式计算器<br/>OnlineEMA, OnlineRSI"]
+
+    TYPES["types.rs<br/>Candle<br/>OhlcvFrame"]
+    ERRORS["errors.rs<br/>HazeError<br/>validation::*"]
+    DATAFRAME["dataframe.rs<br/>OhlcvFrame缓存优化"]
+
+    ML["ml/ 模块<br/>SVR, Linear Regression"]
+
+    %% PyO3 入口依赖
+    LIB --> IND_MOD
+    LIB --> UTILS_MOD
+    LIB --> TYPES
+    LIB --> DATAFRAME
+    LIB --> ML
+
+    %% 指标模块结构
+    IND_MOD --> IND_MOM
+    IND_MOD --> IND_VOL
+    IND_MOD --> IND_TREND
+    IND_MOD --> IND_VOLUME
+    IND_MOD --> IND_OVERLAP
+    IND_MOD --> IND_CANDLE
+    IND_MOD --> IND_OTHER
+
+    %% 指标依赖工具库
+    IND_MOM --> UTILS_MA
+    IND_MOM --> UTILS_STATS
+    IND_MOM --> ERRORS
+
+    IND_VOL --> UTILS_MA
+    IND_VOL --> UTILS_STATS
+    IND_VOL --> ERRORS
+
+    IND_TREND --> UTILS_MA
+    IND_TREND --> UTILS_STATS
+    IND_TREND --> ERRORS
+
+    IND_VOLUME --> UTILS_MA
+    IND_VOLUME --> ERRORS
+
+    IND_OVERLAP --> UTILS_MA
+    IND_OVERLAP --> ERRORS
+
+    IND_CANDLE --> UTILS_MA
+    IND_CANDLE --> ERRORS
+
+    %% 工具模块结构
+    UTILS_MOD --> UTILS_MA
+    UTILS_MOD --> UTILS_STATS
+    UTILS_MOD --> UTILS_MATH
+    UTILS_MOD --> UTILS_STREAM
+
+    %% 工具模块内部依赖
+    UTILS_MA --> UTILS_MATH
+    UTILS_STATS --> UTILS_MATH
+    UTILS_STREAM --> UTILS_MA
+    UTILS_STREAM --> ERRORS
+
+    %% 数据结构依赖
+    DATAFRAME --> TYPES
+    DATAFRAME --> ERRORS
+    DATAFRAME --> IND_MOD
+
+    %% ML 模块依赖
+    ML --> UTILS_STATS
+    ML --> TYPES
+    ML --> ERRORS
+
+    %% 样式
+    style LIB fill:#ffccbc,stroke:#bf360c,stroke-width:3px
+    style IND_MOD fill:#c5e1a5,stroke:#558b2f,stroke-width:2px
+    style UTILS_MOD fill:#90caf9,stroke:#01579b,stroke-width:2px
+    style TYPES fill:#ce93d8,stroke:#4a148c,stroke-width:2px
+    style ERRORS fill:#ef9a9a,stroke:#c62828,stroke-width:2px
+
+    style IND_MOM fill:#dcedc8
+    style IND_VOL fill:#dcedc8
+    style IND_TREND fill:#dcedc8
+    style IND_VOLUME fill:#dcedc8
+    style IND_OVERLAP fill:#dcedc8
+    style IND_CANDLE fill:#dcedc8
+
+    style UTILS_MA fill:#bbdefb
+    style UTILS_STATS fill:#bbdefb
+    style UTILS_MATH fill:#bbdefb
+    style UTILS_STREAM fill:#bbdefb
+```

@@ -65,13 +65,12 @@ class TestSMA:
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
         # 空数组
-        result = haze.py_sma(empty_array, period=3)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_sma(empty_array, period=3)
 
         # 数组长度小于周期
-        result = haze.py_sma(single_value, period=3)
-        assert len(result) == 1
-        assert np.isnan(result[0])
+        with pytest.raises(ValueError):
+            haze.py_sma(single_value, period=3)
 
         # 周期=1 应该返回原数组
         result = haze.py_sma([10.0, 11.0, 12.0], period=1)
@@ -118,13 +117,12 @@ class TestEMA:
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
         # 空数组
-        result = haze.py_ema(empty_array, period=3)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_ema(empty_array, period=3)
 
         # 单值数组
-        result = haze.py_ema(single_value, period=3)
-        assert len(result) == 1
-        assert np.isnan(result[0])
+        with pytest.raises(ValueError):
+            haze.py_ema(single_value, period=3)
 
     def test_different_periods(self, simple_prices):
         """测试不同周期参数"""
@@ -168,13 +166,12 @@ class TestWMA:
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
         # 空数组
-        result = haze.py_wma(empty_array, period=3)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_wma(empty_array, period=3)
 
         # 单值
-        result = haze.py_wma(single_value, period=3)
-        assert len(result) == 1
-        assert np.isnan(result[0])
+        with pytest.raises(ValueError):
+            haze.py_wma(single_value, period=3)
 
     def test_different_periods(self, simple_prices):
         """测试不同周期参数"""
@@ -209,12 +206,12 @@ class TestDEMA:
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
         # 空数组
-        result = haze.py_dema(empty_array, period=3)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_dema(empty_array, period=3)
 
         # 单值
-        result = haze.py_dema(single_value, period=3)
-        assert len(result) == 1
+        with pytest.raises(ValueError):
+            haze.py_dema(single_value, period=3)
 
     def test_different_periods(self, simple_prices):
         """测试不同周期参数"""
@@ -245,11 +242,11 @@ class TestTEMA:
 
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
-        result = haze.py_tema(empty_array, period=3)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_tema(empty_array, period=3)
 
-        result = haze.py_tema(single_value, period=3)
-        assert len(result) == 1
+        with pytest.raises(ValueError):
+            haze.py_tema(single_value, period=3)
 
     def test_different_periods(self, simple_prices):
         """测试不同周期参数"""
@@ -282,11 +279,11 @@ class TestHMA:
 
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
-        result = haze.py_hma(empty_array, period=3)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_hma(empty_array, period=3)
 
-        result = haze.py_hma(single_value, period=3)
-        assert len(result) == 1
+        with pytest.raises(ValueError):
+            haze.py_hma(single_value, period=3)
 
     def test_different_periods(self, simple_prices):
         """测试不同周期参数"""
@@ -319,11 +316,11 @@ class TestRMA:
 
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
-        result = haze.py_rma(empty_array, period=3)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_rma(empty_array, period=3)
 
-        result = haze.py_rma(single_value, period=3)
-        assert len(result) == 1
+        with pytest.raises(ValueError):
+            haze.py_rma(single_value, period=3)
 
     def test_different_periods(self, simple_prices):
         """测试不同周期参数"""
@@ -353,11 +350,11 @@ class TestZLMA:
 
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
-        result = haze.py_zlma(empty_array, period=3)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_zlma(empty_array, period=3)
 
-        result = haze.py_zlma(single_value, period=3)
-        assert len(result) == 1
+        with pytest.raises(ValueError):
+            haze.py_zlma(single_value, period=3)
 
     def test_different_periods(self, simple_prices):
         """测试不同周期参数"""
@@ -391,11 +388,11 @@ class TestT3:
 
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
-        result = haze.py_t3(empty_array, period=3, vfactor=0.7)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_t3(empty_array, period=3, vfactor=0.7)
 
-        result = haze.py_t3(single_value, period=3, vfactor=0.7)
-        assert len(result) == 1
+        with pytest.raises(ValueError):
+            haze.py_t3(single_value, period=3, vfactor=0.7)
 
     def test_different_parameters(self, simple_prices):
         """测试不同参数（周期和 vfactor）"""
@@ -433,11 +430,11 @@ class TestKAMA:
 
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
-        result = haze.py_kama(empty_array, period=5, fast_period=2, slow_period=10)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_kama(empty_array, period=5, fast_period=2, slow_period=10)
 
-        result = haze.py_kama(single_value, period=5, fast_period=2, slow_period=10)
-        assert len(result) == 1
+        with pytest.raises(ValueError):
+            haze.py_kama(single_value, period=5, fast_period=2, slow_period=10)
 
     def test_different_parameters(self, simple_prices):
         """测试不同参数组合"""
@@ -448,7 +445,7 @@ class TestKAMA:
         result_fast = haze.py_kama(simple_prices, period=5, fast_period=2, slow_period=15)
 
         # 更慢响应
-        result_slow = haze.py_kama(simple_prices, period=15, fast_period=3, slow_period=50)
+        result_slow = haze.py_kama(simple_prices, period=9, fast_period=3, slow_period=50)
 
         assert len(result_default) == len(simple_prices)
         assert len(result_fast) == len(simple_prices)
@@ -475,11 +472,11 @@ class TestFRAMA:
 
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
-        result = haze.py_frama(empty_array, period=8)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_frama(empty_array, period=8)
 
-        result = haze.py_frama(single_value, period=8)
-        assert len(result) == 1
+        with pytest.raises(ValueError):
+            haze.py_frama(single_value, period=8)
 
     def test_different_periods(self, simple_prices):
         """测试不同周期参数"""
@@ -509,11 +506,11 @@ class TestALMA:
 
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
-        result = haze.py_alma(empty_array, period=5, sigma=6.0, offset=0.85)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_alma(empty_array, period=5, sigma=6.0, offset=0.85)
 
-        result = haze.py_alma(single_value, period=5, sigma=6.0, offset=0.85)
-        assert len(result) == 1
+        with pytest.raises(ValueError):
+            haze.py_alma(single_value, period=5, sigma=6.0, offset=0.85)
 
     def test_different_parameters(self, simple_prices):
         """测试不同参数（sigma 和 offset）"""
@@ -551,11 +548,11 @@ class TestVIDYA:
 
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
-        result = haze.py_vidya(empty_array, period=5)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_vidya(empty_array, period=5)
 
-        result = haze.py_vidya(single_value, period=5)
-        assert len(result) == 1
+        with pytest.raises(ValueError):
+            haze.py_vidya(single_value, period=5)
 
     def test_different_periods(self, simple_prices):
         """测试不同周期参数"""
@@ -591,12 +588,11 @@ class TestPWMA:
 
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
-        result = haze.py_pwma(empty_array, period=3)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_pwma(empty_array, period=3)
 
-        result = haze.py_pwma(single_value, period=3)
-        assert len(result) == 1
-        assert np.isnan(result[0])
+        with pytest.raises(ValueError):
+            haze.py_pwma(single_value, period=3)
 
     def test_different_periods(self, simple_prices):
         """测试不同周期参数"""
@@ -633,12 +629,11 @@ class TestSINWMA:
 
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
-        result = haze.py_sinwma(empty_array, period=3)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_sinwma(empty_array, period=3)
 
-        result = haze.py_sinwma(single_value, period=3)
-        assert len(result) == 1
-        assert np.isnan(result[0])
+        with pytest.raises(ValueError):
+            haze.py_sinwma(single_value, period=3)
 
     def test_different_periods(self, simple_prices):
         """测试不同周期参数"""
@@ -674,12 +669,11 @@ class TestSWMA:
 
     def test_edge_cases(self, empty_array, single_value):
         """测试边界条件"""
-        result = haze.py_swma(empty_array, period=3)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_swma(empty_array, period=3)
 
-        result = haze.py_swma(single_value, period=3)
-        assert len(result) == 1
-        assert np.isnan(result[0])
+        with pytest.raises(ValueError):
+            haze.py_swma(single_value, period=3)
 
     def test_different_periods(self, simple_prices):
         """测试不同周期参数"""

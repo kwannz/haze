@@ -23,7 +23,7 @@ def _safe_float(value: Any) -> float | None:
         if value is None:
             return None
         return float(value)
-    except Exception:
+    except (TypeError, ValueError):
         return None
 
 
@@ -99,7 +99,7 @@ class CCXTExecutionProvider(ExecutionProvider):
         params: Mapping[str, Any] | None = None,
     ) -> None:
         try:
-            import ccxt  # type: ignore[import-not-found]
+            import ccxt  # type: ignore[import-untyped]
         except Exception as e:  # pragma: no cover
             raise ExecutionProviderError(
                 "ccxt is required for CCXTExecutionProvider (pip install ccxt)",
@@ -163,8 +163,14 @@ class CCXTExecutionProvider(ExecutionProvider):
             default_sub_type = None
 
         base = "USDT-FUTURES"
-        if isinstance(default_sub_type, str) and default_sub_type.lower() == "inverse":
-            base = "COIN-FUTURES"
+        if isinstance(default_sub_type, str):
+            sub_type = default_sub_type.lower()
+            if sub_type == "inverse":
+                base = "COIN-FUTURES"
+            elif "usdc" in sub_type:
+                base = "USDC-FUTURES"
+            elif "-" in default_sub_type:
+                base = default_sub_type.upper()
 
         if not self._sandbox:
             return base
@@ -290,14 +296,14 @@ class CCXTExecutionProvider(ExecutionProvider):
             raw = self._exchange.fetch_balance()
             if not isinstance(raw, dict):
                 raise ExecutionProviderError("Unexpected balance response", provider=self.name)
-            free = raw.get("free") if isinstance(raw.get("free"), dict) else {}
-            used = raw.get("used") if isinstance(raw.get("used"), dict) else {}
-            total = raw.get("total") if isinstance(raw.get("total"), dict) else {}
+            free: dict[str, Any] = raw.get("free") if isinstance(raw.get("free"), dict) else {}
+            used: dict[str, Any] = raw.get("used") if isinstance(raw.get("used"), dict) else {}
+            total: dict[str, Any] = raw.get("total") if isinstance(raw.get("total"), dict) else {}
 
-            assets = set()
-            assets.update(getattr(free, "keys", lambda: [])())
-            assets.update(getattr(used, "keys", lambda: [])())
-            assets.update(getattr(total, "keys", lambda: [])())
+            assets: set[str] = set()
+            assets.update(free.keys())
+            assets.update(used.keys())
+            assets.update(total.keys())
 
             balances: list[Balance] = []
             for asset in sorted(a for a in assets if isinstance(a, str) and a):

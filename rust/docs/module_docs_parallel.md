@@ -60,7 +60,7 @@
 //! ];
 //!
 //! // Compute RSI in parallel (4x faster on 4-core CPU)
-//! let results = parallel_rsi(&symbols_data);
+//! let results = parallel_rsi(&symbols_data).unwrap();
 //!
 //! // Find oversold opportunities
 //! for (symbol, rsi_values) in results {
@@ -80,7 +80,7 @@
 //!
 //! // Calculate multiple SMAs in parallel
 //! let periods = vec![20, 50, 100, 200];
-//! let sma_results = parallel_multi_period_sma(&btc_prices, &periods);
+//! let sma_results = parallel_multi_period_sma(&btc_prices, &periods).unwrap();
 //!
 //! // Analyze alignment (all SMAs trending up = strong trend)
 //! let mut all_rising = true;
@@ -165,7 +165,7 @@
 //!     .map(|(sym, (h, l, c))| (*sym, h.as_slice(), l.as_slice(), c.as_slice(), 14))
 //!     .collect();
 //!
-//! let atr_results = parallel_atr(&atr_inputs);
+//! let atr_results = parallel_atr(&atr_inputs).unwrap();
 //!
 //! // Display volatility ranking
 //! let mut volatility: Vec<_> = atr_results.iter()

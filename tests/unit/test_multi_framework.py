@@ -233,7 +233,6 @@ class TestPyTorchIntegration:
 
     def test_torch_device_preservation(self, torch_tensors):
         """Test that output tensor preserves input device."""
-        import torch
         # CPU test
         close_cpu = torch_tensors['close']
         result = torch_ta.sma(close_cpu, period=5)
@@ -241,7 +240,6 @@ class TestPyTorchIntegration:
 
     def test_torch_gradient_detached(self, torch_tensors):
         """Test that gradients are detached (no grad tracking)."""
-        import torch
         close = torch_tensors['close'].requires_grad_(True)
         result = torch_ta.sma(close, period=5)
         # Result should not require grad (computation done in Rust)

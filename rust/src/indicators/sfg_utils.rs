@@ -7,6 +7,12 @@
 // 提供背离检测、FVG、Order Block 等高级市场结构分析
 // 遵循 KISS 原则: 每个函数只做一件事
 
+use crate::errors::{HazeError, HazeResult};
+use crate::errors::validation::{
+    validate_lengths_match, validate_min_length, validate_not_empty, validate_not_empty_allow_nan,
+    validate_period, validate_range,
+};
+use crate::types::{TradingSignals, ZoneSignals};
 use crate::utils::math::is_zero;
 
 /// 背离类型
@@ -33,6 +39,41 @@ pub struct DivergenceResult {
     pub strength: Vec<f64>,
 }
 
+#[inline]
+fn validate_finite_value(value: f64, name: &'static str) -> HazeResult<()> {
+    if !value.is_finite() {
+        return Err(HazeError::InvalidValue {
+            index: 0,
+            message: format!("{name} contains non-finite value: {value}"),
+        });
+    }
+    Ok(())
+}
+
+#[inline]
+fn validate_same_length_allow_nan(
+    data1: &[f64],
+    name1: &'static str,
+    data2: &[f64],
+    name2: &'static str,
+) -> HazeResult<()> {
+    if data1.is_empty() {
+        return Err(HazeError::EmptyInput { name: name1 });
+    }
+    if data2.is_empty() {
+        return Err(HazeError::EmptyInput { name: name2 });
+    }
+    if data1.len() != data2.len() {
+        return Err(HazeError::LengthMismatch {
+            name1,
+            len1: data1.len(),
+            name2,
+            len2: data2.len(),
+        });
+    }
+    Ok(())
+}
+
 /// 检测价格与指标之间的背离
 ///
 /// # 参数
@@ -45,15 +86,31 @@ pub fn detect_divergence(
     indicator: &[f64],
     lookback: usize,
     threshold: f64,
-) -> DivergenceResult {
+) -> HazeResult<DivergenceResult> {
+    validate_not_empty(price, "price")?;
+    validate_lengths_match(&[(price, "price"), (indicator, "indicator")])?;
+    validate_range("threshold", threshold, 0.0, f64::INFINITY)?;
+    if lookback == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: lookback,
+            data_len: price.len(),
+        });
+    }
     let len = price.len();
     let mut result = DivergenceResult {
         divergence_type: vec![DivergenceType::None; len],
         strength: vec![0.0; len],
     };
 
-    if len < lookback * 2 {
-        return result;
+    let required = lookback.checked_mul(2).ok_or_else(|| HazeError::InvalidValue {
+        index: 0,
+        message: "lookback * 2 overflow".to_string(),
+    })?;
+    if len < required {
+        return Err(HazeError::InsufficientData {
+            required,
+            actual: len,
+        });
     }
 
     // 找到局部高点和低点
@@ -115,7 +172,7 @@ pub fn detect_divergence(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// 计算背离强度
@@ -177,13 +234,12 @@ pub struct FVG {
 /// FVG 定义: 三根K线中间缺口
 /// - 看涨 FVG: 第一根K线高点 < 第三根K线低点
 /// - 看跌 FVG: 第一根K线低点 > 第三根K线高点
-pub fn detect_fvg(high: &[f64], low: &[f64]) -> Vec<FVG> {
+pub fn detect_fvg(high: &[f64], low: &[f64]) -> HazeResult<Vec<FVG>> {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low")])?;
+    validate_min_length(high, 3)?;
     let len = high.len();
     let mut fvgs = Vec::new();
-
-    if len < 3 {
-        return fvgs;
-    }
 
     for i in 2..len {
         // 看涨 FVG
@@ -228,18 +284,23 @@ pub fn detect_fvg(high: &[f64], low: &[f64]) -> Vec<FVG> {
         }
     }
 
-    fvgs
+    Ok(fvgs)
 }
 
 /// 生成 FVG 信号数组
-pub fn fvg_signals(high: &[f64], low: &[f64]) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+pub fn fvg_signals(
+    high: &[f64],
+    low: &[f64],
+) -> ZoneSignals {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low")])?;
     let len = high.len();
     let mut bullish_fvg = vec![f64::NAN; len];
     let mut bearish_fvg = vec![f64::NAN; len];
     let mut fvg_upper = vec![f64::NAN; len];
     let mut fvg_lower = vec![f64::NAN; len];
 
-    let fvgs = detect_fvg(high, low);
+    let fvgs = detect_fvg(high, low)?;
 
     for fvg in fvgs {
         if !fvg.is_filled {
@@ -253,7 +314,7 @@ pub fn fvg_signals(high: &[f64], low: &[f64]) -> (Vec<f64>, Vec<f64>, Vec<f64>, 
         }
     }
 
-    (bullish_fvg, bearish_fvg, fvg_upper, fvg_lower)
+    Ok((bullish_fvg, bearish_fvg, fvg_upper, fvg_lower))
 }
 
 // ============================================================
@@ -284,19 +345,44 @@ pub fn detect_order_block(
     low: &[f64],
     close: &[f64],
     lookback: usize,
-) -> Vec<OrderBlock> {
-    let len = close.len();
-    let mut obs = Vec::new();
-
-    if len < lookback + 2 {
-        return obs;
+) -> HazeResult<Vec<OrderBlock>> {
+    validate_not_empty(close, "close")?;
+    validate_lengths_match(&[
+        (open, "open"),
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
+    if lookback == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: lookback,
+            data_len: close.len(),
+        });
     }
+    let len = close.len();
+    let required = lookback.checked_add(2).ok_or_else(|| HazeError::InvalidValue {
+        index: 0,
+        message: "lookback + 2 overflow".to_string(),
+    })?;
+    if len < required {
+        return Err(HazeError::InsufficientData {
+            required,
+            actual: len,
+        });
+    }
+    let mut obs = Vec::new();
 
     for i in lookback..(len - 1) {
         let is_bullish_candle = close[i] > open[i];
         let is_bearish_candle = close[i] < open[i];
 
         // 检查是否有强势移动
+        if is_zero(close[i]) {
+            return Err(HazeError::InvalidValue {
+                index: i,
+                message: "close contains zero, cannot compute next_move".to_string(),
+            });
+        }
         let next_move = (close[i + 1] - close[i]) / close[i];
 
         // 看涨 OB: 阳线后大幅上涨
@@ -342,7 +428,7 @@ pub fn detect_order_block(
         }
     }
 
-    obs
+    Ok(obs)
 }
 
 // ============================================================
@@ -363,11 +449,17 @@ pub struct SRZone {
 }
 
 /// 检测支撑阻力区域
-pub fn detect_zones(high: &[f64], low: &[f64], close: &[f64], tolerance: f64) -> Vec<SRZone> {
+pub fn detect_zones(
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    tolerance: f64,
+) -> HazeResult<Vec<SRZone>> {
+    validate_not_empty(close, "close")?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
+    validate_range("tolerance", tolerance, 0.0, f64::INFINITY)?;
     let len = close.len();
-    if len < 10 {
-        return Vec::new();
-    }
+    validate_min_length(close, 10)?;
 
     // 找到所有摆动高点和低点
     let (swing_highs, swing_lows) = find_swing_points(close, 5);
@@ -411,7 +503,7 @@ pub fn detect_zones(high: &[f64], low: &[f64], close: &[f64], tolerance: f64) ->
     // 合并相近的区域
     zones = merge_zones(zones, tolerance);
 
-    zones
+    Ok(zones)
 }
 
 /// 计算价格触及某水平的次数
@@ -504,8 +596,8 @@ pub fn detect_breaker_block(
     low: &[f64],
     close: &[f64],
     lookback: usize,
-) -> Vec<BreakerBlock> {
-    let obs = detect_order_block(open, high, low, close, lookback);
+) -> HazeResult<Vec<BreakerBlock>> {
+    let obs = detect_order_block(open, high, low, close, lookback)?;
     let len = close.len();
     let mut breakers = Vec::new();
 
@@ -561,7 +653,7 @@ pub fn detect_breaker_block(
         }
     }
 
-    breakers
+    Ok(breakers)
 }
 
 /// 计算 PD Array (溢价/折扣数组)
@@ -569,7 +661,20 @@ pub fn detect_breaker_block(
 /// 基于摆动高低点计算溢价区和折扣区
 /// - 溢价区: 高于 50% 回撤 (卖出区域)
 /// - 折扣区: 低于 50% 回撤 (买入区域)
-pub fn pd_array(high: &[f64], low: &[f64], close: &[f64], swing_lookback: usize) -> PDArrayResult {
+pub fn pd_array(
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    swing_lookback: usize,
+) -> HazeResult<PDArrayResult> {
+    validate_not_empty(close, "close")?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
+    if swing_lookback == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: swing_lookback,
+            data_len: close.len(),
+        });
+    }
     let len = close.len();
     let mut result = PDArrayResult {
         premium_zones: Vec::new(),
@@ -579,8 +684,17 @@ pub fn pd_array(high: &[f64], low: &[f64], close: &[f64], swing_lookback: usize)
         in_discount: vec![false; len],
     };
 
-    if len < swing_lookback * 2 {
-        return result;
+    let required = swing_lookback
+        .checked_mul(2)
+        .ok_or_else(|| HazeError::InvalidValue {
+            index: 0,
+            message: "swing_lookback * 2 overflow".to_string(),
+        })?;
+    if len < required {
+        return Err(HazeError::InsufficientData {
+            required,
+            actual: len,
+        });
     }
 
     // 找到摆动高低点
@@ -634,7 +748,7 @@ pub fn pd_array(high: &[f64], low: &[f64], close: &[f64], swing_lookback: usize)
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// PD Array 信号生成
@@ -647,21 +761,29 @@ pub fn pd_array_signals(
     close: &[f64],
     swing_lookback: usize,
     atr_values: &[f64],
-) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+) -> TradingSignals {
+    validate_not_empty(close, "close")?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
+    validate_same_length_allow_nan(close, "close", atr_values, "atr_values")?;
     let len = close.len();
     let mut buy_signals = vec![0.0; len];
     let mut sell_signals = vec![0.0; len];
     let mut stop_loss = vec![f64::NAN; len];
     let mut take_profit = vec![f64::NAN; len];
 
-    let pd = pd_array(high, low, close, swing_lookback);
+    let pd = pd_array(high, low, close, swing_lookback)?;
 
     for i in 1..len {
-        let atr_val = if atr_values[i].is_nan() {
-            0.0
-        } else {
-            atr_values[i]
-        };
+        let atr_val = atr_values[i];
+        if atr_val.is_infinite() {
+            return Err(HazeError::InvalidValue {
+                index: i,
+                message: "atr_values contains infinite value".to_string(),
+            });
+        }
+        if atr_val.is_nan() {
+            continue;
+        }
 
         // 从溢价区进入折扣区 → 买入信号
         if pd.in_premium[i - 1] && pd.in_discount[i] {
@@ -678,7 +800,7 @@ pub fn pd_array_signals(
         }
     }
 
-    (buy_signals, sell_signals, stop_loss, take_profit)
+    Ok((buy_signals, sell_signals, stop_loss, take_profit))
 }
 
 /// Breaker Block 信号生成
@@ -691,14 +813,21 @@ pub fn breaker_block_signals(
     low: &[f64],
     close: &[f64],
     lookback: usize,
-) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+) -> TradingSignals {
+    validate_not_empty(close, "close")?;
+    validate_lengths_match(&[
+        (open, "open"),
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
     let len = close.len();
     let mut buy_signals = vec![0.0; len];
     let mut sell_signals = vec![0.0; len];
     let mut breaker_upper = vec![f64::NAN; len];
     let mut breaker_lower = vec![f64::NAN; len];
 
-    let breakers = detect_breaker_block(open, high, low, close, lookback);
+    let breakers = detect_breaker_block(open, high, low, close, lookback)?;
 
     for bb in breakers {
         if bb.is_broken {
@@ -727,7 +856,7 @@ pub fn breaker_block_signals(
         }
     }
 
-    (buy_signals, sell_signals, breaker_upper, breaker_lower)
+    Ok((buy_signals, sell_signals, breaker_upper, breaker_lower))
 }
 
 // ============================================================
@@ -777,8 +906,16 @@ pub fn linear_regression_channel(
     close: &[f64],
     period: usize,
     std_dev_mult: f64,
-) -> LinearRegressionChannel {
+) -> HazeResult<LinearRegressionChannel> {
+    validate_not_empty(close, "close")?;
+    validate_range("std_dev_mult", std_dev_mult, 0.0, f64::INFINITY)?;
     let len = close.len();
+    if period < 3 || period > len {
+        return Err(HazeError::InvalidPeriod {
+            period,
+            data_len: len,
+        });
+    }
     let mut result = LinearRegressionChannel {
         upper: vec![f64::NAN; len],
         middle: vec![f64::NAN; len],
@@ -786,10 +923,6 @@ pub fn linear_regression_channel(
         slope: vec![f64::NAN; len],
         r_squared: vec![f64::NAN; len],
     };
-
-    if period < 3 || period > len {
-        return result;
-    }
 
     for i in (period - 1)..len {
         let window = &close[i + 1 - period..=i];
@@ -847,7 +980,7 @@ pub fn linear_regression_channel(
         }
     }
 
-    result
+    Ok(result)
 }
 
 /// 检测增强型供需区域
@@ -860,14 +993,31 @@ pub fn detect_supply_demand_zones(
     volume: &[f64],
     tolerance: f64,
     linreg_period: usize,
-) -> Vec<EnhancedSRZone> {
+) -> HazeResult<Vec<EnhancedSRZone>> {
+    validate_not_empty(close, "close")?;
+    validate_lengths_match(&[
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+        (volume, "volume"),
+    ])?;
+    validate_range("tolerance", tolerance, 0.0, f64::INFINITY)?;
+    if linreg_period == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: linreg_period,
+            data_len: close.len(),
+        });
+    }
     let len = close.len();
     if len < linreg_period {
-        return Vec::new();
+        return Err(HazeError::InsufficientData {
+            required: linreg_period,
+            actual: len,
+        });
     }
 
     // 基础区域检测
-    let basic_zones = detect_zones(high, low, close, tolerance);
+    let basic_zones = detect_zones(high, low, close, tolerance)?;
 
     // 计算线性回归
     let (slopes, _, _) = crate::utils::stats::linear_regression(close, linreg_period);
@@ -917,7 +1067,7 @@ pub fn detect_supply_demand_zones(
         });
     }
 
-    enhanced_zones
+    Ok(enhanced_zones)
 }
 
 /// 线性回归供需区域信号生成
@@ -932,7 +1082,22 @@ pub fn linreg_supply_demand_signals(
     atr_values: &[f64],
     linreg_period: usize,
     tolerance: f64,
-) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+) -> TradingSignals {
+    validate_not_empty(close, "close")?;
+    validate_lengths_match(&[
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+        (volume, "volume"),
+    ])?;
+    validate_same_length_allow_nan(close, "close", atr_values, "atr_values")?;
+    validate_range("tolerance", tolerance, 0.0, f64::INFINITY)?;
+    if linreg_period == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: linreg_period,
+            data_len: close.len(),
+        });
+    }
     let len = close.len();
     let mut buy_signals = vec![0.0; len];
     let mut sell_signals = vec![0.0; len];
@@ -940,17 +1105,22 @@ pub fn linreg_supply_demand_signals(
     let mut take_profit = vec![f64::NAN; len];
 
     // 计算线性回归通道
-    let channel = linear_regression_channel(close, linreg_period, 2.0);
+    let channel = linear_regression_channel(close, linreg_period, 2.0)?;
 
     // 检测供需区域
-    let zones = detect_supply_demand_zones(high, low, close, volume, tolerance, linreg_period);
+    let zones = detect_supply_demand_zones(high, low, close, volume, tolerance, linreg_period)?;
 
     for i in linreg_period..len {
-        let atr_val = if atr_values[i].is_nan() {
-            0.0
-        } else {
-            atr_values[i]
-        };
+        let atr_val = atr_values[i];
+        if atr_val.is_infinite() {
+            return Err(HazeError::InvalidValue {
+                index: i,
+                message: "atr_values contains infinite value".to_string(),
+            });
+        }
+        if atr_val.is_nan() {
+            continue;
+        }
 
         // 检查是否触及支撑区域 + 通道下轨
         for zone in &zones {
@@ -985,7 +1155,7 @@ pub fn linreg_supply_demand_signals(
         }
     }
 
-    (buy_signals, sell_signals, stop_loss, take_profit)
+    Ok((buy_signals, sell_signals, stop_loss, take_profit))
 }
 
 // ============================================================
@@ -1006,7 +1176,14 @@ pub struct VolumeFilter {
 /// 创建成交量过滤器
 ///
 /// 使用前 period 根K线的平均成交量作为基准 (不含当前K线)
-pub fn volume_filter(volume: &[f64], period: usize) -> VolumeFilter {
+pub fn volume_filter(volume: &[f64], period: usize) -> HazeResult<VolumeFilter> {
+    validate_not_empty(volume, "volume")?;
+    if period == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period,
+            data_len: volume.len(),
+        });
+    }
     let len = volume.len();
     let mut result = VolumeFilter {
         above_average: vec![false; len],
@@ -1014,8 +1191,15 @@ pub fn volume_filter(volume: &[f64], period: usize) -> VolumeFilter {
         volume_spike: vec![false; len],
     };
 
-    if len < period + 1 {
-        return result;
+    let required = period.checked_add(1).ok_or_else(|| HazeError::InvalidValue {
+        index: 0,
+        message: "period + 1 overflow".to_string(),
+    })?;
+    if len < required {
+        return Err(HazeError::InsufficientData {
+            required,
+            actual: len,
+        });
     }
 
     // 计算初始 period 根K线的和
@@ -1033,7 +1217,7 @@ pub fn volume_filter(volume: &[f64], period: usize) -> VolumeFilter {
         sum = sum - volume[i - period] + volume[i];
     }
 
-    result
+    Ok(result)
 }
 
 /// 使用成交量过滤信号
@@ -1043,8 +1227,21 @@ pub fn filter_signals_by_volume(
     buy_signals: &[f64],
     sell_signals: &[f64],
     volume_filter: &VolumeFilter,
-) -> (Vec<f64>, Vec<f64>) {
+) -> HazeResult<(Vec<f64>, Vec<f64>)> {
+    validate_not_empty_allow_nan(buy_signals, "buy_signals")?;
+    validate_same_length_allow_nan(buy_signals, "buy_signals", sell_signals, "sell_signals")?;
     let len = buy_signals.len();
+    if volume_filter.above_average.len() != len
+        || volume_filter.relative_volume.len() != len
+        || volume_filter.volume_spike.len() != len
+    {
+        return Err(HazeError::LengthMismatch {
+            name1: "buy_signals",
+            len1: len,
+            name2: "volume_filter",
+            len2: volume_filter.above_average.len(),
+        });
+    }
     let mut filtered_buy = vec![0.0; len];
     let mut filtered_sell = vec![0.0; len];
 
@@ -1057,7 +1254,7 @@ pub fn filter_signals_by_volume(
         }
     }
 
-    (filtered_buy, filtered_sell)
+    Ok((filtered_buy, filtered_sell))
 }
 
 #[cfg(test)]
@@ -1082,7 +1279,7 @@ mod tests {
         let high = vec![10.0, 11.0, 12.0, 15.0, 16.0];
         let low = vec![8.0, 9.0, 10.0, 13.0, 14.0];
 
-        let fvgs = detect_fvg(&high, &low);
+        let fvgs = detect_fvg(&high, &low).unwrap();
 
         // 应该检测到看涨 FVG: high[0]=10 < low[2]=10 (边界情况)
         // 实际上 high[2]=12 和 low[4]=14 会形成看涨 FVG
@@ -1098,7 +1295,7 @@ mod tests {
             100.0, 100.0, 100.0, 100.0, 100.0, 300.0, 100.0, 100.0, 100.0, 100.0,
         ];
 
-        let filter = volume_filter(&volume, 5);
+        let filter = volume_filter(&volume, 5).unwrap();
 
         // 索引 5 的成交量 300 是基准 (100) 的 3 倍, 应该是 spike
         assert!(filter.volume_spike[5]);
@@ -1118,7 +1315,7 @@ mod tests {
             103.0, 104.0, 103.5, 105.0, 103.2, 106.0, 103.3, 107.0, 103.1, 108.0,
         ];
 
-        let zones = detect_zones(&high, &low, &close, 0.01);
+        let zones = detect_zones(&high, &low, &close, 0.01).unwrap();
 
         // 应该检测到 ~100 和 ~105 附近的区域
         assert!(!zones.is_empty() || zones.is_empty());
@@ -1140,7 +1337,7 @@ mod tests {
             105.0, 110.0, 115.0, 110.0, 107.0, 105.0, 108.0, 112.0, 116.0, 118.0,
         ];
 
-        let result = pd_array(&high, &low, &close, 2);
+        let result = pd_array(&high, &low, &close, 2).unwrap();
 
         assert_eq!(result.equilibrium.len(), 10);
         assert_eq!(result.in_premium.len(), 10);
@@ -1160,7 +1357,7 @@ mod tests {
         ];
         let atr = vec![2.0; 10];
 
-        let (buy, sell, sl, tp) = pd_array_signals(&high, &low, &close, 2, &atr);
+        let (buy, sell, sl, tp) = pd_array_signals(&high, &low, &close, 2, &atr).unwrap();
 
         assert_eq!(buy.len(), 10);
         assert_eq!(sell.len(), 10);
@@ -1183,7 +1380,7 @@ mod tests {
             101.0, 103.0, 105.0, 107.0, 109.0, 111.0, 107.0, 105.0, 103.0, 100.0,
         ];
 
-        let breakers = detect_breaker_block(&open, &high, &low, &close, 2);
+        let breakers = detect_breaker_block(&open, &high, &low, &close, 2).unwrap();
 
         // 结果取决于数据模式
         assert!(breakers.iter().all(|bb| bb.index < close.len()));
@@ -1205,7 +1402,8 @@ mod tests {
             101.0, 103.0, 105.0, 107.0, 109.0, 111.0, 107.0, 105.0, 103.0, 100.0,
         ];
 
-        let (buy, sell, upper, lower) = breaker_block_signals(&open, &high, &low, &close, 2);
+        let (buy, sell, upper, lower) =
+            breaker_block_signals(&open, &high, &low, &close, 2).unwrap();
 
         assert_eq!(buy.len(), 10);
         assert_eq!(sell.len(), 10);
@@ -1224,7 +1422,7 @@ mod tests {
             100.0, 102.0, 104.0, 106.0, 108.0, 110.0, 112.0, 114.0, 116.0, 118.0,
         ];
 
-        let channel = linear_regression_channel(&close, 5, 2.0);
+        let channel = linear_regression_channel(&close, 5, 2.0).unwrap();
 
         assert_eq!(channel.middle.len(), 10);
         assert_eq!(channel.upper.len(), 10);
@@ -1256,7 +1454,8 @@ mod tests {
             1000.0, 1200.0, 800.0, 1500.0, 900.0, 1100.0, 1300.0, 700.0, 1400.0, 1000.0,
         ];
 
-        let zones = detect_supply_demand_zones(&high, &low, &close, &volume, 0.02, 5);
+        let zones =
+            detect_supply_demand_zones(&high, &low, &close, &volume, 0.02, 5).unwrap();
 
         // 结果取决于数据
         for zone in &zones {
@@ -1280,7 +1479,7 @@ mod tests {
         let atr = vec![2.0; 10];
 
         let (buy, sell, sl, tp) =
-            linreg_supply_demand_signals(&high, &low, &close, &volume, &atr, 5, 0.02);
+            linreg_supply_demand_signals(&high, &low, &close, &volume, &atr, 5, 0.02).unwrap();
 
         assert_eq!(buy.len(), 10);
         assert_eq!(sell.len(), 10);

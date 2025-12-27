@@ -199,7 +199,9 @@ impl ATR2RidgeModel {
         }
 
         // 中心化数据 (减去均值)
-        let x_mean: Array1<f64> = features.mean_axis(ndarray::Axis(0)).unwrap();
+        let x_mean: Array1<f64> = features
+            .mean_axis(ndarray::Axis(0))
+            .ok_or("Failed to compute feature means")?;
         let y_mean: f64 = targets.mean().unwrap_or(0.0);
 
         let x_centered = features - &x_mean.view().insert_axis(ndarray::Axis(0));

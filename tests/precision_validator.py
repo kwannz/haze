@@ -14,13 +14,13 @@ Date: 2025-12-25
 
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Tuple, Optional, Any
+from typing import Dict, Any
 from dataclasses import dataclass
 import warnings
 
 warnings.filterwarnings('ignore')
 
-# pandas-ta 兼容导入（用于 3.13+ 无 numba 环境）
+# pandas-ta 兼容导入（用于 3.14+ 无 numba 环境）
 from pandas_ta_compat import import_pandas_ta
 
 # 导入参考库

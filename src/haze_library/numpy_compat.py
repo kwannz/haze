@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from collections import deque
 import numpy as np
-from typing import Optional, Tuple, Union
+from typing import Tuple, Union
 
 # Import Rust extension
 try:
@@ -166,9 +166,11 @@ def bollinger_bands(data: ArrayLike, period: int = 20,
 
 
 def keltner_channel(high: ArrayLike, low: ArrayLike, close: ArrayLike,
-                    period: int = 20, atr_period: int = 10,
+                    period: int = 20, atr_period: int | None = None,
                     multiplier: float = 2.0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Keltner Channel. Returns (upper, middle, lower)."""
+    if atr_period is None:
+        atr_period = period
     upper, middle, lower = _lib.py_keltner_channel(
         _to_list_fast(high), _to_list_fast(low), _to_list_fast(close),
         period, atr_period, multiplier
@@ -202,11 +204,12 @@ def macd(data: ArrayLike, fast: int = 12, slow: int = 26,
 
 
 def stochastic(high: ArrayLike, low: ArrayLike, close: ArrayLike,
-               k_period: int = 14, d_period: int = 3) -> Tuple[np.ndarray, np.ndarray]:
+               k_period: int = 14, smooth_k: int = 3,
+               d_period: int = 3) -> Tuple[np.ndarray, np.ndarray]:
     """Stochastic Oscillator. Returns (%K, %D)."""
     k, d = _lib.py_stochastic(
         _to_list_fast(high), _to_list_fast(low), _to_list_fast(close),
-        k_period, d_period
+        k_period, smooth_k, d_period
     )
     return _to_array(k), _to_array(d)
 
@@ -252,11 +255,12 @@ def fisher_transform(high: ArrayLike, low: ArrayLike, close: ArrayLike,
 
 
 def kdj(high: ArrayLike, low: ArrayLike, close: ArrayLike,
-        k_period: int = 9, d_period: int = 3) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        k_period: int = 9, smooth_k: int = 3,
+        d_period: int = 3) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """KDJ Indicator. Returns (K, D, J)."""
     k, d, j = _lib.py_kdj(
         _to_list_fast(high), _to_list_fast(low), _to_list_fast(close),
-        k_period, d_period
+        k_period, smooth_k, d_period
     )
     return _to_array(k), _to_array(d), _to_array(j)
 

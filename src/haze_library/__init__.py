@@ -32,11 +32,11 @@ Performance:
     - High numerical precision using f64
 """
 
-__version__ = "0.1.2"
+__version__ = "1.0.0"
 __author__ = "kwannz"
 
 import inspect
-from typing import Any, Callable, Dict
+from typing import Any, Callable
 
 # Import Rust extension
 try:
@@ -52,7 +52,7 @@ except ImportError:
 # Clean API aliases (no `py_` prefix)
 # -----------------------------------------------------------------------------
 
-_KW_ALIASES: Dict[str, str] = {
+_KW_ALIASES: dict[str, str] = {
     "close": "values",
     "std_dev": "std_multiplier",
     "std": "std_multiplier",
@@ -64,7 +64,9 @@ _KW_ALIASES: Dict[str, str] = {
 }
 
 
-def _make_clean_wrapper(py_func: Callable[..., Any], *, clean_name: str) -> Callable[..., Any]:
+def _make_clean_wrapper(
+    py_func: Callable[..., Any], *, clean_name: str
+) -> Callable[..., Any]:
     signature = inspect.signature(py_func)
     parameter_names = set(signature.parameters)
 
@@ -85,8 +87,8 @@ def _make_clean_wrapper(py_func: Callable[..., Any], *, clean_name: str) -> Call
     return wrapper
 
 
-def _install_clean_api_aliases() -> Dict[str, str]:
-    mapping: Dict[str, str] = {}
+def _install_clean_api_aliases() -> dict[str, str]:
+    mapping: dict[str, str] = {}
 
     for name, obj in list(globals().items()):
         if not name.startswith("py_"):
@@ -109,9 +111,9 @@ def _install_clean_api_aliases() -> Dict[str, str]:
 # Mapping from legacy `py_*` function names to clean names. Used for tooling/tests.
 _PY_PREFIX_ALIASES = _install_clean_api_aliases()
 
-# Register pandas accessor
+# Register pandas accessor (import triggers side-effect registration)
 try:
-    from . import accessor
+    from . import accessor as _accessor  # noqa: F401 - side-effect import
     from .accessor import TechnicalAnalysisAccessor, SeriesTechnicalAnalysisAccessor
 except ImportError:
     # pandas not available
@@ -123,6 +125,33 @@ try:
     from . import numpy_compat as np_ta
 except ImportError:
     np_ta = None
+
+# AI indicator helpers
+from .ai_indicators import adaptive_rsi, ensemble_signal, ml_supertrend
+
+# Streaming/incremental calculators
+try:
+    from .streaming import (
+        IncrementalSMA,
+        IncrementalEMA,
+        IncrementalRSI,
+        IncrementalATR,
+        IncrementalMACD,
+        IncrementalBollingerBands,
+        IncrementalStochastic,
+        IncrementalSuperTrend,
+        IncrementalAdaptiveRSI,
+        IncrementalEnsembleSignal,
+        IncrementalMLSuperTrend,
+        CCXTStreamProcessor,
+        get_available_streaming_indicators,
+        create_indicator,
+    )
+    # Also expose as stream_ta module alias for convenience
+    from . import streaming as stream_ta
+except ImportError:
+    # Streaming module not available
+    stream_ta = None
 
 # Exception types
 from .exceptions import (
@@ -138,11 +167,34 @@ from .exceptions import (
 __all__ = [
     # Version
     "__version__",
+    # Rust frame
+    "OhlcvFrame",
     # Accessors
     "TechnicalAnalysisAccessor",
     "SeriesTechnicalAnalysisAccessor",
     # NumPy module
     "np_ta",
+    # Streaming module
+    "stream_ta",
+    # Streaming classes
+    "IncrementalSMA",
+    "IncrementalEMA",
+    "IncrementalRSI",
+    "IncrementalATR",
+    "IncrementalMACD",
+    "IncrementalBollingerBands",
+    "IncrementalStochastic",
+    "IncrementalSuperTrend",
+    "IncrementalAdaptiveRSI",
+    "IncrementalEnsembleSignal",
+    "IncrementalMLSuperTrend",
+    "CCXTStreamProcessor",
+    "get_available_streaming_indicators",
+    "create_indicator",
+    # AI indicators
+    "adaptive_rsi",
+    "ensemble_signal",
+    "ml_supertrend",
     # Exceptions
     "HazeError",
     "InvalidPeriodError",

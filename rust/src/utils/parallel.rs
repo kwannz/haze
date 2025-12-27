@@ -41,10 +41,10 @@
 //!     ("BTC", &btc_prices, 3),
 //!     ("ETH", &eth_prices, 3),
 //! ];
-//! let results = parallel_sma(&data_sets);
+//! let results = parallel_sma(&data_sets).unwrap();
 //!
 //! // Compute multiple periods for single symbol
-//! let multi_sma = parallel_multi_period_sma(&btc_prices, &[5, 10, 20]);
+//! let multi_sma = parallel_multi_period_sma(&btc_prices, &[3, 5]).unwrap();
 //! ```
 //!
 //! # Performance Characteristics
@@ -69,6 +69,8 @@
 // Parallel OHLCV dataset processing requires complex tuple types
 #![allow(clippy::type_complexity)]
 
+use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_period};
+use crate::errors::{HazeError, HazeResult};
 use crate::init_result;
 use rayon::prelude::*;
 
@@ -82,18 +84,24 @@ use super::ma::{ema, sma};
 /// - `data_sets`: 多组输入数据 (symbol_id, values, period)
 ///
 /// # 返回
-/// - Vec<(symbol_id, sma_values)>
-pub fn parallel_sma<'a>(data_sets: &[(&'a str, &[f64], usize)]) -> Vec<(&'a str, Vec<f64>)> {
-    data_sets
+/// - `HazeResult<Vec<(symbol_id, sma_values)>>`
+pub fn parallel_sma<'a>(
+    data_sets: &[(&'a str, &[f64], usize)],
+) -> HazeResult<Vec<(&'a str, Vec<f64>)>> {
+    for (_, values, period) in data_sets {
+        validate_not_empty(values, "values")?;
+        validate_period(*period, values.len())?;
+    }
+
+    Ok(data_sets
         .par_iter()
         .map(|(symbol, values, period)| {
-            let n = values.len();
             (
                 *symbol,
-                sma(values, *period).unwrap_or_else(|_| init_result!(n)),
+                sma(values, *period).expect("parallel_sma: validated input"),
             )
         })
-        .collect()
+        .collect())
 }
 
 /// 并行计算多组 EMA
@@ -104,18 +112,24 @@ pub fn parallel_sma<'a>(data_sets: &[(&'a str, &[f64], usize)]) -> Vec<(&'a str,
 /// - `data_sets`: 多组输入数据 (symbol_id, values, period)
 ///
 /// # 返回
-/// - Vec<(symbol_id, ema_values)>
-pub fn parallel_ema<'a>(data_sets: &[(&'a str, &[f64], usize)]) -> Vec<(&'a str, Vec<f64>)> {
-    data_sets
+/// - `HazeResult<Vec<(symbol_id, ema_values)>>`
+pub fn parallel_ema<'a>(
+    data_sets: &[(&'a str, &[f64], usize)],
+) -> HazeResult<Vec<(&'a str, Vec<f64>)>> {
+    for (_, values, period) in data_sets {
+        validate_not_empty(values, "values")?;
+        validate_period(*period, values.len())?;
+    }
+
+    Ok(data_sets
         .par_iter()
         .map(|(symbol, values, period)| {
-            let n = values.len();
             (
                 *symbol,
-                ema(values, *period).unwrap_or_else(|_| init_result!(n)),
+                ema(values, *period).expect("parallel_ema: validated input"),
             )
         })
-        .collect()
+        .collect())
 }
 
 /// 并行计算多周期 SMA
@@ -127,18 +141,25 @@ pub fn parallel_ema<'a>(data_sets: &[(&'a str, &[f64], usize)]) -> Vec<(&'a str,
 /// - `periods`: 多个周期
 ///
 /// # 返回
-/// - Vec<(period, sma_values)>
-pub fn parallel_multi_period_sma(values: &[f64], periods: &[usize]) -> Vec<(usize, Vec<f64>)> {
-    let n = values.len();
-    periods
+/// - `HazeResult<Vec<(period, sma_values)>>`
+pub fn parallel_multi_period_sma(
+    values: &[f64],
+    periods: &[usize],
+) -> HazeResult<Vec<(usize, Vec<f64>)>> {
+    validate_not_empty(values, "values")?;
+    for &period in periods {
+        validate_period(period, values.len())?;
+    }
+
+    Ok(periods
         .par_iter()
         .map(|&period| {
             (
                 period,
-                sma(values, period).unwrap_or_else(|_| init_result!(n)),
+                sma(values, period).expect("parallel_multi_period_sma: validated input"),
             )
         })
-        .collect()
+        .collect())
 }
 
 /// 并行计算多周期 EMA
@@ -150,18 +171,25 @@ pub fn parallel_multi_period_sma(values: &[f64], periods: &[usize]) -> Vec<(usiz
 /// - `periods`: 多个周期
 ///
 /// # 返回
-/// - Vec<(period, ema_values)>
-pub fn parallel_multi_period_ema(values: &[f64], periods: &[usize]) -> Vec<(usize, Vec<f64>)> {
-    let n = values.len();
-    periods
+/// - `HazeResult<Vec<(period, ema_values)>>`
+pub fn parallel_multi_period_ema(
+    values: &[f64],
+    periods: &[usize],
+) -> HazeResult<Vec<(usize, Vec<f64>)>> {
+    validate_not_empty(values, "values")?;
+    for &period in periods {
+        validate_period(period, values.len())?;
+    }
+
+    Ok(periods
         .par_iter()
         .map(|&period| {
             (
                 period,
-                ema(values, period).unwrap_or_else(|_| init_result!(n)),
+                ema(values, period).expect("parallel_multi_period_ema: validated input"),
             )
         })
-        .collect()
+        .collect())
 }
 
 /// 批量指标计算器
@@ -194,20 +222,38 @@ where
 /// - `data_sets`: 多组输入数据 (symbol_id, close_prices, period)
 ///
 /// # 返回
-/// - Vec<(symbol_id, rsi_values)>
-pub fn parallel_rsi<'a>(data_sets: &[(&'a str, &[f64], usize)]) -> Vec<(&'a str, Vec<f64>)> {
-    data_sets
+/// - `HazeResult<Vec<(symbol_id, rsi_values)>>`
+pub fn parallel_rsi<'a>(
+    data_sets: &[(&'a str, &[f64], usize)],
+) -> HazeResult<Vec<(&'a str, Vec<f64>)>> {
+    for (_, values, period) in data_sets {
+        validate_not_empty(values, "values")?;
+        let n = values.len();
+        if *period == 0 {
+            return Err(HazeError::InvalidPeriod {
+                period: *period,
+                data_len: n,
+            });
+        }
+        if *period >= n {
+            return Err(HazeError::InsufficientData {
+                required: period + 1,
+                actual: n,
+            });
+        }
+    }
+
+    Ok(data_sets
         .par_iter()
         .map(|(symbol, values, period)| (*symbol, compute_rsi(values, *period)))
-        .collect()
+        .collect())
 }
 
 /// RSI 计算（内部函数）
 fn compute_rsi(values: &[f64], period: usize) -> Vec<f64> {
     let n = values.len();
-    if period == 0 || period >= n {
-        return init_result!(n);
-    }
+    debug_assert!(period > 0);
+    debug_assert!(period < n);
 
     let mut result = init_result!(n);
     let mut gains = Vec::with_capacity(n - 1);
@@ -256,22 +302,40 @@ fn compute_rsi(values: &[f64], period: usize) -> Vec<f64> {
 /// - `data_sets`: 多组输入数据 (symbol_id, high, low, close, period)
 ///
 /// # 返回
-/// - Vec<(symbol_id, atr_values)>
+/// - `HazeResult<Vec<(symbol_id, atr_values)>>`
 pub fn parallel_atr<'a>(
     data_sets: &[(&'a str, &[f64], &[f64], &[f64], usize)],
-) -> Vec<(&'a str, Vec<f64>)> {
-    data_sets
+) -> HazeResult<Vec<(&'a str, Vec<f64>)>> {
+    for (_, high, low, close, period) in data_sets {
+        validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
+        let n = high.len();
+        if *period == 0 {
+            return Err(HazeError::InvalidPeriod {
+                period: *period,
+                data_len: n,
+            });
+        }
+        if *period >= n {
+            return Err(HazeError::InsufficientData {
+                required: period + 1,
+                actual: n,
+            });
+        }
+    }
+
+    Ok(data_sets
         .par_iter()
         .map(|(symbol, high, low, close, period)| (*symbol, compute_atr(high, low, close, *period)))
-        .collect()
+        .collect())
 }
 
 /// ATR 计算（内部函数）
 fn compute_atr(high: &[f64], low: &[f64], close: &[f64], period: usize) -> Vec<f64> {
     let n = high.len();
-    if n != low.len() || n != close.len() || period == 0 || period > n {
-        return init_result!(n);
-    }
+    debug_assert_eq!(n, low.len());
+    debug_assert_eq!(n, close.len());
+    debug_assert!(period > 0);
+    debug_assert!(period < n);
 
     let mut result = init_result!(n);
     let mut tr_values = Vec::with_capacity(n);
@@ -324,7 +388,7 @@ mod tests {
         let data_sets: Vec<(&str, &[f64], usize)> =
             vec![("BTC", &values1, 3), ("ETH", &values2, 3)];
 
-        let results = parallel_sma(&data_sets);
+        let results = parallel_sma(&data_sets).unwrap();
 
         assert_eq!(results.len(), 2);
         // BTC: SMA(3) = (1+2+3)/3 = 2.0 at index 2
@@ -338,7 +402,7 @@ mod tests {
         let values = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0];
         let periods = vec![3, 5];
 
-        let results = parallel_multi_period_sma(&values, &periods);
+        let results = parallel_multi_period_sma(&values, &periods).unwrap();
 
         assert_eq!(results.len(), 2);
     }
@@ -351,7 +415,7 @@ mod tests {
         let data_sets: Vec<(&str, &[f64], usize)> =
             vec![("BTC", &values1, 14), ("ETH", &values2, 14)];
 
-        let results = parallel_rsi(&data_sets);
+        let results = parallel_rsi(&data_sets).unwrap();
 
         assert_eq!(results.len(), 2);
         // 持续上涨，RSI 应接近 100
@@ -369,7 +433,7 @@ mod tests {
         let data_sets: Vec<(&str, &[f64], &[f64], &[f64], usize)> =
             vec![("BTC", &high, &low, &close, 3)];
 
-        let results = parallel_atr(&data_sets);
+        let results = parallel_atr(&data_sets).unwrap();
 
         assert_eq!(results.len(), 1);
         // ATR 应该有有效值

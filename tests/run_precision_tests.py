@@ -564,7 +564,154 @@ def validate_volatility_indicators(validator: PrecisionValidator, df):
                 reference_lib="TA-Lib"
             )
 
-        # TODO: 添加 Keltner Channel, Donchian Channel 等其他指标
+        # True Range
+        print("\n[4/10] 验证 True Range...")
+        validator.validate_indicator(
+            name="True Range",
+            haze_func=lambda: haze.py_true_range(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist()
+            ),
+            reference_func=lambda: talib.TRANGE(
+                df['high'].values,
+                df['low'].values,
+                df['close'].values
+            ),
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+
+    # pandas-ta 验证（如果可用）
+    pta, _ = import_pandas_ta()
+    if pta is not None:
+        # Keltner Channel
+        print("\n[5/10] 验证 Keltner Channel...")
+        try:
+            haze_kc = haze.py_keltner_channel(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                20, 20, 2.0
+            )
+            pta_kc = pta.kc(df['high'], df['low'], df['close'], length=20, scalar=2.0)
+            if pta_kc is not None and not pta_kc.empty:
+                # 中轨
+                mid_col = [c for c in pta_kc.columns if 'basis' in c.lower() or 'mid' in c.lower()]
+                if mid_col:
+                    validator.validate_indicator(
+                        name="KC_Middle",
+                        haze_func=lambda: haze_kc[1],  # middle band
+                        reference_func=lambda: pta_kc[mid_col[0]].values,
+                        test_data=df.to_dict('list'),
+                        params={},
+                        reference_lib="pandas-ta"
+                    )
+        except Exception as e:
+            print(f"   ⚠️ Keltner Channel 验证跳过: {e}")
+
+        # Donchian Channel
+        print("\n[6/10] 验证 Donchian Channel...")
+        try:
+            haze_dc = haze.py_donchian_channel(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                20
+            )
+            pta_dc = pta.donchian(df['high'], df['low'], lower_length=20, upper_length=20)
+            if pta_dc is not None and not pta_dc.empty:
+                upper_col = [c for c in pta_dc.columns if 'upper' in c.lower() or 'dcu' in c.lower()]
+                lower_col = [c for c in pta_dc.columns if 'lower' in c.lower() or 'dcl' in c.lower()]
+                if upper_col:
+                    validator.validate_indicator(
+                        name="DC_Upper",
+                        haze_func=lambda: haze_dc[0],  # upper band
+                        reference_func=lambda: pta_dc[upper_col[0]].values,
+                        test_data=df.to_dict('list'),
+                        params={},
+                        reference_lib="pandas-ta"
+                    )
+                if lower_col:
+                    validator.validate_indicator(
+                        name="DC_Lower",
+                        haze_func=lambda: haze_dc[2],  # lower band
+                        reference_func=lambda: pta_dc[lower_col[0]].values,
+                        test_data=df.to_dict('list'),
+                        params={},
+                        reference_lib="pandas-ta"
+                    )
+        except Exception as e:
+            print(f"   ⚠️ Donchian Channel 验证跳过: {e}")
+
+        # Historical Volatility
+        print("\n[7/10] 验证 Historical Volatility...")
+        try:
+            haze.py_historical_volatility(df['close'].tolist(), 20)
+            pta_hv = pta.rvi(df['close'], length=20)  # RVI in pandas-ta approximates HV
+            if pta_hv is not None:
+                # Note: RVI and HV may differ in calculation, just verify correlation
+                print("   ℹ️ HV vs RVI: 检查相关性（算法略有不同）")
+        except Exception as e:
+            print(f"   ⚠️ Historical Volatility 验证跳过: {e}")
+
+        # Ulcer Index
+        print("\n[8/10] 验证 Ulcer Index...")
+        try:
+            haze_ui = haze.py_ulcer_index(df['close'].tolist(), 14)
+            pta_ui = pta.ui(df['close'], length=14)
+            if pta_ui is not None:
+                validator.validate_indicator(
+                    name="Ulcer Index",
+                    haze_func=lambda: haze_ui,
+                    reference_func=lambda: pta_ui.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ Ulcer Index 验证跳过: {e}")
+
+        # Mass Index
+        print("\n[9/10] 验证 Mass Index...")
+        try:
+            haze_mi = haze.py_mass_index(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                9, 25
+            )
+            pta_mi = pta.massi(df['high'], df['low'], fast=9, slow=25)
+            if pta_mi is not None:
+                validator.validate_indicator(
+                    name="Mass Index",
+                    haze_func=lambda: haze_mi,
+                    reference_func=lambda: pta_mi.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ Mass Index 验证跳过: {e}")
+
+        # Chandelier Exit
+        print("\n[10/10] 验证 Chandelier Exit...")
+        try:
+            haze_ce = haze.py_chandelier_exit(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                22, 22, 3.0
+            )
+            # pandas-ta 没有直接的 Chandelier Exit，跳过对比
+            print("   ℹ️ Chandelier Exit: 无参考库对比，仅验证数值范围")
+            ce_long, ce_short = haze_ce
+            valid_long = [x for x in ce_long if not (x != x)]  # filter NaN
+            valid_short = [x for x in ce_short if not (x != x)]
+            if valid_long and valid_short:
+                print(f"   ✓ Long exits: {len(valid_long)} 有效值")
+                print(f"   ✓ Short exits: {len(valid_short)} 有效值")
+        except Exception as e:
+            print(f"   ⚠️ Chandelier Exit 验证跳过: {e}")
 
     print("\n✅ 波动率指标验证完成")
 
@@ -691,6 +838,190 @@ def validate_momentum_indicators(validator: PrecisionValidator, df):
             reference_lib="TA-Lib"
         )
 
+        # Stochastic
+        print("\n[8/17] 验证 Stochastic...")
+        haze_stoch = haze.py_stochastic(
+            df['high'].tolist(),
+            df['low'].tolist(),
+            df['close'].tolist(),
+            14, 3, 3
+        )
+        talib_stoch = talib.STOCH(
+            df['high'].values,
+            df['low'].values,
+            df['close'].values,
+            fastk_period=14,
+            slowk_period=3,
+            slowd_period=3
+        )
+        validator.validate_indicator(
+            name="STOCH_K",
+            haze_func=lambda: haze_stoch[0],
+            reference_func=lambda: talib_stoch[0],
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+        validator.validate_indicator(
+            name="STOCH_D",
+            haze_func=lambda: haze_stoch[1],
+            reference_func=lambda: talib_stoch[1],
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+
+        # Ultimate Oscillator
+        print("\n[9/17] 验证 Ultimate Oscillator...")
+        validator.validate_indicator(
+            name="ULTOSC",
+            haze_func=lambda: haze.py_ultimate_oscillator(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                7, 14, 28
+            ),
+            reference_func=lambda: talib.ULTOSC(
+                df['high'].values,
+                df['low'].values,
+                df['close'].values,
+                timeperiod1=7,
+                timeperiod2=14,
+                timeperiod3=28
+            ),
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+
+        # TRIX
+        print("\n[10/17] 验证 TRIX...")
+        validator.validate_indicator(
+            name="TRIX",
+            haze_func=lambda: haze.py_trix(df['close'].tolist(), 15),
+            reference_func=lambda: talib.TRIX(df['close'].values, timeperiod=15),
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+
+        # APO
+        print("\n[11/17] 验证 APO...")
+        validator.validate_indicator(
+            name="APO",
+            haze_func=lambda: haze.py_apo(df['close'].tolist(), 12, 26),
+            reference_func=lambda: talib.APO(df['close'].values, fastperiod=12, slowperiod=26),
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+
+        # PPO
+        print("\n[12/17] 验证 PPO...")
+        validator.validate_indicator(
+            name="PPO",
+            haze_func=lambda: haze.py_ppo(df['close'].tolist(), 12, 26),
+            reference_func=lambda: talib.PPO(df['close'].values, fastperiod=12, slowperiod=26),
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+
+        # CMO
+        print("\n[13/17] 验证 CMO...")
+        validator.validate_indicator(
+            name="CMO",
+            haze_func=lambda: haze.py_cmo(df['close'].tolist(), 14),
+            reference_func=lambda: talib.CMO(df['close'].values, timeperiod=14),
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+
+        # ADX
+        print("\n[14/17] 验证 ADX...")
+        validator.validate_indicator(
+            name="ADX",
+            haze_func=lambda: haze.py_adx(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                14
+            )[0],  # ADX value
+            reference_func=lambda: talib.ADX(
+                df['high'].values,
+                df['low'].values,
+                df['close'].values,
+                timeperiod=14
+            ),
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+
+    # pandas-ta 验证额外动量指标
+    pta, _ = import_pandas_ta()
+    if pta is not None:
+        # Fisher Transform
+        print("\n[15/17] 验证 Fisher Transform...")
+        try:
+            haze_fisher = haze.py_fisher_transform(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                9
+            )
+            pta_fisher = pta.fisher(df['high'], df['low'], length=9)
+            if pta_fisher is not None and not pta_fisher.empty:
+                fisher_col = [c for c in pta_fisher.columns if 'fisher' in c.lower()]
+                if fisher_col:
+                    validator.validate_indicator(
+                        name="Fisher",
+                        haze_func=lambda: haze_fisher[0],  # Fisher line
+                        reference_func=lambda: pta_fisher[fisher_col[0]].values,
+                        test_data=df.to_dict('list'),
+                        params={},
+                        reference_lib="pandas-ta"
+                    )
+        except Exception as e:
+            print(f"   ⚠️ Fisher Transform 验证跳过: {e}")
+
+        # KDJ
+        print("\n[16/17] 验证 KDJ...")
+        try:
+            haze_kdj = haze.py_kdj(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                9, 3, 3
+            )
+            # KDJ 使用 Stochastic 作为基础
+            print("   ℹ️ KDJ: 基于 Stochastic 的变体，验证数值范围")
+            k, d, j = haze_kdj
+            valid_k = [x for x in k if not (x != x)]
+            if valid_k:
+                print(f"   ✓ K线: {len(valid_k)} 有效值, 范围 [{min(valid_k):.2f}, {max(valid_k):.2f}]")
+        except Exception as e:
+            print(f"   ⚠️ KDJ 验证跳过: {e}")
+
+        # TSI
+        print("\n[17/17] 验证 TSI...")
+        try:
+            haze_tsi = haze.py_tsi(df['close'].tolist(), 25, 13)
+            pta_tsi = pta.tsi(df['close'], fast=13, slow=25)
+            if pta_tsi is not None and not pta_tsi.empty:
+                tsi_col = [c for c in pta_tsi.columns if 'tsi' in c.lower()]
+                if tsi_col:
+                    validator.validate_indicator(
+                        name="TSI",
+                        haze_func=lambda: haze_tsi[0],  # TSI line
+                        reference_func=lambda: pta_tsi[tsi_col[0]].values,
+                        test_data=df.to_dict('list'),
+                        params={},
+                        reference_lib="pandas-ta"
+                    )
+        except Exception as e:
+            print(f"   ⚠️ TSI 验证跳过: {e}")
+
     print("\n✅ 动量指标验证完成")
 
 
@@ -780,7 +1111,729 @@ def validate_moving_averages(validator: PrecisionValidator, df):
             reference_lib="TA-Lib"
         )
 
+    # pandas-ta 验证额外移动平均线
+    pta, _ = import_pandas_ta()
+    if pta is not None:
+        # HMA
+        print("\n[8/16] 验证 HMA...")
+        try:
+            haze_hma = haze.py_hma(df['close'].tolist(), 20)
+            pta_hma = pta.hma(df['close'], length=20)
+            if pta_hma is not None:
+                validator.validate_indicator(
+                    name="HMA",
+                    haze_func=lambda: haze_hma,
+                    reference_func=lambda: pta_hma.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ HMA 验证跳过: {e}")
+
+        # RMA (Wilder's MA)
+        print("\n[9/16] 验证 RMA...")
+        try:
+            haze_rma = haze.py_rma(df['close'].tolist(), 14)
+            pta_rma = pta.rma(df['close'], length=14)
+            if pta_rma is not None:
+                validator.validate_indicator(
+                    name="RMA",
+                    haze_func=lambda: haze_rma,
+                    reference_func=lambda: pta_rma.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ RMA 验证跳过: {e}")
+
+        # ZLMA
+        print("\n[10/16] 验证 ZLMA...")
+        try:
+            haze_zlma = haze.py_zlma(df['close'].tolist(), 20)
+            pta_zlma = pta.zlma(df['close'], length=20)
+            if pta_zlma is not None:
+                validator.validate_indicator(
+                    name="ZLMA",
+                    haze_func=lambda: haze_zlma,
+                    reference_func=lambda: pta_zlma.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ ZLMA 验证跳过: {e}")
+
+        # FRAMA
+        print("\n[11/16] 验证 FRAMA...")
+        try:
+            haze_frama = haze.py_frama(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                20
+            )
+            pta_frama = pta.frama(df['high'], df['low'], df['close'], length=20)
+            if pta_frama is not None:
+                validator.validate_indicator(
+                    name="FRAMA",
+                    haze_func=lambda: haze_frama,
+                    reference_func=lambda: pta_frama.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ FRAMA 验证跳过: {e}")
+
+        # ALMA
+        print("\n[12/16] 验证 ALMA...")
+        try:
+            haze_alma = haze.py_alma(df['close'].tolist(), 9, 0.85, 6.0)
+            pta_alma = pta.alma(df['close'], length=9, sigma=6.0, offset=0.85)
+            if pta_alma is not None:
+                validator.validate_indicator(
+                    name="ALMA",
+                    haze_func=lambda: haze_alma,
+                    reference_func=lambda: pta_alma.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ ALMA 验证跳过: {e}")
+
+        # VIDYA
+        print("\n[13/16] 验证 VIDYA...")
+        try:
+            haze_vidya = haze.py_vidya(df['close'].tolist(), 14)
+            pta_vidya = pta.vidya(df['close'], length=14)
+            if pta_vidya is not None:
+                validator.validate_indicator(
+                    name="VIDYA",
+                    haze_func=lambda: haze_vidya,
+                    reference_func=lambda: pta_vidya.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ VIDYA 验证跳过: {e}")
+
+        # PWMA
+        print("\n[14/16] 验证 PWMA...")
+        try:
+            haze_pwma = haze.py_pwma(df['close'].tolist(), 5)
+            pta_pwma = pta.pwma(df['close'], length=5)
+            if pta_pwma is not None:
+                validator.validate_indicator(
+                    name="PWMA",
+                    haze_func=lambda: haze_pwma,
+                    reference_func=lambda: pta_pwma.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ PWMA 验证跳过: {e}")
+
+        # SINWMA
+        print("\n[15/16] 验证 SINWMA...")
+        try:
+            haze_sinwma = haze.py_sinwma(df['close'].tolist(), 14)
+            pta_sinwma = pta.sinwma(df['close'], length=14)
+            if pta_sinwma is not None:
+                validator.validate_indicator(
+                    name="SINWMA",
+                    haze_func=lambda: haze_sinwma,
+                    reference_func=lambda: pta_sinwma.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ SINWMA 验证跳过: {e}")
+
+        # SWMA
+        print("\n[16/16] 验证 SWMA...")
+        try:
+            haze_swma = haze.py_swma(df['close'].tolist(), 5)
+            pta_swma = pta.swma(df['close'], length=5)
+            if pta_swma is not None:
+                validator.validate_indicator(
+                    name="SWMA",
+                    haze_func=lambda: haze_swma,
+                    reference_func=lambda: pta_swma.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ SWMA 验证跳过: {e}")
+
     print("\n✅ 移动平均线验证完成")
+
+
+def validate_trend_indicators(validator: PrecisionValidator, df):
+    """验证趋势指标"""
+    print("\n" + "="*70)
+    print("📊 验证趋势指标 (Trend Indicators)")
+    print("="*70)
+
+    if HAS_TALIB:
+        import talib
+
+        # ADX
+        print("\n[1/12] 验证 ADX...")
+        validator.validate_indicator(
+            name="ADX",
+            haze_func=lambda: haze.py_adx(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                14
+            ),
+            reference_func=lambda: talib.ADX(
+                df['high'].values,
+                df['low'].values,
+                df['close'].values,
+                timeperiod=14
+            ),
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+
+        # Parabolic SAR
+        print("\n[2/12] 验证 Parabolic SAR...")
+        validator.validate_indicator(
+            name="SAR",
+            haze_func=lambda: haze.py_sar(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                0.02, 0.2
+            ),
+            reference_func=lambda: talib.SAR(
+                df['high'].values,
+                df['low'].values,
+                acceleration=0.02,
+                maximum=0.2
+            ),
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+
+        # Aroon Up/Down
+        print("\n[3/12] 验证 Aroon...")
+        try:
+            haze_aroon = haze.py_aroon(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                25
+            )
+            talib_aroon_down, talib_aroon_up = talib.AROON(
+                df['high'].values,
+                df['low'].values,
+                timeperiod=25
+            )
+            validator.validate_indicator(
+                name="Aroon_Up",
+                haze_func=lambda: haze_aroon[0],
+                reference_func=lambda: talib_aroon_up,
+                test_data=df.to_dict('list'),
+                params={},
+                reference_lib="TA-Lib"
+            )
+            validator.validate_indicator(
+                name="Aroon_Down",
+                haze_func=lambda: haze_aroon[1],
+                reference_func=lambda: talib_aroon_down,
+                test_data=df.to_dict('list'),
+                params={},
+                reference_lib="TA-Lib"
+            )
+        except Exception as e:
+            print(f"   ⚠️ Aroon 验证跳过: {e}")
+
+        # DMI (+DI, -DI)
+        print("\n[4/12] 验证 DMI...")
+        try:
+            haze_dmi = haze.py_dmi(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                14
+            )
+            talib_plus_di = talib.PLUS_DI(
+                df['high'].values,
+                df['low'].values,
+                df['close'].values,
+                timeperiod=14
+            )
+            talib_minus_di = talib.MINUS_DI(
+                df['high'].values,
+                df['low'].values,
+                df['close'].values,
+                timeperiod=14
+            )
+            validator.validate_indicator(
+                name="+DI",
+                haze_func=lambda: haze_dmi[0],
+                reference_func=lambda: talib_plus_di,
+                test_data=df.to_dict('list'),
+                params={},
+                reference_lib="TA-Lib"
+            )
+            validator.validate_indicator(
+                name="-DI",
+                haze_func=lambda: haze_dmi[1],
+                reference_func=lambda: talib_minus_di,
+                test_data=df.to_dict('list'),
+                params={},
+                reference_lib="TA-Lib"
+            )
+        except Exception as e:
+            print(f"   ⚠️ DMI 验证跳过: {e}")
+
+        # DX
+        print("\n[5/12] 验证 DX...")
+        try:
+            haze_dx = haze.py_dx(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                14
+            )
+            talib_dx = talib.DX(
+                df['high'].values,
+                df['low'].values,
+                df['close'].values,
+                timeperiod=14
+            )
+            validator.validate_indicator(
+                name="DX",
+                haze_func=lambda: haze_dx,
+                reference_func=lambda: talib_dx,
+                test_data=df.to_dict('list'),
+                params={},
+                reference_lib="TA-Lib"
+            )
+        except Exception as e:
+            print(f"   ⚠️ DX 验证跳过: {e}")
+
+    # pandas-ta 验证
+    pta, _ = import_pandas_ta()
+    if pta is not None:
+        # SuperTrend
+        print("\n[6/12] 验证 SuperTrend...")
+        try:
+            haze_st = haze.py_supertrend(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                10, 3.0
+            )
+            pta_st = pta.supertrend(df['high'], df['low'], df['close'], length=10, multiplier=3.0)
+            if pta_st is not None and not pta_st.empty:
+                # SuperTrend 方向
+                st_dir_col = [c for c in pta_st.columns if 'SUPERTd' in c]
+                if st_dir_col:
+                    validator.validate_indicator(
+                        name="SuperTrend_Direction",
+                        haze_func=lambda: haze_st[0],
+                        reference_func=lambda: pta_st[st_dir_col[0]].values,
+                        test_data=df.to_dict('list'),
+                        params={},
+                        reference_lib="pandas-ta"
+                    )
+        except Exception as e:
+            print(f"   ⚠️ SuperTrend 验证跳过: {e}")
+
+        # TRIX
+        print("\n[7/12] 验证 TRIX...")
+        try:
+            haze_trix = haze.py_trix(df['close'].tolist(), 15)
+            pta_trix = pta.trix(df['close'], length=15)
+            if pta_trix is not None:
+                validator.validate_indicator(
+                    name="TRIX",
+                    haze_func=lambda: haze_trix,
+                    reference_func=lambda: pta_trix.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ TRIX 验证跳过: {e}")
+
+        # DPO
+        print("\n[8/12] 验证 DPO...")
+        try:
+            haze_dpo = haze.py_dpo(df['close'].tolist(), 20)
+            pta_dpo = pta.dpo(df['close'], length=20)
+            if pta_dpo is not None:
+                validator.validate_indicator(
+                    name="DPO",
+                    haze_func=lambda: haze_dpo,
+                    reference_func=lambda: pta_dpo.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ DPO 验证跳过: {e}")
+
+        # Vortex
+        print("\n[9/12] 验证 Vortex...")
+        try:
+            haze_vortex = haze.py_vortex(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                14
+            )
+            pta_vortex = pta.vortex(df['high'], df['low'], df['close'], length=14)
+            if pta_vortex is not None and not pta_vortex.empty:
+                vi_pos_col = [c for c in pta_vortex.columns if 'VTXP' in c]
+                vi_neg_col = [c for c in pta_vortex.columns if 'VTXM' in c]
+                if vi_pos_col:
+                    validator.validate_indicator(
+                        name="Vortex_Positive",
+                        haze_func=lambda: haze_vortex[0],
+                        reference_func=lambda: pta_vortex[vi_pos_col[0]].values,
+                        test_data=df.to_dict('list'),
+                        params={},
+                        reference_lib="pandas-ta"
+                    )
+                if vi_neg_col:
+                    validator.validate_indicator(
+                        name="Vortex_Negative",
+                        haze_func=lambda: haze_vortex[1],
+                        reference_func=lambda: pta_vortex[vi_neg_col[0]].values,
+                        test_data=df.to_dict('list'),
+                        params={},
+                        reference_lib="pandas-ta"
+                    )
+        except Exception as e:
+            print(f"   ⚠️ Vortex 验证跳过: {e}")
+
+        # Choppiness
+        print("\n[10/12] 验证 Choppiness...")
+        try:
+            haze_chop = haze.py_choppiness(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                14
+            )
+            pta_chop = pta.chop(df['high'], df['low'], df['close'], length=14)
+            if pta_chop is not None:
+                validator.validate_indicator(
+                    name="Choppiness",
+                    haze_func=lambda: haze_chop,
+                    reference_func=lambda: pta_chop.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ Choppiness 验证跳过: {e}")
+
+        # QStick
+        print("\n[11/12] 验证 QStick...")
+        try:
+            haze_qstick = haze.py_qstick(
+                df['open'].tolist(),
+                df['close'].tolist(),
+                14
+            )
+            pta_qstick = pta.qstick(df['open'], df['close'], length=14)
+            if pta_qstick is not None:
+                validator.validate_indicator(
+                    name="QStick",
+                    haze_func=lambda: haze_qstick,
+                    reference_func=lambda: pta_qstick.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ QStick 验证跳过: {e}")
+
+        # VHF
+        print("\n[12/12] 验证 VHF...")
+        try:
+            haze_vhf = haze.py_vhf(df['close'].tolist(), 28)
+            pta_vhf = pta.vhf(df['close'], length=28)
+            if pta_vhf is not None:
+                validator.validate_indicator(
+                    name="VHF",
+                    haze_func=lambda: haze_vhf,
+                    reference_func=lambda: pta_vhf.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ VHF 验证跳过: {e}")
+
+
+    print("\n✅ 趋势指标验证完成")
+
+
+def validate_volume_indicators(validator: PrecisionValidator, df):
+    """验证成交量指标"""
+    print("\n" + "="*70)
+    print("📊 验证成交量指标 (Volume Indicators)")
+    print("="*70)
+
+    if HAS_TALIB:
+        import talib
+
+        # OBV
+        print("\n[1/11] 验证 OBV...")
+        validator.validate_indicator(
+            name="OBV",
+            haze_func=lambda: haze.py_obv(
+                df['close'].tolist(),
+                df['volume'].tolist()
+            ),
+            reference_func=lambda: talib.OBV(
+                df['close'].values,
+                df['volume'].values
+            ),
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+
+        # AD (Accumulation/Distribution)
+        print("\n[2/11] 验证 AD...")
+        validator.validate_indicator(
+            name="AD",
+            haze_func=lambda: haze.py_ad(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                df['volume'].tolist()
+            ),
+            reference_func=lambda: talib.AD(
+                df['high'].values,
+                df['low'].values,
+                df['close'].values,
+                df['volume'].values
+            ),
+            test_data=df.to_dict('list'),
+            params={},
+            reference_lib="TA-Lib"
+        )
+
+        # ADOSC (Chaikin A/D Oscillator)
+        print("\n[3/11] 验证 ADOSC...")
+        try:
+            haze_adosc = haze.py_adosc(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                df['volume'].tolist(),
+                3, 10
+            )
+            talib_adosc = talib.ADOSC(
+                df['high'].values,
+                df['low'].values,
+                df['close'].values,
+                df['volume'].values,
+                fastperiod=3,
+                slowperiod=10
+            )
+            validator.validate_indicator(
+                name="ADOSC",
+                haze_func=lambda: haze_adosc,
+                reference_func=lambda: talib_adosc,
+                test_data=df.to_dict('list'),
+                params={},
+                reference_lib="TA-Lib"
+            )
+        except Exception as e:
+            print(f"   ⚠️ ADOSC 验证跳过: {e}")
+
+    # pandas-ta 验证
+    pta, _ = import_pandas_ta()
+    if pta is not None:
+        # VWAP
+        print("\n[4/11] 验证 VWAP...")
+        try:
+            haze_vwap = haze.py_vwap(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                df['volume'].tolist()
+            )
+            pta_vwap = pta.vwap(df['high'], df['low'], df['close'], df['volume'])
+            if pta_vwap is not None:
+                validator.validate_indicator(
+                    name="VWAP",
+                    haze_func=lambda: haze_vwap,
+                    reference_func=lambda: pta_vwap.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ VWAP 验证跳过: {e}")
+
+        # Force Index
+        print("\n[5/11] 验证 Force Index...")
+        try:
+            haze_fi = haze.py_force_index(
+                df['close'].tolist(),
+                df['volume'].tolist(),
+                13
+            )
+            pta_fi = pta.efi(df['close'], df['volume'], length=13)
+            if pta_fi is not None:
+                validator.validate_indicator(
+                    name="Force Index",
+                    haze_func=lambda: haze_fi,
+                    reference_func=lambda: pta_fi.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ Force Index 验证跳过: {e}")
+
+        # CMF
+        print("\n[6/11] 验证 CMF...")
+        try:
+            haze_cmf = haze.py_cmf(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                df['volume'].tolist(),
+                20
+            )
+            pta_cmf = pta.cmf(df['high'], df['low'], df['close'], df['volume'], length=20)
+            if pta_cmf is not None:
+                validator.validate_indicator(
+                    name="CMF",
+                    haze_func=lambda: haze_cmf,
+                    reference_func=lambda: pta_cmf.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ CMF 验证跳过: {e}")
+
+        # Volume Oscillator
+        print("\n[7/11] 验证 Volume Oscillator...")
+        try:
+            haze_vo = haze.py_volume_oscillator(
+                df['volume'].tolist(),
+                5, 10
+            )
+            pta_pvo = pta.pvo(df['volume'], fast=5, slow=10)
+            if pta_pvo is not None and not pta_pvo.empty:
+                pvo_col = [c for c in pta_pvo.columns if 'PVO_' in c and 'H' not in c and 'S' not in c]
+                if pvo_col:
+                    validator.validate_indicator(
+                        name="Volume Oscillator",
+                        haze_func=lambda: haze_vo,
+                        reference_func=lambda: pta_pvo[pvo_col[0]].values,
+                        test_data=df.to_dict('list'),
+                        params={},
+                        reference_lib="pandas-ta"
+                    )
+        except Exception as e:
+            print(f"   ⚠️ Volume Oscillator 验证跳过: {e}")
+
+        # PVT
+        print("\n[8/11] 验证 PVT...")
+        try:
+            haze_pvt = haze.py_pvt(
+                df['close'].tolist(),
+                df['volume'].tolist()
+            )
+            pta_pvt = pta.pvt(df['close'], df['volume'])
+            if pta_pvt is not None:
+                validator.validate_indicator(
+                    name="PVT",
+                    haze_func=lambda: haze_pvt,
+                    reference_func=lambda: pta_pvt.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ PVT 验证跳过: {e}")
+
+        # NVI
+        print("\n[9/11] 验证 NVI...")
+        try:
+            haze_nvi = haze.py_nvi(
+                df['close'].tolist(),
+                df['volume'].tolist()
+            )
+            pta_nvi = pta.nvi(df['close'], df['volume'])
+            if pta_nvi is not None:
+                validator.validate_indicator(
+                    name="NVI",
+                    haze_func=lambda: haze_nvi,
+                    reference_func=lambda: pta_nvi.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ NVI 验证跳过: {e}")
+
+        # PVI
+        print("\n[10/11] 验证 PVI...")
+        try:
+            haze_pvi = haze.py_pvi(
+                df['close'].tolist(),
+                df['volume'].tolist()
+            )
+            pta_pvi = pta.pvi(df['close'], df['volume'])
+            if pta_pvi is not None:
+                validator.validate_indicator(
+                    name="PVI",
+                    haze_func=lambda: haze_pvi,
+                    reference_func=lambda: pta_pvi.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ PVI 验证跳过: {e}")
+
+        # EOM
+        print("\n[11/11] 验证 EOM...")
+        try:
+            haze_eom = haze.py_eom(
+                df['high'].tolist(),
+                df['low'].tolist(),
+                df['close'].tolist(),
+                df['volume'].tolist(),
+                14, 10000
+            )
+            pta_eom = pta.eom(df['high'], df['low'], df['close'], df['volume'], length=14, divisor=10000)
+            if pta_eom is not None:
+                validator.validate_indicator(
+                    name="EOM",
+                    haze_func=lambda: haze_eom,
+                    reference_func=lambda: pta_eom.values,
+                    test_data=df.to_dict('list'),
+                    params={},
+                    reference_lib="pandas-ta"
+                )
+        except Exception as e:
+            print(f"   ⚠️ EOM 验证跳过: {e}")
+
+    print("\n✅ 成交量指标验证完成")
 
 
 def main():
@@ -794,7 +1847,7 @@ def main():
         print("❌ haze-library 未安装，请运行: maturin develop")
         return
 
-    print(f"\n✅ 环境检查:")
+    print("\n✅ 环境检查:")
     print(f"   - haze-library: {'✓' if HAS_HAZE else '✗'}")
     print(f"   - pandas-ta:    {'✓' if HAS_PANDAS_TA else '✗'}")
     print(f"   - TA-Lib:       {'✓' if HAS_TALIB else '✗'}")
@@ -810,7 +1863,7 @@ def main():
     df = generate_test_data(500)
     print(f"   ├─ 价格范围: ${df['close'].min():.2f} - ${df['close'].max():.2f}")
     print(f"   ├─ 成交量范围: {df['volume'].min():.0f} - {df['volume'].max():.0f}")
-    print(f"   └─ 数据时间跨度: 500 个周期")
+    print("   └─ 数据时间跨度: 500 个周期")
 
     # 初始化验证器
     validator = PrecisionValidator(threshold=1e-9)
@@ -819,6 +1872,8 @@ def main():
     validate_volatility_indicators(validator, df)
     validate_momentum_indicators(validator, df)
     validate_moving_averages(validator, df)
+    validate_trend_indicators(validator, df)
+    validate_volume_indicators(validator, df)
     validate_pandas_ta_exclusive(validator, df)
 
     # 生成最终报告

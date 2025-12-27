@@ -3,7 +3,7 @@
 //! # Overview
 //! This module provides fundamental moving average calculations that serve as
 //! building blocks for other technical indicators. All MA functions are optimized
-//! for performance with incremental updates and NaN-safe computations.
+//! for performance with incremental updates and warmup NaNs.
 //!
 //! # Available Functions
 //! - [`sma`] - Simple Moving Average (arithmetic mean)
@@ -47,8 +47,8 @@
 //! - DEMA/TEMA: O(n) with chained EMA calculations
 //!
 //! # NaN Handling
-//! - All functions return NaN for warmup periods (first period-1 values)
-//! - NaN values in input reset the calculation window
+//! - Inputs must be finite; NaN/Inf are rejected by validation
+//! - Warmup periods (first period-1 values) are NaN by design
 //! - Output maintains same length as input array
 //!
 //! # Cross-References
@@ -58,7 +58,9 @@
 
 #![allow(dead_code)]
 
-use crate::errors::validation::{validate_not_empty, validate_period, validate_same_length};
+use crate::errors::validation::{
+    validate_not_empty, validate_not_empty_allow_nan, validate_period, validate_same_length,
+};
 use crate::errors::{HazeError, HazeResult};
 use crate::init_result;
 use crate::utils::math::{is_zero, kahan_sum};
@@ -79,13 +81,9 @@ use crate::utils::math::{is_zero, kahan_sum};
 /// # 错误
 /// - 如果输入为空，返回 `HazeError::EmptyInput`
 /// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
-pub fn sma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+fn sma_impl(values: &[f64], period: usize) -> Vec<f64> {
     /// 重新计算间隔：每 1000 次迭代重新计算一次以重置累积误差
     const RECALC_INTERVAL: usize = 1000;
-
-    // Fail-Fast 验证
-    validate_not_empty(values, "values")?;
-    validate_period(period, values.len())?;
 
     let n = values.len();
     let mut result = init_result!(n);
@@ -95,7 +93,8 @@ pub fn sma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     let mut steps_since_recalc = 0usize;
 
     for i in 0..n {
-        if values[i].is_nan() {
+        let v = values[i];
+        if v.is_nan() {
             sum = 0.0;
             compensation = 0.0;
             count = 0;
@@ -104,7 +103,7 @@ pub fn sma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
         }
 
         // 使用 Kahan 求和添加新值
-        let y = values[i] - compensation;
+        let y = v - compensation;
         let t = sum + y;
         compensation = (t - sum) - y;
         sum = t;
@@ -133,7 +132,20 @@ pub fn sma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
         }
     }
 
-    Ok(result)
+    result
+}
+
+pub fn sma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
+    Ok(sma_impl(values, period))
+}
+
+pub(crate) fn sma_allow_nan(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    validate_not_empty_allow_nan(values, "values")?;
+    validate_period(period, values.len())?;
+    Ok(sma_impl(values, period))
 }
 
 /// EMA - Exponential Moving Average（指数移动平均）
@@ -153,48 +165,59 @@ pub fn sma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 /// # 错误
 /// - 如果输入为空，返回 `HazeError::EmptyInput`
 /// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
+fn ema_impl(values: &[f64], period: usize, alpha: f64) -> Vec<f64> {
+    let n = values.len();
+    let mut result = init_result!(n);
+    let mut warmup_sum = 0.0;
+    let mut warmup_comp = 0.0;
+    let mut warmup_count = 0usize;
+    let mut prev = f64::NAN;
+
+    for i in 0..n {
+        let v = values[i];
+        if v.is_nan() {
+            warmup_sum = 0.0;
+            warmup_comp = 0.0;
+            warmup_count = 0;
+            prev = f64::NAN;
+            continue;
+        }
+
+        if warmup_count < period {
+            warmup_count += 1;
+            let y = v - warmup_comp;
+            let t = warmup_sum + y;
+            warmup_comp = (t - warmup_sum) - y;
+            warmup_sum = t;
+
+            if warmup_count == period {
+                prev = warmup_sum / period as f64;
+                result[i] = prev;
+            }
+            continue;
+        }
+
+        prev = alpha * v + (1.0 - alpha) * prev;
+        result[i] = prev;
+    }
+
+    result
+}
+
 pub fn ema(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     // Fail-Fast 验证
     validate_not_empty(values, "values")?;
     validate_period(period, values.len())?;
 
-    let n = values.len();
     let alpha = 2.0 / (period as f64 + 1.0);
-    let mut result = init_result!(n);
+    Ok(ema_impl(values, period, alpha))
+}
 
-    // 支持输入中存在前导 NaN 的情况
-    let mut sum = 0.0;
-    let mut count = 0usize;
-    let mut start_idx = None;
-
-    for i in 0..n {
-        if values[i].is_nan() {
-            sum = 0.0;
-            count = 0;
-            continue;
-        }
-
-        count += 1;
-        sum += values[i];
-
-        if count == period {
-            result[i] = sum / period as f64;
-            start_idx = Some(i);
-            break;
-        }
-    }
-
-    if let Some(start) = start_idx {
-        for i in (start + 1)..n {
-            if values[i].is_nan() {
-                result[i] = result[i - 1];
-            } else {
-                result[i] = alpha * values[i] + (1.0 - alpha) * result[i - 1];
-            }
-        }
-    }
-
-    Ok(result)
+pub(crate) fn ema_allow_nan(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    validate_not_empty_allow_nan(values, "values")?;
+    validate_period(period, values.len())?;
+    let alpha = 2.0 / (period as f64 + 1.0);
+    Ok(ema_impl(values, period, alpha))
 }
 
 /// RMA - Wilder's Moving Average（威尔德移动平均）
@@ -219,47 +242,15 @@ pub fn rma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     validate_not_empty(values, "values")?;
     validate_period(period, values.len())?;
 
-    let n = values.len();
-
     let alpha = 1.0 / period as f64;
-    let mut result = vec![f64::NAN; n];
+    Ok(ema_impl(values, period, alpha))
+}
 
-    // 支持输入中存在前导 NaN 的情况（与 EMA 保持一致）
-    let mut sum = 0.0;
-    let mut count = 0usize;
-    let mut start_idx = None;
-
-    // 寻找第一个有效的 period 窗口
-    for i in 0..n {
-        if values[i].is_nan() {
-            sum = 0.0;
-            count = 0;
-            continue;
-        }
-
-        count += 1;
-        sum += values[i];
-
-        if count == period {
-            result[i] = sum / period as f64;
-            start_idx = Some(i);
-            break;
-        }
-    }
-
-    // Wilder's smoothing（处理后续 NaN）
-    if let Some(start) = start_idx {
-        for i in (start + 1)..n {
-            if values[i].is_nan() {
-                // 遇到 NaN 时保持前一个值（与 EMA 行为一致）
-                result[i] = result[i - 1];
-            } else {
-                result[i] = alpha * values[i] + (1.0 - alpha) * result[i - 1];
-            }
-        }
-    }
-
-    Ok(result)
+pub(crate) fn rma_allow_nan(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    validate_not_empty_allow_nan(values, "values")?;
+    validate_period(period, values.len())?;
+    let alpha = 1.0 / period as f64;
+    Ok(ema_impl(values, period, alpha))
 }
 
 /// WMA - Weighted Moving Average（加权移动平均）
@@ -291,12 +282,8 @@ pub fn rma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 /// # 错误
 /// - 如果输入为空，返回 `HazeError::EmptyInput`
 /// - 如果 period 为 0 或超过数据长度，返回 `HazeError::InvalidPeriod`
-pub fn wma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+fn wma_impl(values: &[f64], period: usize) -> Vec<f64> {
     const RECALC_INTERVAL: usize = 1000;
-
-    // Fail-Fast 验证
-    validate_not_empty(values, "values")?;
-    validate_period(period, values.len())?;
 
     let n = values.len();
 
@@ -320,9 +307,7 @@ pub fn wma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     let mut count = 0usize;
     let mut steps_since_recalc = 0usize;
 
-    // 单次遍历：
-    // - NaN 出现时重置窗口
-    // - 累积到 period 后使用 O(n) 增量更新
+    // 单次遍历：累积到 period 后使用 O(n) 增量更新
     for i in 0..n {
         let v = values[i];
 
@@ -382,7 +367,20 @@ pub fn wma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
         steps_since_recalc += 1;
     }
 
-    Ok(result)
+    result
+}
+
+pub fn wma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    // Fail-Fast 验证
+    validate_not_empty(values, "values")?;
+    validate_period(period, values.len())?;
+    Ok(wma_impl(values, period))
+}
+
+pub(crate) fn wma_allow_nan(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    validate_not_empty_allow_nan(values, "values")?;
+    validate_period(period, values.len())?;
+    Ok(wma_impl(values, period))
 }
 
 /// HMA - Hull Moving Average（赫尔移动平均，低延迟）
@@ -412,8 +410,8 @@ pub fn hma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     let half_period = period / 2;
     let sqrt_period = (period as f64).sqrt() as usize;
 
-    let wma_half = wma(values, half_period)?;
-    let wma_full = wma(values, period)?;
+    let wma_half = wma_allow_nan(values, half_period)?;
+    let wma_full = wma_allow_nan(values, period)?;
 
     // 2 * WMA(half) - WMA(full)
     let diff: Vec<f64> = wma_half
@@ -428,7 +426,7 @@ pub fn hma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
         })
         .collect();
 
-    let result = wma(&diff, sqrt_period)?;
+    let result = wma_allow_nan(&diff, sqrt_period)?;
     if result.iter().all(|v| v.is_nan()) {
         Ok(diff)
     } else {
@@ -455,8 +453,8 @@ pub fn dema(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     validate_not_empty(values, "values")?;
     validate_period(period, values.len())?;
 
-    let ema1 = ema(values, period)?;
-    let ema2 = ema(&ema1, period)?;
+    let ema1 = ema_allow_nan(values, period)?;
+    let ema2 = ema_allow_nan(&ema1, period)?;
 
     Ok(ema1
         .iter()
@@ -490,9 +488,9 @@ pub fn tema(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     validate_not_empty(values, "values")?;
     validate_period(period, values.len())?;
 
-    let ema1 = ema(values, period)?;
-    let ema2 = ema(&ema1, period)?;
-    let ema3 = ema(&ema2, period)?;
+    let ema1 = ema_allow_nan(values, period)?;
+    let ema2 = ema_allow_nan(&ema1, period)?;
+    let ema3 = ema_allow_nan(&ema2, period)?;
 
     if !ema3.iter().any(|v| !v.is_nan()) {
         return dema(values, period);
@@ -699,7 +697,7 @@ mod tests {
     #[test]
     fn test_wma_nan_reset() {
         let values = vec![1.0, 2.0, f64::NAN, 4.0, 5.0, 6.0];
-        let result = wma(&values, 3).unwrap();
+        let result = wma_allow_nan(&values, 3).unwrap();
 
         // NaN 会重置窗口，直到凑齐 period 个有效值才会输出
         assert!(result[0].is_nan());
@@ -773,7 +771,7 @@ pub fn zlma(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
         ema_data[i] = 2.0 * values[i] - values[i - lag];
     }
 
-    ema(&ema_data, period)
+    ema_allow_nan(&ema_data, period)
 }
 
 /// T3 (Tillson T3) 移动平均
@@ -806,12 +804,12 @@ pub fn t3(values: &[f64], period: usize, v_factor: f64) -> HazeResult<Vec<f64>> 
     let c4 = 1.0 + 3.0 * v_factor + v_factor * v_factor * v_factor + 3.0 * v_factor * v_factor;
 
     // 6 层 EMA
-    let e1 = ema(values, period)?;
-    let e2 = ema(&e1, period)?;
-    let e3 = ema(&e2, period)?;
-    let e4 = ema(&e3, period)?;
-    let e5 = ema(&e4, period)?;
-    let e6 = ema(&e5, period)?;
+    let e1 = ema_allow_nan(values, period)?;
+    let e2 = ema_allow_nan(&e1, period)?;
+    let e3 = ema_allow_nan(&e2, period)?;
+    let e4 = ema_allow_nan(&e3, period)?;
+    let e5 = ema_allow_nan(&e4, period)?;
+    let e6 = ema_allow_nan(&e5, period)?;
 
     // 加权组合
     let mut t3_values = init_result!(n);
@@ -822,7 +820,7 @@ pub fn t3(values: &[f64], period: usize, v_factor: f64) -> HazeResult<Vec<f64>> 
     }
 
     if t3_values.iter().all(|v| v.is_nan()) {
-        ema(values, period)
+        ema_allow_nan(values, period)
     } else {
         Ok(t3_values)
     }
@@ -1124,7 +1122,7 @@ mod floating_point_error_tests {
         );
     }
 
-    /// 测试 SMA 处理 NaN 后恢复的精度
+    /// 测试 SMA 对 NaN 输入的 Fail-Fast 行为
     #[test]
     fn test_sma_nan_recovery_precision() {
         const PERIOD: usize = 10;
@@ -1133,15 +1131,9 @@ mod floating_point_error_tests {
         let mut values: Vec<f64> = (0..1000).map(|i| i as f64 + 0.5).collect();
         values[500] = f64::NAN; // 在中间插入 NaN
 
-        let result = sma(&values, PERIOD).unwrap();
-
-        // NaN 之后应该正确恢复
-        // 从索引 501 开始重新计算，到 510 时应有有效结果
-        let test_idx = 510;
-        let expected: f64 =
-            values[test_idx + 1 - PERIOD..=test_idx].iter().sum::<f64>() / PERIOD as f64;
-        let actual = result[test_idx];
-
-        assert!((actual - expected).abs() < 1e-10, "SMA NaN 恢复后精度不足");
+        assert!(matches!(
+            sma(&values, PERIOD),
+            Err(HazeError::InvalidValue { .. })
+        ));
     }
 }

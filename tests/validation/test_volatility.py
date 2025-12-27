@@ -164,7 +164,7 @@ class TestVolatilityVsPandasTa:
                 df["high"].tolist(),
                 df["low"].tolist(),
                 df["close"].tolist(),
-                20, 10, 2.0  # ema_period=20, atr_period=10, mult=2.0
+                20, 20, 2.0  # ema_period=20, atr_period=20, mult=2.0
             ),
             ref_fn=lambda: (
                 pta_result.iloc[:, 0].values,  # lower
@@ -216,10 +216,8 @@ class TestVolatilityEdgeCases:
         high = [10.5, 11.0, 10.8]
         low = [9.5, 10.0, 9.8]
         close = [10.0, 10.5, 10.2]
-
-        result = haze.py_atr(high, low, close, 14)
-        # 数据不足, 应返回全 NaN 或空
-        assert len(result) == len(close)
+        with pytest.raises(ValueError):
+            haze.py_atr(high, low, close, 14)
 
     def test_bollinger_constant_price(self):
         """布林带常数价格 (零波动)"""

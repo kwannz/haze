@@ -2,19 +2,17 @@
 Comprehensive Python FFI Test Suite - Core Indicators
 
 Tests 50 most commonly used indicators for:
-- Empty input handling (returns empty/NaN-filled vectors for backward compatibility)
-- Invalid parameter handling (returns NaN-filled vectors for backward compatibility)
-- NaN propagation
+- Empty input handling (fail-fast raises ValueError)
+- Invalid parameter handling (fail-fast raises ValueError)
 - Output format correctness
 - NumPy array compatibility
 - Length mismatch validation
 - Range validation
 
-IMPORTANT: Due to backward compatibility via ok_or_nan_vec():
-- EmptyInput → Returns empty list or NaN-filled vector
-- InvalidPeriod → Returns NaN-filled vector
-- InsufficientData → Returns NaN-filled vector
-- Only LengthMismatch and other errors raise ValueError
+IMPORTANT: Fail-fast behavior:
+- EmptyInput → raises ValueError
+- InvalidPeriod → raises ValueError
+- InsufficientData → raises ValueError
 
 Test Coverage:
     - Overlap Indicators (8): SMA, EMA, WMA, DEMA, TEMA, HMA, RMA, ZLMA
@@ -96,9 +94,9 @@ class TestOverlapIndicators(IndicatorTestBase):
         (haze.py_zlma, 10),
     ])
     def test_ma_empty_input(self, func, period):
-        """MA functions return empty list for empty input (backward compatibility)"""
-        result = func([], period)
-        assert len(result) == 0, f"{func.__name__} should return empty list for empty input"
+        """MA functions should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            func([], period)
 
     # ---- Invalid Period Tests ----
     @pytest.mark.parametrize("func,period", [
@@ -112,11 +110,10 @@ class TestOverlapIndicators(IndicatorTestBase):
         (haze.py_zlma, 10),
     ])
     def test_ma_zero_period(self, func, period):
-        """MA functions return NaN-filled vector for period=0 (backward compatibility)"""
+        """MA functions should fail-fast on period=0"""
         data = self.valid_data(50)
-        result = func(data, 0)
-        assert len(result) == 50, f"{func.__name__} should return same-length vector"
-        assert all(np.isnan(x) for x in result), f"{func.__name__} should return all NaN for invalid period"
+        with pytest.raises(ValueError):
+            func(data, 0)
 
     # ---- Period Exceeds Length Tests ----
     @pytest.mark.parametrize("func", [
@@ -125,11 +122,10 @@ class TestOverlapIndicators(IndicatorTestBase):
         haze.py_wma,
     ])
     def test_ma_period_exceeds_length(self, func):
-        """MA functions return NaN-filled vector when period > length (backward compatibility)"""
+        """MA functions should fail-fast when period > length"""
         data = self.valid_data(5)
-        result = func(data, 10)
-        assert len(result) == 5, f"{func.__name__} should return same-length vector"
-        assert all(np.isnan(x) for x in result), f"{func.__name__} should return all NaN when period > length"
+        with pytest.raises(ValueError):
+            func(data, 10)
 
     # ---- Valid Output Tests ----
     @pytest.mark.parametrize("func,period", [
@@ -165,16 +161,15 @@ class TestMomentumIndicators(IndicatorTestBase):
 
     # ---- RSI Tests ----
     def test_rsi_empty_input(self):
-        """RSI returns empty list for empty input"""
-        result = haze.py_rsi([], 14)
-        assert len(result) == 0
+        """RSI should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_rsi([], 14)
 
     def test_rsi_zero_period(self):
-        """RSI returns NaN-filled vector for period=0"""
+        """RSI should fail-fast on period=0"""
         data = self.valid_data(50)
-        result = haze.py_rsi(data, 0)
-        assert len(result) == 50
-        assert all(np.isnan(x) for x in result)
+        with pytest.raises(ValueError):
+            haze.py_rsi(data, 0)
 
     def test_rsi_valid_output(self):
         """RSI returns valid output in [0, 100] range"""
@@ -189,11 +184,9 @@ class TestMomentumIndicators(IndicatorTestBase):
 
     # ---- MACD Tests ----
     def test_macd_empty_input(self):
-        """MACD returns empty tuple for empty input"""
-        macd, signal, histogram = haze.py_macd([], 12, 26, 9)
-        assert len(macd) == 0
-        assert len(signal) == 0
-        assert len(histogram) == 0
+        """MACD should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_macd([], 12, 26, 9)
 
     def test_macd_valid_output(self):
         """MACD returns correct output format"""
@@ -212,24 +205,21 @@ class TestMomentumIndicators(IndicatorTestBase):
 
     # ---- Stochastic Tests ----
     def test_stochastic_empty_input(self):
-        """Stochastic returns empty tuple for empty input"""
-        k, d = haze.py_stochastic([], [], [], 14, 3)
-        assert len(k) == 0
-        assert len(d) == 0
+        """Stochastic should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_stochastic([], [], [], 14, 3, 3)
 
     def test_stochastic_length_mismatch(self):
-        """Stochastic with length mismatch returns NaN-filled vector (backward compatibility)"""
+        """Stochastic with length mismatch should raise ValueError"""
         high, low, close, _ = self.valid_ohlc(50)
-        # Length mismatch is handled via ok_or_nan_vec, returns NaN instead of raising
-        k, d = haze.py_stochastic(high, low[:40], close, 14, 3)
-        # Should return results but with NaN values due to internal error handling
-        assert len(k) == 50
-        assert len(d) == 50
+        # Proper error handling: raise ValueError for length mismatch
+        with pytest.raises(ValueError, match="Length mismatch"):
+            haze.py_stochastic(high, low[:40], close, 14, 3, 3)
 
     def test_stochastic_valid_output(self):
         """Stochastic returns values in [0, 100] range"""
         high, low, close, _ = self.valid_ohlc(50)
-        k, d = haze.py_stochastic(high, low, close, 14, 3)
+        k, d = haze.py_stochastic(high, low, close, 14, 3, 3)
 
         assert len(k) == 50
         assert len(d) == 50
@@ -243,10 +233,9 @@ class TestMomentumIndicators(IndicatorTestBase):
 
     # ---- StochRSI Tests ----
     def test_stochrsi_empty_input(self):
-        """StochRSI returns empty tuple for empty input"""
-        k, d = haze.py_stochrsi([], 14, 14, 3, 3)
-        assert len(k) == 0
-        assert len(d) == 0
+        """StochRSI should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_stochrsi([], 14, 14, 3, 3)
 
     def test_stochrsi_valid_output(self):
         """StochRSI returns correct output format"""
@@ -258,9 +247,9 @@ class TestMomentumIndicators(IndicatorTestBase):
 
     # ---- CCI Tests ----
     def test_cci_empty_input(self):
-        """CCI returns empty list for empty input"""
-        result = haze.py_cci([], [], [], 20)
-        assert len(result) == 0
+        """CCI should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_cci([], [], [], 20)
 
     def test_cci_valid_output(self):
         """CCI returns correct output format"""
@@ -272,9 +261,9 @@ class TestMomentumIndicators(IndicatorTestBase):
 
     # ---- Williams %R Tests ----
     def test_williams_r_empty_input(self):
-        """Williams %R returns empty list for empty input"""
-        result = haze.py_williams_r([], [], [], 14)
-        assert len(result) == 0
+        """Williams %R should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_williams_r([], [], [], 14)
 
     def test_williams_r_valid_output(self):
         """Williams %R returns values in [-100, 0] range"""
@@ -289,10 +278,9 @@ class TestMomentumIndicators(IndicatorTestBase):
 
     # ---- Fisher Transform Tests ----
     def test_fisher_empty_input(self):
-        """Fisher Transform returns empty tuple for empty input"""
-        fisher, trigger = haze.py_fisher_transform([], [], [], 9)
-        assert len(fisher) == 0
-        assert len(trigger) == 0
+        """Fisher Transform should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_fisher_transform([], [], [], 9)
 
     def test_fisher_valid_output(self):
         """Fisher Transform returns correct output format"""
@@ -304,16 +292,14 @@ class TestMomentumIndicators(IndicatorTestBase):
 
     # ---- KDJ Tests ----
     def test_kdj_empty_input(self):
-        """KDJ returns empty triple for empty input"""
-        k, d, j = haze.py_kdj([], [], [], 9, 3)
-        assert len(k) == 0
-        assert len(d) == 0
-        assert len(j) == 0
+        """KDJ should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_kdj([], [], [], 9, 3, 3)
 
     def test_kdj_valid_output(self):
         """KDJ returns correct output format"""
         high, low, close, _ = self.valid_ohlc(50)
-        k, d, j = haze.py_kdj(high, low, close, 9, 3)
+        k, d, j = haze.py_kdj(high, low, close, 9, 3, 3)
 
         assert len(k) == 50
         assert len(d) == 50
@@ -321,10 +307,9 @@ class TestMomentumIndicators(IndicatorTestBase):
 
     # ---- TSI Tests ----
     def test_tsi_empty_input(self):
-        """TSI returns empty tuple for empty input"""
-        tsi, signal = haze.py_tsi([], 25, 13, 13)
-        assert len(tsi) == 0
-        assert len(signal) == 0
+        """TSI should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_tsi([], 25, 13, 13)
 
     def test_tsi_valid_output(self):
         """TSI returns correct output format"""
@@ -352,16 +337,16 @@ class TestVolatilityIndicators(IndicatorTestBase):
 
     # ---- ATR Tests ----
     def test_atr_empty_input(self):
-        """ATR returns empty list for empty input"""
-        result = haze.py_atr([], [], [], 14)
-        assert len(result) == 0
+        """ATR should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_atr([], [], [], 14)
 
     def test_atr_length_mismatch(self):
-        """ATR with length mismatch returns NaN-filled vector (backward compatibility)"""
+        """ATR with length mismatch should raise ValueError"""
         high, low, close, _ = self.valid_ohlc(50)
-        # Length mismatch is handled via ok_or_nan_vec, returns NaN instead of raising
-        result = haze.py_atr(high, low[:40], close, 14)
-        assert len(result) == 50
+        # Proper error handling: raise ValueError for length mismatch
+        with pytest.raises(ValueError, match="Length mismatch"):
+            haze.py_atr(high, low[:40], close, 14)
 
     def test_atr_valid_output(self):
         """ATR returns non-negative values"""
@@ -376,9 +361,9 @@ class TestVolatilityIndicators(IndicatorTestBase):
 
     # ---- NATR Tests ----
     def test_natr_empty_input(self):
-        """NATR returns empty list for empty input"""
-        result = haze.py_natr([], [], [], 14)
-        assert len(result) == 0
+        """NATR should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_natr([], [], [], 14)
 
     def test_natr_valid_output(self):
         """NATR returns non-negative values"""
@@ -393,11 +378,9 @@ class TestVolatilityIndicators(IndicatorTestBase):
 
     # ---- Bollinger Bands Tests ----
     def test_bollinger_bands_empty_input(self):
-        """Bollinger Bands returns empty tuple for empty input"""
-        upper, middle, lower = haze.py_bollinger_bands([], 20, 2.0)
-        assert len(upper) == 0
-        assert len(middle) == 0
-        assert len(lower) == 0
+        """Bollinger Bands should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_bollinger_bands([], 20, 2.0)
 
     def test_bollinger_bands_valid_output(self):
         """Bollinger Bands returns correctly ordered bands"""
@@ -415,11 +398,9 @@ class TestVolatilityIndicators(IndicatorTestBase):
 
     # ---- Keltner Channel Tests ----
     def test_keltner_channel_empty_input(self):
-        """Keltner Channel returns empty tuple for empty input"""
-        upper, middle, lower = haze.py_keltner_channel([], [], [], 20, 10, 2.0)
-        assert len(upper) == 0
-        assert len(middle) == 0
-        assert len(lower) == 0
+        """Keltner Channel should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_keltner_channel([], [], [], 20, 10, 2.0)
 
     def test_keltner_channel_valid_output(self):
         """Keltner Channel returns correct output format"""
@@ -432,11 +413,9 @@ class TestVolatilityIndicators(IndicatorTestBase):
 
     # ---- Donchian Channel Tests ----
     def test_donchian_channel_empty_input(self):
-        """Donchian Channel returns empty tuple for empty input"""
-        upper, middle, lower = haze.py_donchian_channel([], [], 20)
-        assert len(upper) == 0
-        assert len(middle) == 0
-        assert len(lower) == 0
+        """Donchian Channel should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_donchian_channel([], [], 20)
 
     def test_donchian_channel_valid_output(self):
         """Donchian Channel returns correct output format"""
@@ -454,14 +433,14 @@ class TestVolatilityIndicators(IndicatorTestBase):
 
     # ---- Ulcer Index Tests ----
     def test_ulcer_index_empty_input(self):
-        """Ulcer Index returns empty list for empty input"""
-        result = haze.py_ulcer_index([])
-        assert len(result) == 0
+        """Ulcer Index should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_ulcer_index([], period=14)
 
     def test_ulcer_index_valid_output(self):
         """Ulcer Index returns non-negative values"""
         data = self.valid_data(50)
-        result = haze.py_ulcer_index(data)
+        result = haze.py_ulcer_index(data, period=14)
 
         assert len(result) == 50
         # Ulcer Index should be non-negative
@@ -479,20 +458,16 @@ class TestTrendIndicators(IndicatorTestBase):
 
     # ---- ADX Tests ----
     def test_adx_empty_input(self):
-        """ADX returns empty triple for empty input"""
-        adx, plus_di, minus_di = haze.py_adx([], [], [], 14)
-        assert len(adx) == 0
-        assert len(plus_di) == 0
-        assert len(minus_di) == 0
+        """ADX should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_adx([], [], [], 14)
 
     def test_adx_length_mismatch(self):
-        """ADX with length mismatch returns NaN-filled vector (backward compatibility)"""
+        """ADX with length mismatch should raise ValueError"""
         high, low, close, _ = self.valid_ohlc(50)
-        # Length mismatch is handled via ok_or_nan_vec, returns NaN instead of raising
-        adx, plus_di, minus_di = haze.py_adx(high, low[:40], close, 14)
-        assert len(adx) == 50
-        assert len(plus_di) == 50
-        assert len(minus_di) == 50
+        # Proper error handling: raise ValueError for length mismatch
+        with pytest.raises(ValueError, match="Length mismatch"):
+            haze.py_adx(high, low[:40], close, 14)
 
     def test_adx_valid_output(self):
         """ADX returns values in [0, 100] range"""
@@ -511,12 +486,9 @@ class TestTrendIndicators(IndicatorTestBase):
 
     # ---- SuperTrend Tests ----
     def test_supertrend_empty_input(self):
-        """SuperTrend returns empty tuple for empty input"""
-        trend, direction, lower, upper = haze.py_supertrend([], [], [], 10, 3.0)
-        assert len(trend) == 0
-        assert len(direction) == 0
-        assert len(lower) == 0
-        assert len(upper) == 0
+        """SuperTrend should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_supertrend([], [], [], 10, 3.0)
 
     def test_supertrend_valid_output(self):
         """SuperTrend returns correct direction values"""
@@ -535,26 +507,23 @@ class TestTrendIndicators(IndicatorTestBase):
 
     # ---- PSAR Tests ----
     def test_psar_empty_input(self):
-        """PSAR returns empty tuple for empty input"""
-        psar, trend = haze.py_psar([], [], [])
-        assert len(psar) == 0
-        assert len(trend) == 0
+        """PSAR should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_psar([], [], [], af_init=0.02, af_increment=0.02, af_max=0.2)
 
     def test_psar_valid_output(self):
         """PSAR returns correct output format"""
         high, low, close, _ = self.valid_ohlc(50)
-        psar, trend = haze.py_psar(high, low, close)
+        psar, trend = haze.py_psar(high, low, close, af_init=0.02, af_increment=0.02, af_max=0.2)
 
         assert len(psar) == 50
         assert len(trend) == 50
 
     # ---- Aroon Tests ----
     def test_aroon_empty_input(self):
-        """Aroon returns empty tuple for empty input"""
-        aroon_up, aroon_down, aroon_oscillator = haze.py_aroon([], [], 14)
-        assert len(aroon_up) == 0
-        assert len(aroon_down) == 0
-        assert len(aroon_oscillator) == 0
+        """Aroon should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_aroon([], [], 14)
 
     def test_aroon_valid_output(self):
         """Aroon returns values in [0, 100] range"""
@@ -574,10 +543,9 @@ class TestTrendIndicators(IndicatorTestBase):
 
     # ---- Vortex Tests ----
     def test_vortex_empty_input(self):
-        """Vortex returns empty tuple for empty input"""
-        vi_plus, vi_minus = haze.py_vortex([], [], [], 14)
-        assert len(vi_plus) == 0
-        assert len(vi_minus) == 0
+        """Vortex should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_vortex([], [], [], 14)
 
     def test_vortex_valid_output(self):
         """Vortex returns correct output format"""
@@ -589,22 +557,22 @@ class TestTrendIndicators(IndicatorTestBase):
 
     # ---- DPO Tests ----
     def test_dpo_empty_input(self):
-        """DPO returns empty list for empty input"""
-        result = haze.py_dpo([])
-        assert len(result) == 0
+        """DPO should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_dpo([], period=20)
 
     def test_dpo_valid_output(self):
         """DPO returns correct output format"""
         data = self.valid_data(50)
-        result = haze.py_dpo(data)
+        result = haze.py_dpo(data, period=20)
 
         assert len(result) == 50
 
     # ---- QStick Tests ----
     def test_qstick_empty_input(self):
-        """QStick returns empty list for empty input"""
-        result = haze.py_qstick([], [], 10)
-        assert len(result) == 0
+        """QStick should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_qstick([], [], 10)
 
     def test_qstick_valid_output(self):
         """QStick returns correct output format"""
@@ -615,9 +583,9 @@ class TestTrendIndicators(IndicatorTestBase):
 
     # ---- VHF Tests ----
     def test_vhf_empty_input(self):
-        """VHF returns empty list for empty input"""
-        result = haze.py_vhf([], 28)
-        assert len(result) == 0
+        """VHF should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_vhf([], 28)
 
     def test_vhf_valid_output(self):
         """VHF returns correct output format"""
@@ -628,22 +596,22 @@ class TestTrendIndicators(IndicatorTestBase):
 
     # ---- TRIX Tests ----
     def test_trix_empty_input(self):
-        """TRIX returns empty list for empty input"""
-        result = haze.py_trix([])
-        assert len(result) == 0
+        """TRIX should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_trix([], period=15)
 
     def test_trix_valid_output(self):
         """TRIX returns correct output format"""
         data = self.valid_data(100)
-        result = haze.py_trix(data)
+        result = haze.py_trix(data, period=15)
 
         assert len(result) == 100
 
     # ---- Choppiness Index Tests ----
     def test_choppiness_empty_input(self):
-        """Choppiness Index returns empty list for empty input"""
-        result = haze.py_choppiness([], [], [], 14)
-        assert len(result) == 0
+        """Choppiness Index should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_choppiness([], [], [], 14)
 
     def test_choppiness_valid_output(self):
         """Choppiness Index returns correct output format"""
@@ -662,17 +630,17 @@ class TestVolumeIndicators(IndicatorTestBase):
 
     # ---- OBV Tests ----
     def test_obv_empty_input(self):
-        """OBV returns empty list for empty input"""
-        result = haze.py_obv([], [])
-        assert len(result) == 0
+        """OBV should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_obv([], [])
 
     def test_obv_length_mismatch(self):
-        """OBV with length mismatch returns NaN-filled vector (backward compatibility)"""
+        """OBV with length mismatch should raise ValueError"""
         close = self.valid_data(50)
         volume = self.valid_volume(40)
-        # Length mismatch is handled via ok_or_nan_vec, returns NaN instead of raising
-        result = haze.py_obv(close, volume)
-        assert len(result) == 50
+        # Proper error handling: raise ValueError for length mismatch
+        with pytest.raises(ValueError, match="Length mismatch"):
+            haze.py_obv(close, volume)
 
     def test_obv_valid_output(self):
         """OBV returns correct output format"""
@@ -685,9 +653,9 @@ class TestVolumeIndicators(IndicatorTestBase):
 
     # ---- MFI Tests ----
     def test_mfi_empty_input(self):
-        """MFI returns empty list for empty input"""
-        result = haze.py_mfi([], [], [], [], 14)
-        assert len(result) == 0
+        """MFI should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_mfi([], [], [], [], 14)
 
     def test_mfi_valid_output(self):
         """MFI returns values in [0, 100] range"""
@@ -703,9 +671,9 @@ class TestVolumeIndicators(IndicatorTestBase):
 
     # ---- VWAP Tests ----
     def test_vwap_empty_input(self):
-        """VWAP returns empty list for empty input"""
-        result = haze.py_vwap([], [], [], [], None)
-        assert len(result) == 0
+        """VWAP should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_vwap([], [], [], [], None)
 
     def test_vwap_valid_output(self):
         """VWAP returns correct output format"""
@@ -717,9 +685,9 @@ class TestVolumeIndicators(IndicatorTestBase):
 
     # ---- CMF Tests ----
     def test_cmf_empty_input(self):
-        """CMF returns empty list for empty input"""
-        result = haze.py_cmf([], [], [], [], 20)
-        assert len(result) == 0
+        """CMF should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_cmf([], [], [], [], 20)
 
     def test_cmf_valid_output(self):
         """CMF returns values in [-1, 1] range"""
@@ -735,22 +703,22 @@ class TestVolumeIndicators(IndicatorTestBase):
 
     # ---- Volume Oscillator Tests ----
     def test_volume_oscillator_empty_input(self):
-        """Volume Oscillator returns empty list for empty input"""
-        result = haze.py_volume_oscillator([])
-        assert len(result) == 0
+        """Volume Oscillator should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_volume_oscillator([], short_period=5, long_period=10)
 
     def test_volume_oscillator_valid_output(self):
         """Volume Oscillator returns correct output format"""
         volume = self.valid_volume(50)
-        result = haze.py_volume_oscillator(volume)
+        result = haze.py_volume_oscillator(volume, short_period=5, long_period=10)
 
         assert len(result) == 50
 
     # ---- AD Line Tests ----
     def test_ad_line_empty_input(self):
-        """AD Line returns empty list for empty input"""
-        result = haze.py_ad([], [], [], [])
-        assert len(result) == 0
+        """AD Line should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_ad([], [], [], [])
 
     def test_ad_line_valid_output(self):
         """AD Line returns correct output format"""
@@ -762,9 +730,9 @@ class TestVolumeIndicators(IndicatorTestBase):
 
     # ---- PVT Tests ----
     def test_pvt_empty_input(self):
-        """PVT returns empty list for empty input"""
-        result = haze.py_pvt([], [])
-        assert len(result) == 0
+        """PVT should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_pvt([], [])
 
     def test_pvt_valid_output(self):
         """PVT returns correct output format"""
@@ -776,15 +744,15 @@ class TestVolumeIndicators(IndicatorTestBase):
 
     # ---- EOM Tests ----
     def test_eom_empty_input(self):
-        """EOM returns empty list for empty input"""
-        result = haze.py_eom([], [], [])
-        assert len(result) == 0
+        """EOM should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_eom([], [], [], period=14)
 
     def test_eom_valid_output(self):
         """EOM returns correct output format"""
         high, low, _, _ = self.valid_ohlc(50)
         volume = self.valid_volume(50)
-        result = haze.py_eom(high, low, volume)
+        result = haze.py_eom(high, low, volume, period=14)
 
         assert len(result) == 50
 
@@ -857,9 +825,9 @@ class TestPriceTransformIndicators(IndicatorTestBase):
 
     # ---- MEDPRICE Tests ----
     def test_medprice_empty_input(self):
-        """MEDPRICE returns empty list for empty input"""
-        result = haze.py_medprice([], [])
-        assert len(result) == 0
+        """MEDPRICE should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_medprice([], [])
 
     def test_medprice_valid_output(self):
         """MEDPRICE = (High + Low) / 2"""
@@ -874,9 +842,9 @@ class TestPriceTransformIndicators(IndicatorTestBase):
 
     # ---- TYPPRICE Tests ----
     def test_typprice_empty_input(self):
-        """TYPPRICE returns empty list for empty input"""
-        result = haze.py_typprice([], [], [])
-        assert len(result) == 0
+        """TYPPRICE should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_typprice([], [], [])
 
     def test_typprice_valid_output(self):
         """TYPPRICE = (High + Low + Close) / 3"""
@@ -891,9 +859,9 @@ class TestPriceTransformIndicators(IndicatorTestBase):
 
     # ---- WCLPRICE Tests ----
     def test_wclprice_empty_input(self):
-        """WCLPRICE returns empty list for empty input"""
-        result = haze.py_wclprice([], [], [])
-        assert len(result) == 0
+        """WCLPRICE should fail-fast on empty input"""
+        with pytest.raises(ValueError):
+            haze.py_wclprice([], [], [])
 
     def test_wclprice_valid_output(self):
         """WCLPRICE = (High + Low + 2*Close) / 4"""
@@ -1043,7 +1011,7 @@ class TestIntegration(IndicatorTestBase):
     def test_stochastic_d_is_smoothed_k(self):
         """Verify Stochastic %D is smoothed version of %K"""
         high, low, close, _ = self.valid_ohlc(100)
-        k, d = haze.py_stochastic(high, low, close, 14, 3)
+        k, d = haze.py_stochastic(high, low, close, 14, 3, 3)
 
         # %D should be smoother than %K (verified by visual inspection)
         assert len(k) == len(d) == 100

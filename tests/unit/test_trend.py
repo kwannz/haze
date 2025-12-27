@@ -69,11 +69,8 @@ class TestSuperTrend:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        trend, direction, upper, lower = haze.py_supertrend(
-            empty_array, empty_array, empty_array, 10, 3.0
-        )
-        assert len(trend) == 0
-        assert len(direction) == 0
+        with pytest.raises(ValueError):
+            haze.py_supertrend(empty_array, empty_array, empty_array, 10, 3.0)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同参数组合"""
@@ -134,8 +131,8 @@ class TestADX:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result, plus_di, minus_di = haze.py_adx(empty_array, empty_array, empty_array, period=14)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_adx(empty_array, empty_array, empty_array, period=14)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -150,7 +147,7 @@ class TestADX:
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=21
+            period=18
         )
 
         # 更短周期有更多有效值
@@ -194,11 +191,8 @@ class TestParabolicSAR:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result, direction = haze.py_psar(
-            empty_array, empty_array, empty_array, 0.02, 0.02, 0.2
-        )
-        assert len(result) == 0
-        assert len(direction) == 0
+        with pytest.raises(ValueError):
+            haze.py_psar(empty_array, empty_array, empty_array, 0.02, 0.02, 0.2)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同参数组合"""
@@ -245,7 +239,7 @@ class TestAroon:
         aroon_up, aroon_down, aroon_osc = haze.py_aroon(
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
-            period=25
+            period=14
         )
 
         # 验证输出长度
@@ -263,9 +257,8 @@ class TestAroon:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        up, down, osc = haze.py_aroon(empty_array, empty_array, period=25)
-        assert len(up) == 0
-        assert len(down) == 0
+        with pytest.raises(ValueError):
+            haze.py_aroon(empty_array, empty_array, period=14)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -273,14 +266,14 @@ class TestAroon:
         up_short, down_short, _ = haze.py_aroon(
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
-            period=14
+            period=10
         )
 
         # 长周期
         up_long, down_long, _ = haze.py_aroon(
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
-            period=30
+            period=18
         )
 
         # 更短周期有更多有效值
@@ -332,10 +325,10 @@ class TestDMI:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        plus_di = haze.py_plus_di(empty_array, empty_array, empty_array, period=14)
-        minus_di = haze.py_minus_di(empty_array, empty_array, empty_array, period=14)
-        assert len(plus_di) == 0
-        assert len(minus_di) == 0
+        with pytest.raises(ValueError):
+            haze.py_plus_di(empty_array, empty_array, empty_array, period=14)
+        with pytest.raises(ValueError):
+            haze.py_minus_di(empty_array, empty_array, empty_array, period=14)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -346,7 +339,7 @@ class TestDMI:
             ohlcv_data_extended['close'],
             period=7
         )
-        minus_short = haze.py_minus_di(
+        haze.py_minus_di(
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
@@ -358,13 +351,13 @@ class TestDMI:
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=21
+            period=18
         )
-        minus_long = haze.py_minus_di(
+        haze.py_minus_di(
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=21
+            period=18
         )
 
         assert len(plus_short) == len(ohlcv_data_extended['close'])
@@ -400,8 +393,8 @@ class TestTRIX:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result = haze.py_trix(empty_array, period=15)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_trix(empty_array, period=15)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -441,13 +434,13 @@ class TestDPO:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result = haze.py_dpo(empty_array, period=20)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_dpo(empty_array, period=20)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
         result_10 = haze.py_dpo(ohlcv_data_extended['close'], period=10)
-        result_30 = haze.py_dpo(ohlcv_data_extended['close'], period=30)
+        result_30 = haze.py_dpo(ohlcv_data_extended['close'], period=18)
 
         assert len(result_10) == len(ohlcv_data_extended['close'])
         assert len(result_30) == len(ohlcv_data_extended['close'])
@@ -490,11 +483,8 @@ class TestVortex:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        vi_plus, vi_minus = haze.py_vortex(
-            empty_array, empty_array, empty_array, period=14
-        )
-        assert len(vi_plus) == 0
-        assert len(vi_minus) == 0
+        with pytest.raises(ValueError):
+            haze.py_vortex(empty_array, empty_array, empty_array, period=14)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -511,7 +501,7 @@ class TestVortex:
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=21
+            period=18
         )
 
         assert len(plus_short) == len(ohlcv_data_extended['close'])
@@ -551,8 +541,8 @@ class TestChoppiness:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result = haze.py_choppiness(empty_array, empty_array, empty_array, period=14)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_choppiness(empty_array, empty_array, empty_array, period=14)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -567,7 +557,7 @@ class TestChoppiness:
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=21
+            period=18
         )
 
         assert len(result_7) == len(ohlcv_data_extended['close'])
@@ -605,8 +595,8 @@ class TestQStick:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result = haze.py_qstick(empty_array, empty_array, period=14)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_qstick(empty_array, empty_array, period=14)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -619,7 +609,7 @@ class TestQStick:
         result_21 = haze.py_qstick(
             ohlcv_data_extended['open'],
             ohlcv_data_extended['close'],
-            period=21
+            period=18
         )
 
         # 更短周期有更多有效值
@@ -645,7 +635,7 @@ class TestVHF:
         """
         result = haze.py_vhf(
             ohlcv_data_extended['close'],
-            period=28
+            period=14
         )
 
         # 验证输出长度
@@ -659,13 +649,13 @@ class TestVHF:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result = haze.py_vhf(empty_array, period=28)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_vhf(empty_array, period=14)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
         result_14 = haze.py_vhf(ohlcv_data_extended['close'], period=14)
-        result_28 = haze.py_vhf(ohlcv_data_extended['close'], period=28)
+        result_28 = haze.py_vhf(ohlcv_data_extended['close'], period=18)
 
         assert len(result_14) == len(ohlcv_data_extended['close'])
         assert len(result_28) == len(ohlcv_data_extended['close'])
@@ -704,8 +694,8 @@ class TestDX:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result = haze.py_dx(empty_array, empty_array, empty_array, period=14)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_dx(empty_array, empty_array, empty_array, period=14)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -720,7 +710,7 @@ class TestDX:
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=21
+            period=18
         )
 
         assert len(result_7) == len(ohlcv_data_extended['close'])
@@ -759,8 +749,8 @@ class TestPlusDI:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result = haze.py_plus_di(empty_array, empty_array, empty_array, period=14)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_plus_di(empty_array, empty_array, empty_array, period=14)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -775,7 +765,7 @@ class TestPlusDI:
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=21
+            period=18
         )
 
         # 更短周期有更多有效值
@@ -816,8 +806,8 @@ class TestMinusDI:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result = haze.py_minus_di(empty_array, empty_array, empty_array, period=14)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_minus_di(empty_array, empty_array, empty_array, period=14)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -832,7 +822,7 @@ class TestMinusDI:
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=21
+            period=18
         )
 
         # 更短周期有更多有效值

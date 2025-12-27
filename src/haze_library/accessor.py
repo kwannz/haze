@@ -23,7 +23,8 @@ from __future__ import annotations
 
 import pandas as pd
 import numpy as np
-from typing import Optional, Union, Tuple, List, Any
+import inspect
+from typing import Union, Tuple, List, Any
 from .exceptions import ColumnNotFoundError
 
 # Import Rust extension
@@ -67,13 +68,123 @@ class TechnicalAnalysisAccessor:
     def __init__(self, pandas_obj: pd.DataFrame):
         self._obj = pandas_obj
         self._cache_columns()
+        self._frame_cache: Any = None
+        self._frame_cache_len: int | None = None
+        self._dynamic_method_cache: dict[str, Any] = {}
 
-    def _cache_columns(self):
+    def _cache_columns(self) -> None:
         """Cache normalized column name mappings."""
-        self._col_map = {}
+        self._col_map: dict[str, str] = {}
         for col in self._obj.columns:
             normalized = _normalize_column_name(col)
             self._col_map[normalized] = col
+
+    def clear_frame_cache(self) -> None:
+        """Clear cached Rust OhlcvFrame (if any)."""
+        self._frame_cache = None
+        self._frame_cache_len = None
+
+    def frame(self, *, refresh: bool = False) -> Any:
+        """Get a cached Rust `OhlcvFrame` for fast repeated computations.
+
+        If the underlying DataFrame length changes, the cache is rebuilt
+        automatically. For in-place OHLCV edits with the same length, call
+        `df.haze.clear_frame_cache()` or `df.haze.frame(refresh=True)`.
+        """
+
+        n = len(self._obj)
+        if (
+            not refresh
+            and self._frame_cache is not None
+            and self._frame_cache_len == n
+        ):
+            return self._frame_cache
+
+        timestamps = list(range(n))
+        close = _to_list(self._get_column("close"))
+
+        open_ = _to_list(self._get_column("open"))
+        high = _to_list(self._get_column("high"))
+        low = _to_list(self._get_column("low"))
+        volume = _to_list(self._get_column("volume"))
+
+        self._frame_cache = _lib.OhlcvFrame(timestamps, open_, high, low, close, volume)
+        self._frame_cache_len = n
+        return self._frame_cache
+
+    def __getattr__(self, name: str) -> Any:
+        """Dynamically expose Rust `py_*` indicators as `df.haze.<name>(...)`.
+
+        This keeps the accessor surface in sync with the Rust extension module,
+        without manually writing hundreds of thin wrappers.
+        """
+
+        if name.startswith("_"):
+            raise AttributeError(name)
+
+        cached = self._dynamic_method_cache.get(name)
+        if cached is not None:
+            return cached
+
+        py_name = f"py_{name}"
+        py_func = getattr(_lib, py_name, None)
+        if py_func is None or not callable(py_func):
+            raise AttributeError(name)
+
+        sig = inspect.signature(py_func)
+        ordered_params = list(sig.parameters)
+
+        data_param_names = []
+        for param_name in ordered_params:
+            if param_name in {"open", "high", "low", "close", "volume", "values"}:
+                data_param_names.append(param_name)
+                continue
+            break
+
+        def _wrap_result(result: Any) -> Any:
+            if isinstance(result, list):
+                return (
+                    _to_series(result, self.index)
+                    if len(result) == len(self._obj)
+                    else result
+                )
+            if isinstance(result, tuple):
+                return tuple(
+                    (
+                        _to_series(v, self.index)
+                        if isinstance(v, list) and len(v) == len(self._obj)
+                        else v
+                    )
+                    for v in result
+                )
+            if isinstance(result, dict):
+                return {
+                    k: (
+                        _to_series(v, self.index)
+                        if isinstance(v, list) and len(v) == len(self._obj)
+                        else v
+                    )
+                    for k, v in result.items()
+                }
+            return result
+
+        def dynamic(*args: Any, **kwargs: Any) -> Any:
+            column = kwargs.pop("column", "close")
+            data_args: List[Any] = []
+            for p in data_param_names:
+                if p == "values" or (p == "close" and len(data_param_names) == 1):
+                    data_args.append(_to_list(self._get_column(column)))
+                else:
+                    data_args.append(_to_list(self._get_column(p)))
+
+            return _wrap_result(py_func(*data_args, *args, **kwargs))
+
+        dynamic.__name__ = name
+        dynamic.__qualname__ = f"{type(self).__name__}.{name}"
+        dynamic.__doc__ = getattr(py_func, "__doc__", None)
+
+        self._dynamic_method_cache[name] = dynamic
+        return dynamic
 
     def _get_column(self, name: str) -> pd.Series:
         """Get column by normalized name."""
@@ -128,12 +239,26 @@ class TechnicalAnalysisAccessor:
 
     def sma(self, period: int = 20, column: str = 'close') -> pd.Series:
         """Simple Moving Average."""
+        if column == "close":
+            try:
+                result = self.frame().sma(period)
+                return _to_series(result, self.index)
+            except (AttributeError, ColumnNotFoundError):
+                pass
+
         data = _to_list(self._get_column(column))
         result = _lib.py_sma(data, period)
         return _to_series(result, self.index)
 
     def ema(self, period: int = 20, column: str = 'close') -> pd.Series:
         """Exponential Moving Average."""
+        if column == "close":
+            try:
+                result = self.frame().ema(period)
+                return _to_series(result, self.index)
+            except (AttributeError, ColumnNotFoundError):
+                pass
+
         data = _to_list(self._get_column(column))
         result = _lib.py_ema(data, period)
         return _to_series(result, self.index)
@@ -146,12 +271,26 @@ class TechnicalAnalysisAccessor:
 
     def wma(self, period: int = 20, column: str = 'close') -> pd.Series:
         """Weighted Moving Average."""
+        if column == "close":
+            try:
+                result = self.frame().wma(period)
+                return _to_series(result, self.index)
+            except (AttributeError, ColumnNotFoundError):
+                pass
+
         data = _to_list(self._get_column(column))
         result = _lib.py_wma(data, period)
         return _to_series(result, self.index)
 
     def hma(self, period: int = 20, column: str = 'close') -> pd.Series:
         """Hull Moving Average."""
+        if column == "close":
+            try:
+                result = self.frame().hma(period)
+                return _to_series(result, self.index)
+            except (AttributeError, ColumnNotFoundError):
+                pass
+
         data = _to_list(self._get_column(column))
         result = _lib.py_hma(data, period)
         return _to_series(result, self.index)
@@ -217,9 +356,16 @@ class TechnicalAnalysisAccessor:
 
     def atr(self, period: int = 14) -> pd.Series:
         """Average True Range."""
-        high, low, close = self._get_hlc()
-        result = _lib.py_atr(high, low, close, period)
-        return _to_series(result, self.index)
+        try:
+            # Preserve the historical behavior: ATR requires high/low/close columns.
+            self._get_column("high")
+            self._get_column("low")
+            result = self.frame().atr(period)
+            return _to_series(result, self.index)
+        except (AttributeError, ColumnNotFoundError):
+            high, low, close = self._get_hlc()
+            result = _lib.py_atr(high, low, close, period)
+            return _to_series(result, self.index)
 
     def natr(self, period: int = 14) -> pd.Series:
         """Normalized Average True Range (percentage)."""
@@ -229,6 +375,15 @@ class TechnicalAnalysisAccessor:
 
     def true_range(self, drift: int = 1) -> pd.Series:
         """True Range."""
+        if drift == 1:
+            try:
+                self._get_column("high")
+                self._get_column("low")
+                result = self.frame().true_range()
+                return _to_series(result, self.index)
+            except (AttributeError, ColumnNotFoundError):
+                pass
+
         high, low, close = self._get_hlc()
         result = _lib.py_true_range(high, low, close, drift)
         return _to_series(result, self.index)
@@ -236,6 +391,17 @@ class TechnicalAnalysisAccessor:
     def bollinger_bands(self, period: int = 20, std: float = 2.0,
                         column: str = 'close') -> Tuple[pd.Series, pd.Series, pd.Series]:
         """Bollinger Bands. Returns (upper, middle, lower)."""
+        if column == "close":
+            try:
+                upper, middle, lower = self.frame().bollinger_bands(period, std)
+                return (
+                    _to_series(upper, self.index),
+                    _to_series(middle, self.index),
+                    _to_series(lower, self.index),
+                )
+            except (AttributeError, ColumnNotFoundError):
+                pass
+
         data = _to_list(self._get_column(column))
         upper, middle, lower = _lib.py_bollinger_bands(data, period, std)
         return (
@@ -244,9 +410,11 @@ class TechnicalAnalysisAccessor:
             _to_series(lower, self.index),
         )
 
-    def keltner_channel(self, period: int = 20, atr_period: int = 10,
+    def keltner_channel(self, period: int = 20, atr_period: int | None = None,
                         multiplier: float = 2.0) -> Tuple[pd.Series, pd.Series, pd.Series]:
         """Keltner Channel. Returns (upper, middle, lower)."""
+        if atr_period is None:
+            atr_period = period
         high, low, close = self._get_hlc()
         upper, middle, lower = _lib.py_keltner_channel(
             high, low, close, period, atr_period, multiplier
@@ -272,6 +440,13 @@ class TechnicalAnalysisAccessor:
 
     def rsi(self, period: int = 14, column: str = 'close') -> pd.Series:
         """Relative Strength Index."""
+        if column == "close":
+            try:
+                result = self.frame().rsi(period)
+                return _to_series(result, self.index)
+            except (AttributeError, ColumnNotFoundError):
+                pass
+
         data = _to_list(self._get_column(column))
         result = _lib.py_rsi(data, period)
         return _to_series(result, self.index)
@@ -279,6 +454,17 @@ class TechnicalAnalysisAccessor:
     def macd(self, fast: int = 12, slow: int = 26,
              signal: int = 9, column: str = 'close') -> Tuple[pd.Series, pd.Series, pd.Series]:
         """MACD. Returns (macd_line, signal_line, histogram)."""
+        if column == "close":
+            try:
+                macd_line, signal_line, histogram = self.frame().macd(fast, slow, signal)
+                return (
+                    _to_series(macd_line, self.index),
+                    _to_series(signal_line, self.index),
+                    _to_series(histogram, self.index),
+                )
+            except (AttributeError, ColumnNotFoundError):
+                pass
+
         data = _to_list(self._get_column(column))
         macd_line, signal_line, histogram = _lib.py_macd(data, fast, slow, signal)
         return (
@@ -287,11 +473,18 @@ class TechnicalAnalysisAccessor:
             _to_series(histogram, self.index),
         )
 
-    def stochastic(self, k_period: int = 14, d_period: int = 3) -> Tuple[pd.Series, pd.Series]:
+    def stochastic(self, k_period: int = 14, smooth_k: int = 3,
+                   d_period: int = 3) -> Tuple[pd.Series, pd.Series]:
         """Stochastic Oscillator. Returns (%K, %D)."""
-        high, low, close = self._get_hlc()
-        k, d = _lib.py_stochastic(high, low, close, k_period, d_period)
-        return _to_series(k, self.index), _to_series(d, self.index)
+        try:
+            self._get_column("high")
+            self._get_column("low")
+            k, d = self.frame().stochastic(k_period, smooth_k, d_period)
+            return _to_series(k, self.index), _to_series(d, self.index)
+        except (AttributeError, ColumnNotFoundError):
+            high, low, close = self._get_hlc()
+            k, d = _lib.py_stochastic(high, low, close, k_period, smooth_k, d_period)
+            return _to_series(k, self.index), _to_series(d, self.index)
 
     def stochrsi(self, period: int = 14, k_period: int = 3, d_period: int = 3,
                  column: str = 'close') -> Tuple[pd.Series, pd.Series]:
@@ -302,15 +495,27 @@ class TechnicalAnalysisAccessor:
 
     def cci(self, period: int = 20) -> pd.Series:
         """Commodity Channel Index."""
-        high, low, close = self._get_hlc()
-        result = _lib.py_cci(high, low, close, period)
-        return _to_series(result, self.index)
+        try:
+            self._get_column("high")
+            self._get_column("low")
+            result = self.frame().cci(period)
+            return _to_series(result, self.index)
+        except (AttributeError, ColumnNotFoundError):
+            high, low, close = self._get_hlc()
+            result = _lib.py_cci(high, low, close, period)
+            return _to_series(result, self.index)
 
     def williams_r(self, period: int = 14) -> pd.Series:
         """Williams %R."""
-        high, low, close = self._get_hlc()
-        result = _lib.py_williams_r(high, low, close, period)
-        return _to_series(result, self.index)
+        try:
+            self._get_column("high")
+            self._get_column("low")
+            result = self.frame().williams_r(period)
+            return _to_series(result, self.index)
+        except (AttributeError, ColumnNotFoundError):
+            high, low, close = self._get_hlc()
+            result = _lib.py_williams_r(high, low, close, period)
+            return _to_series(result, self.index)
 
     def awesome_oscillator(self, fast: int = 5, slow: int = 34) -> pd.Series:
         """Awesome Oscillator."""
@@ -325,10 +530,11 @@ class TechnicalAnalysisAccessor:
         fisher, signal = _lib.py_fisher_transform(high, low, close, period)
         return _to_series(fisher, self.index), _to_series(signal, self.index)
 
-    def kdj(self, k_period: int = 9, d_period: int = 3) -> Tuple[pd.Series, pd.Series, pd.Series]:
+    def kdj(self, k_period: int = 9, smooth_k: int = 3,
+            d_period: int = 3) -> Tuple[pd.Series, pd.Series, pd.Series]:
         """KDJ Indicator. Returns (K, D, J)."""
         high, low, close = self._get_hlc()
-        k, d, j = _lib.py_kdj(high, low, close, k_period, d_period)
+        k, d, j = _lib.py_kdj(high, low, close, k_period, smooth_k, d_period)
         return (
             _to_series(k, self.index),
             _to_series(d, self.index),
@@ -386,8 +592,13 @@ class TechnicalAnalysisAccessor:
     def supertrend(self, period: int = 10, multiplier: float = 3.0
                    ) -> Tuple[pd.Series, pd.Series, pd.Series, pd.Series]:
         """SuperTrend. Returns (supertrend, direction, upper_band, lower_band)."""
-        high, low, close = self._get_hlc()
-        st, direction, upper, lower = _lib.py_supertrend(high, low, close, period, multiplier)
+        try:
+            self._get_column("high")
+            self._get_column("low")
+            st, direction, upper, lower = self.frame().supertrend(period, multiplier)
+        except (AttributeError, ColumnNotFoundError):
+            high, low, close = self._get_hlc()
+            st, direction, upper, lower = _lib.py_supertrend(high, low, close, period, multiplier)
         return (
             _to_series(st, self.index),
             _to_series(direction, self.index),
@@ -397,8 +608,13 @@ class TechnicalAnalysisAccessor:
 
     def adx(self, period: int = 14) -> Tuple[pd.Series, pd.Series, pd.Series]:
         """Average Directional Index. Returns (adx, plus_di, minus_di)."""
-        high, low, close = self._get_hlc()
-        adx_val, plus_di, minus_di = _lib.py_adx(high, low, close, period)
+        try:
+            self._get_column("high")
+            self._get_column("low")
+            adx_val, plus_di, minus_di = self.frame().adx(period)
+        except (AttributeError, ColumnNotFoundError):
+            high, low, close = self._get_hlc()
+            adx_val, plus_di, minus_di = _lib.py_adx(high, low, close, period)
         return (
             _to_series(adx_val, self.index),
             _to_series(plus_di, self.index),
@@ -459,24 +675,43 @@ class TechnicalAnalysisAccessor:
 
     def obv(self) -> pd.Series:
         """On Balance Volume."""
-        close = _to_list(self._get_column('close'))
-        volume = _to_list(self._get_column('volume'))
-        result = _lib.py_obv(close, volume)
-        return _to_series(result, self.index)
+        try:
+            self._get_column("volume")
+            result = self.frame().obv()
+            return _to_series(result, self.index)
+        except (AttributeError, ColumnNotFoundError):
+            close = _to_list(self._get_column('close'))
+            volume = _to_list(self._get_column('volume'))
+            result = _lib.py_obv(close, volume)
+            return _to_series(result, self.index)
 
     def vwap(self) -> pd.Series:
         """Volume Weighted Average Price."""
-        high, low, close = self._get_hlc()
-        volume = _to_list(self._get_column('volume'))
-        result = _lib.py_vwap(high, low, close, volume)
-        return _to_series(result, self.index)
+        try:
+            self._get_column("high")
+            self._get_column("low")
+            self._get_column("volume")
+            result = self.frame().vwap(0)
+            return _to_series(result, self.index)
+        except (AttributeError, ColumnNotFoundError):
+            high, low, close = self._get_hlc()
+            volume = _to_list(self._get_column('volume'))
+            result = _lib.py_vwap(high, low, close, volume)
+            return _to_series(result, self.index)
 
     def mfi(self, period: int = 14) -> pd.Series:
         """Money Flow Index."""
-        high, low, close = self._get_hlc()
-        volume = _to_list(self._get_column('volume'))
-        result = _lib.py_mfi(high, low, close, volume, period)
-        return _to_series(result, self.index)
+        try:
+            self._get_column("high")
+            self._get_column("low")
+            self._get_column("volume")
+            result = self.frame().mfi(period)
+            return _to_series(result, self.index)
+        except (AttributeError, ColumnNotFoundError):
+            high, low, close = self._get_hlc()
+            volume = _to_list(self._get_column('volume'))
+            result = _lib.py_mfi(high, low, close, volume, period)
+            return _to_series(result, self.index)
 
     def cmf(self, period: int = 20) -> pd.Series:
         """Chaikin Money Flow."""

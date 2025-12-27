@@ -120,9 +120,8 @@ class TestVWAP:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_vwap([], [], [], [])
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_vwap([], [], [], [])
 
 
 # ==================== 3. Force Index ====================
@@ -157,9 +156,8 @@ class TestForceIndex:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_force_index([], [], period=13)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_force_index([], [], period=13)
 
 
 # ==================== 4. CMF ====================
@@ -241,9 +239,8 @@ class TestVolumeOscillator:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_volume_oscillator([], short_period=5, long_period=10)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_volume_oscillator([], short_period=5, long_period=10)
 
 
 # ==================== 6. AD ====================
@@ -271,9 +268,8 @@ class TestAD:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_ad([], [], [], [])
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_ad([], [], [], [])
 
     def test_cumulative_nature(self, ohlcv_data_extended):
         """测试AD的累积性质"""
@@ -311,9 +307,13 @@ class TestPVT:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_pvt([], [])
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_pvt([], [])
+
+    def test_single_value(self):
+        """测试单值输入"""
+        with pytest.raises(ValueError):
+            haze.py_pvt([10.0], [100.0])
 
     def test_cumulative_nature(self):
         """测试PVT的累积性质"""
@@ -348,9 +348,13 @@ class TestNVI:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_nvi([], [])
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_nvi([], [])
+
+    def test_single_value(self):
+        """测试单值输入"""
+        with pytest.raises(ValueError):
+            haze.py_nvi([10.0], [100.0])
 
     def test_initial_value(self):
         """测试NVI初始值"""
@@ -387,9 +391,13 @@ class TestPVI:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_pvi([], [])
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_pvi([], [])
+
+    def test_single_value(self):
+        """测试单值输入"""
+        with pytest.raises(ValueError):
+            haze.py_pvi([10.0], [100.0])
 
     def test_initial_value(self):
         """测试PVI初始值"""
@@ -438,9 +446,13 @@ class TestEOM:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_eom([], [], [], period=14)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_eom([], [], [], period=14)
+
+    def test_single_value(self):
+        """测试单值输入"""
+        with pytest.raises(ValueError):
+            haze.py_eom([110.0], [100.0], [1000.0], period=1)
 
 
 # ==================== 11. ADOSC ====================
@@ -479,6 +491,5 @@ class TestADOSC:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_adosc([], [], [], [], fast_period=3, slow_period=10)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_adosc([], [], [], [], fast_period=3, slow_period=10)

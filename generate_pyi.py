@@ -1,479 +1,736 @@
 #!/usr/bin/env python3
 """
-生成 haze_library 类型存根文件 (.pyi)
-从 Rust 源代码提取函数签名并生成 Python 类型注解
+Script to generate .pyi type stub file from Rust source code.
+Extracts all #[pyfunction] declarations and their signatures.
 """
 
 import re
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional
 
-# Rust 类型到 Python 类型的映射
-RUST_TO_PYTHON_TYPE = {
-    'Vec<f64>': 'List[float]',
-    'Vec<i64>': 'List[int]',
-    'Vec<bool>': 'List[bool]',
-    'f64': 'float',
-    'i64': 'int',
-    'usize': 'int',
-    'bool': 'bool',
-    'String': 'str',
-    '&str': 'str',
+# Type mapping from Rust to Python
+TYPE_MAPPING = {
+    "f64": "float",
+    "usize": "int",
+    "i32": "int",
+    "bool": "bool",
+    "String": "str",
 }
 
-def parse_rust_type(rust_type: str) -> str:
-    """将 Rust 类型转换为 Python 类型注解"""
+CUSTOM_TUPLE_MAPPING = {
+    "Vec4F64": "tuple[list[float], list[float], list[float], list[float]]",
+    "Vec5F64": "tuple[list[float], list[float], list[float], list[float], list[float]]",
+    "Vec6F64": "tuple[list[float], list[float], list[float], list[float], list[float], list[float]]",
+    "Vec7F64": "tuple[list[float], list[float], list[float], list[float], list[float], list[float], list[float]]",
+    "Pivots9F64": "tuple[float, float, float, float, float, float, float, float, float]",
+}
+
+CUSTOM_CLASS_MAPPING = {
+    "PyHarmonicPattern": "PyHarmonicPattern",
+    "PySFGModel": "SFGModel",
+    "PyOhlcvFrame": "OhlcvFrame",
+    "Candle": "Candle",
+    "IndicatorResult": "IndicatorResult",
+    "MultiIndicatorResult": "MultiIndicatorResult",
+}
+
+PYCLASS_STUBS = """
+class Candle:
+    \"\"\"OHLCV Candle data structure.\"\"\"
+    timestamp: int
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float
+    def __init__(self, timestamp: int, open: float, high: float, low: float, close: float, volume: float) -> None: ...
+    def to_dict(self) -> dict[str, float]: ...
+    @property
+    def typical_price(self) -> float: ...
+    @property
+    def median_price(self) -> float: ...
+    @property
+    def weighted_close(self) -> float: ...
+
+class IndicatorResult:
+    \"\"\"Single indicator result container.\"\"\"
+    name: str
+    values: list[float]
+    metadata: dict[str, str]
+    def __init__(self, name: str, values: list[float]) -> None: ...
+    def add_metadata(self, key: str, value: str) -> None: ...
+    @property
+    def len(self) -> int: ...
+    def is_empty(self) -> bool: ...
+
+class MultiIndicatorResult:
+    \"\"\"Multiple indicator result container.\"\"\"
+    name: str
+    series: dict[str, list[float]]
+    metadata: dict[str, str]
+    def __init__(self, name: str) -> None: ...
+    def add_series(self, key: str, values: list[float]) -> None: ...
+    def add_metadata(self, key: str, value: str) -> None: ...
+
+class OhlcvFrame:
+    \"\"\"Cached OHLCV frame for fast repeated computations.\"\"\"
+    def __init__(
+        self,
+        timestamps: list[int],
+        open: list[float],
+        high: list[float],
+        low: list[float],
+        close: list[float],
+        volume: list[float],
+    ) -> None: ...
+    def len(self) -> int: ...
+    def __len__(self) -> int: ...
+    def is_empty(self) -> bool: ...
+    def clear_cache(self) -> None: ...
+    def cached_indicators(self) -> list[str]: ...
+    def get_cached(self, name: str) -> list[float] | None: ...
+    def compute_common_indicators(self) -> dict[str, list[float]]: ...
+    def sma(self, period: int) -> list[float]: ...
+    def ema(self, period: int) -> list[float]: ...
+    def wma(self, period: int) -> list[float]: ...
+    def hma(self, period: int) -> list[float]: ...
+    def atr(self, period: int) -> list[float]: ...
+    def true_range(self) -> list[float]: ...
+    def bollinger_bands(self, period: int, std_dev: float) -> tuple[list[float], list[float], list[float]]: ...
+    def rsi(self, period: int) -> list[float]: ...
+    def macd(self, fast: int, slow: int, signal: int) -> tuple[list[float], list[float], list[float]]: ...
+    def stochastic(self, k_period: int, d_period: int) -> tuple[list[float], list[float]]: ...
+    def cci(self, period: int) -> list[float]: ...
+    def williams_r(self, period: int) -> list[float]: ...
+    def supertrend(self, period: int, multiplier: float) -> tuple[list[float], list[float], list[float], list[float]]: ...
+    def adx(self, period: int) -> tuple[list[float], list[float], list[float]]: ...
+    def obv(self) -> list[float]: ...
+    def vwap(self, period: int) -> list[float]: ...
+    def mfi(self, period: int) -> list[float]: ...
+
+class PyHarmonicPattern:
+    \"\"\"Harmonic pattern detection result.\"\"\"
+    pattern_type: str
+    pattern_type_zh: str
+    is_bullish: bool
+    state: str
+    x_index: int
+    x_price: float
+    a_index: int
+    a_price: float
+    b_index: int
+    b_price: float
+    c_index: int | None
+    c_price: float | None
+    d_index: int | None
+    d_price: float | None
+    prz_high: float | None
+    prz_low: float | None
+    prz_center: float | None
+    probability: float
+    target_prices: list[float]
+    stop_loss: float | None
+
+class SFGModel:
+    \"\"\"Python-accessible ML model wrapper.\"\"\"
+    def is_trained(self) -> bool: ...
+    def features_dim(self) -> int: ...
+    def predict(self, features: list[float], n_samples: int) -> list[float]: ...
+"""
+
+
+def map_rust_type_to_python(rust_type: str, has_default: bool = False) -> str:
+    """Map Rust type to Python type annotation."""
     rust_type = rust_type.strip()
 
-    # 处理元组类型
-    if rust_type.startswith('(') and rust_type.endswith(')'):
+    # Handle Option<T>
+    if rust_type.startswith("Option<"):
+        inner_match = re.search(r"Option<(.+)>$", rust_type)
+        if inner_match:
+            inner_type = inner_match.group(1).strip()
+            base_type = map_rust_type_to_python(inner_type)
+            if has_default:
+                return base_type
+            return f"{base_type} | None"
+
+    # Custom class types
+    if rust_type in CUSTOM_CLASS_MAPPING:
+        return CUSTOM_CLASS_MAPPING[rust_type]
+
+    # Custom tuple aliases
+    if rust_type in CUSTOM_TUPLE_MAPPING:
+        return CUSTOM_TUPLE_MAPPING[rust_type]
+
+    # Handle Vec<T>
+    if rust_type.startswith("Vec<") and rust_type.endswith(">"):
+        inner_type = rust_type[4:-1].strip()
+        return f"list[{map_rust_type_to_python(inner_type)}]"
+
+    # Direct mapping
+    if rust_type in TYPE_MAPPING:
+        return TYPE_MAPPING[rust_type]
+
+    # Handle tuple types
+    if rust_type.startswith("(") and rust_type.endswith(")"):
         inner = rust_type[1:-1]
-        parts = [part.strip() for part in inner.split(',')]
-        py_parts = [RUST_TO_PYTHON_TYPE.get(p, 'Any') for p in parts]
-        return f"Tuple[{', '.join(py_parts)}]"
+        parts = []
+        depth = 0
+        current = []
+        for char in inner:
+            if char == "<":
+                depth += 1
+            elif char == ">":
+                depth -= 1
+            elif char == "," and depth == 0:
+                parts.append("".join(current).strip())
+                current = []
+                continue
+            current.append(char)
+        if current:
+            parts.append("".join(current).strip())
 
-    # 处理简单类型
-    return RUST_TO_PYTHON_TYPE.get(rust_type, 'Any')
+        python_parts = [map_rust_type_to_python(p) for p in parts]
+        return f"tuple[{', '.join(python_parts)}]"
 
-def parse_parameter(param_str: str) -> Tuple[str, str, bool]:
-    """解析参数定义,返回 (name, type, is_optional)"""
-    param_str = param_str.strip()
+    # Custom struct types - fallback
+    if any(x in rust_type for x in ["Pivots", "Ichimoku"]):
+        return "dict[str, float | list[float]]"
 
-    # 跳过空参数
-    if not param_str:
-        return None, None, False
+    return "float"
 
-    # 检查是否为 Option 类型
-    is_optional = 'Option<' in param_str
 
-    # 提取参数名和类型
-    if ':' in param_str:
-        name, type_part = param_str.split(':', 1)
-        name = name.strip()
-        type_part = type_part.strip()
+def extract_function_signature(block: str) -> Optional[Dict]:
+    """Extract function signature from a #[pyfunction] block."""
+    # Extract function name
+    fn_match = re.search(r"fn (py_\w+)\s*\(", block)
+    if not fn_match:
+        return None
 
-        # 处理 Option 类型
-        if is_optional:
-            match = re.search(r'Option<(.+?)>', type_part)
-            if match:
-                inner_type = match.group(1)
-                py_type = parse_rust_type(inner_type)
-            else:
-                py_type = 'Any'
-        else:
-            # 处理向量类型
-            if type_part.startswith('Vec<'):
-                py_type = parse_rust_type(type_part)
-            else:
-                py_type = parse_rust_type(type_part)
+    fn_name = fn_match.group(1)
 
-        return name, py_type, is_optional
+    # Extract full function signature
+    fn_sig_match = re.search(r"fn py_\w+\s*\((.*?)\)\s*->\s*([^{]+)", block, re.DOTALL)
+    if not fn_sig_match:
+        return None
 
-    return None, None, False
+    params_str = fn_sig_match.group(1)
+    return_type_str = fn_sig_match.group(2).strip()
 
-def extract_functions_from_rust(rust_file: Path) -> Dict[str, dict]:
-    """从 Rust 源文件提取所有 PyFunction 定义"""
+    # Extract text_signature for defaults
+    text_sig_match = re.search(r'text_signature = "([^"]+)"', block)
+    defaults = {}
+    if text_sig_match:
+        text_sig = text_sig_match.group(1)
+        sig_params = re.search(r"\(([^)]*)\)", text_sig)
+        if sig_params:
+            for param in sig_params.group(1).split(","):
+                param = param.strip()
+                if "=" in param:
+                    name, default = param.split("=", 1)
+                    defaults[name.strip()] = default.strip()
+
+    # Parse parameters
+    params = []
+    if params_str.strip():
+        depth = 0
+        current = []
+        params_list = []
+        for char in params_str:
+            if char == "<":
+                depth += 1
+            elif char == ">":
+                depth -= 1
+            elif char == "," and depth == 0:
+                params_list.append("".join(current).strip())
+                current = []
+                continue
+            current.append(char)
+        if current:
+            params_list.append("".join(current).strip())
+
+        for param in params_list:
+            param = param.strip()
+            if not param or param.startswith("_"):
+                continue
+
+            if ":" in param:
+                parts = param.split(":", 1)
+                param_name = parts[0].strip()
+                rust_type = parts[1].strip()
+
+                has_default = param_name in defaults
+                python_type = map_rust_type_to_python(rust_type, has_default)
+
+                if has_default:
+                    params.append((param_name, python_type, defaults[param_name]))
+                else:
+                    params.append((param_name, python_type, None))
+
+    # Parse return type
+    return_type = "None"
+    if "PyResult<" in return_type_str:
+        inner_match = re.search(r"PyResult<(.+)>$", return_type_str)
+        if inner_match:
+            inner_type = inner_match.group(1).strip()
+            return_type = map_rust_type_to_python(inner_type)
+
+    # Extract first line of docstring
+    doc_match = re.search(r"/// (.+?)(?=\n///\s*\n|\nfn|\n#)", block, re.DOTALL)
+    doc = doc_match.group(1).strip() if doc_match else f"Calculate {fn_name}"
+    doc_first_line = doc.split("\n")[0]
+
+    return {
+        "name": fn_name,
+        "params": params,
+        "return_type": return_type,
+        "doc": doc_first_line,
+    }
+
+
+def extract_functions(rust_file: Path) -> List[Dict]:
+    """Extract all Python functions from Rust source."""
     content = rust_file.read_text()
 
-    functions = {}
+    # Find all #[pyfunction] blocks
+    pattern = r"#\[pyfunction\].*?(?=\n#\[pyfunction\]|\nstruct|\npub struct|\Z)"
+    matches = re.finditer(pattern, content, re.DOTALL)
 
-    # 匹配 pyfunction 定义的模式
-    pattern = r'#\[cfg\(feature = "python"\)\]\s*#\[pyfunction\]\s*fn (py_\w+)\((.*?)\)\s*->\s*PyResult<(.+?)>\s*\{'
-
-    for match in re.finditer(pattern, content, re.DOTALL):
-        func_name = match.group(1)
-        params_str = match.group(2)
-        return_type_str = match.group(3)
-
-        # 解析参数
-        params = []
-        if params_str.strip():
-            # 简单分割(不处理嵌套泛型中的逗号)
-            param_parts = []
-            depth = 0
-            current = []
-            for char in params_str:
-                if char in '<(':
-                    depth += 1
-                elif char in '>)':
-                    depth -= 1
-                elif char == ',' and depth == 0:
-                    param_parts.append(''.join(current))
-                    current = []
-                    continue
-                current.append(char)
-            if current:
-                param_parts.append(''.join(current))
-
-            for param in param_parts:
-                name, py_type, is_optional = parse_parameter(param)
-                if name:
-                    params.append({
-                        'name': name,
-                        'type': py_type,
-                        'optional': is_optional
-                    })
-
-        # 解析返回类型
-        return_type = parse_rust_type(return_type_str)
-
-        functions[func_name] = {
-            'params': params,
-            'return_type': return_type
-        }
+    functions = []
+    for match in matches:
+        block = match.group(0)
+        sig = extract_function_signature(block)
+        if sig:
+            functions.append(sig)
 
     return functions
 
-def categorize_functions(functions: Dict[str, dict]) -> Dict[str, List[str]]:
-    """根据函数名前缀和功能分类"""
+
+def categorize_functions(functions: List[Dict]) -> Dict[str, List[Dict]]:
+    """Categorize functions by their purpose."""
     categories = {
-        'Volatility': [],
-        'Momentum': [],
-        'Trend': [],
-        'Volume': [],
-        'Moving Averages': [],
-        'Candlestick Patterns': [],
-        'Statistical': [],
-        'Price Transform': [],
-        'Math Functions': [],
-        'Fibonacci': [],
-        'Pivot Points': [],
-        'Ichimoku': [],
-        'Cycle': [],
-        'ML/AI Indicators': [],
-        'Signal Functions': [],
-        'Pattern Recognition': [],
-        'Other': []
+        "Volatility Indicators": [],
+        "Momentum Indicators": [],
+        "Trend Indicators": [],
+        "Volume Indicators": [],
+        "Overlap/MA Indicators": [],
+        "Pattern Recognition": [],
+        "Statistical Functions": [],
+        "Price Transforms": [],
+        "Math Operators": [],
+        "Utility Functions": [],
+        "Advanced Indicators": [],
+        "Hilbert Transform": [],
     }
 
-    # 分类规则
-    volatility = ['atr', 'natr', 'true_range', 'bollinger', 'keltner', 'donchian']
-    momentum = ['rsi', 'macd', 'stochastic', 'stochrsi', 'cci', 'williams', 'awesome',
-                'fisher', 'kdj', 'tsi', 'ultimate', 'mom', 'roc', 'apo', 'ppo', 'cmo']
-    trend = ['supertrend', 'adx', 'aroon', 'psar', 'vortex', 'choppiness', 'qstick',
-             'vhf', 'dx', 'plus_di', 'minus_di', 'sar', 'sarext']
-    volume = ['obv', 'vwap', 'mfi', 'cmf', 'volume_profile', 'ad', 'pvt', 'nvi',
-              'pvi', 'eom', 'adosc']
-    ma = ['sma', 'ema', 'wma', 'dema', 'tema', 'hma', 'rma', 'zlma', 't3', 'kama',
-          'frama', 'alma', 'vidya', 'pwma', 'sinwma', 'swma', 'vwma', 'trima', 'midpoint',
-          'midprice', 'mama']
-    candle = ['doji', 'hammer', 'hanging_man', 'engulfing', 'harami', 'piercing',
-              'dark_cloud', 'star', 'soldiers', 'crows', 'shooting', 'marubozu',
-              'spinning', 'tweezers', 'methods', 'takuri', 'pigeon', 'matching',
-              'separating', 'thrusting', 'neck', 'advance_block', 'stalled', 'belthold',
-              'baby', 'counterattack', 'highwave', 'hikkake', 'ladder', 'rickshaw',
-              'river', 'xside', 'breakaway', 'sandwich', 'tristar', 'gap', 'kicking']
-    stat = ['correlation', 'zscore', 'covariance', 'beta', 'standard_error',
-            'linear_regression', 'correl', 'linearreg', 'var', 'tsf']
-    price = ['avgprice', 'medprice', 'typprice', 'wclprice']
-    math = ['max', 'min', 'sum', 'sqrt', 'ln', 'log10', 'exp', 'abs', 'ceil', 'floor',
-            'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh',
-            'add', 'sub', 'mult', 'div', 'minmax', 'minmaxindex', 'slope', 'percent_rank']
-    fib = ['fib_retracement', 'fib_extension', 'fibonacci_pivots']
-    pivot = ['standard_pivots', 'camarilla_pivots', 'pivot_buy_sell']
-    ichimoku = ['ichimoku']
-    cycle = ['ht_dcperiod', 'ht_dcphase', 'ht_phasor', 'ht_sine', 'ht_trendmode']
-    ml = ['ai_supertrend', 'ai_momentum', 'dynamic_macd', 'atr2_signals',
-          'detect_divergence', 'fvg_signals', 'volume_filter', 'pd_array',
-          'breaker_block', 'general_parameters', 'linreg_supply']
-    signal = ['combine_signals', 'calculate_stops']
-    pattern = ['harmonics', 'swing_points']
-    other_indicators = ['entropy', 'aberration', 'squeeze', 'qqe', 'cti', 'er',
-                       'bias', 'psl', 'rvi', 'inertia', 'alligator', 'efi', 'kst',
-                       'stc', 'tdfi', 'wae', 'smi', 'coppock', 'pgo', 'bop',
-                       'ssl_channel', 'cfo']
+    volatility = [
+        "atr",
+        "natr",
+        "true_range",
+        "bollinger",
+        "keltner",
+        "donchian",
+        "chandelier",
+        "historical_volatility",
+        "ulcer",
+        "mass_index",
+        "aberration",
+    ]
 
-    for func_name in functions.keys():
-        # 移除 py_ 前缀
-        clean_name = func_name.replace('py_', '')
+    momentum = [
+        "rsi",
+        "macd",
+        "stochastic",
+        "stochrsi",
+        "cci",
+        "williams",
+        "awesome_oscillator",
+        "fisher_transform",
+        "mom",
+        "roc",
+        "tsi",
+        "ultimate_oscillator",
+        "kdj",
+        "vortex",
+        "qstick",
+        "cmo",
+        "cti",
+        "er",
+        "bias",
+        "psl",
+        "rvi",
+        "inertia",
+        "kst",
+        "stc",
+        "tdfi",
+        "smi",
+        "coppock",
+        "pgo",
+        "cfo",
+        "qqe",
+        "entropy",
+    ]
+
+    trend = [
+        "adx",
+        "aroon",
+        "psar",
+        "supertrend",
+        "trix",
+        "dpo",
+        "dx",
+        "plus_di",
+        "minus_di",
+        "slope",
+        "choppiness",
+        "vhf",
+        "alligator",
+    ]
+
+    volume = [
+        "obv",
+        "vwap",
+        "force_index",
+        "volume_oscillator",
+        "mfi",
+        "cmf",
+        "volume_profile",
+        "ad",
+        "pvt",
+        "nvi",
+        "pvi",
+        "eom",
+        "adosc",
+        "volume_filter",
+        "efi",
+        "vwma",
+        "bop",
+    ]
+
+    overlap = [
+        "sma",
+        "ema",
+        "rma",
+        "wma",
+        "hma",
+        "dema",
+        "tema",
+        "zlma",
+        "frama",
+        "t3",
+        "kama",
+        "trima",
+        "sar",
+        "sarext",
+        "mama",
+        "alma",
+        "vidya",
+        "pwma",
+        "sinwma",
+        "swma",
+        "ssl_channel",
+    ]
+
+    patterns = [
+        "doji",
+        "hammer",
+        "inverted_hammer",
+        "hanging_man",
+        "bullish_engulfing",
+        "bearish_engulfing",
+        "bullish_harami",
+        "bearish_harami",
+        "piercing_pattern",
+        "dark_cloud_cover",
+        "morning_star",
+        "evening_star",
+        "three_white_soldiers",
+        "three_black_crows",
+        "shooting_star",
+        "marubozu",
+        "spinning_top",
+        "dragonfly_doji",
+        "gravestone_doji",
+        "long_legged_doji",
+        "tweezers",
+        "rising_three_methods",
+        "falling_three_methods",
+        "harami_cross",
+        "morning_doji_star",
+        "evening_doji_star",
+        "three_inside",
+        "three_outside",
+        "abandoned_baby",
+        "kicking",
+        "long_line",
+        "short_line",
+        "doji_star",
+        "identical_three_crows",
+        "stick_sandwich",
+        "tristar",
+        "upside_gap_two_crows",
+        "gap_sidesidewhite",
+        "takuri",
+        "homing_pigeon",
+        "matching_low",
+        "separating_lines",
+        "thrusting",
+        "inneck",
+        "onneck",
+        "advance_block",
+        "stalled_pattern",
+        "belthold",
+        "concealing_baby_swallow",
+        "counterattack",
+        "highwave",
+        "hikkake",
+        "hikkake_mod",
+        "ladder_bottom",
+        "mat_hold",
+        "rickshaw_man",
+        "unique_3_river",
+        "xside_gap_3_methods",
+        "closing_marubozu",
+        "breakaway",
+        "harmonics",
+        "harmonics_patterns",
+        "swing_points",
+    ]
+
+    statistical = [
+        "linear_regression",
+        "correlation",
+        "zscore",
+        "covariance",
+        "beta",
+        "standard_error",
+        "stderr",
+        "correl",
+        "linearreg",
+        "linearreg_slope",
+        "linearreg_angle",
+        "linearreg_intercept",
+        "var",
+        "tsf",
+        "percent_rank",
+    ]
+
+    price_transforms = ["avgprice", "medprice", "typprice", "wclprice", "midpoint", "midprice"]
+
+    math_ops = [
+        "max",
+        "min",
+        "sum",
+        "sqrt",
+        "ln",
+        "log10",
+        "exp",
+        "abs",
+        "ceil",
+        "floor",
+        "sin",
+        "cos",
+        "tan",
+        "asin",
+        "acos",
+        "atan",
+        "sinh",
+        "cosh",
+        "tanh",
+        "add",
+        "sub",
+        "mult",
+        "div",
+        "minmax",
+        "minmaxindex",
+    ]
+
+    advanced = [
+        "ai_supertrend",
+        "ai_momentum_index",
+        "dynamic_macd",
+        "atr2_signals",
+        "ai_supertrend_ml",
+        "atr2_signals_ml",
+        "ai_momentum_index_ml",
+        "pivot_buy_sell",
+        "detect_divergence",
+        "fvg_signals",
+        "combine_signals",
+        "calculate_stops",
+        "pd_array_signals",
+        "breaker_block_signals",
+        "general_parameters_signals",
+        "linreg_supply_demand_signals",
+        "squeeze",
+        "wae",
+    ]
+
+    hilbert = ["ht_dcperiod", "ht_dcphase", "ht_phasor", "ht_sine", "ht_trendmode"]
+
+    utility = ["fib_retracement", "fib_extension", "ichimoku_cloud", "standard_pivots", "fibonacci_pivots", "camarilla_pivots", "apo", "ppo"]
+
+    for fn_data in functions:
+        fn_name = fn_data["name"]
+        name_lower = fn_name.lower().replace("py_", "")
 
         categorized = False
-        for keyword in volatility:
-            if keyword in clean_name:
-                categories['Volatility'].append(func_name)
+        for pattern in volatility:
+            if pattern in name_lower:
+                categories["Volatility Indicators"].append(fn_data)
                 categorized = True
                 break
 
         if not categorized:
-            for keyword in momentum:
-                if keyword in clean_name:
-                    categories['Momentum'].append(func_name)
+            for pattern in momentum:
+                if pattern in name_lower:
+                    categories["Momentum Indicators"].append(fn_data)
                     categorized = True
                     break
 
         if not categorized:
-            for keyword in trend:
-                if keyword in clean_name:
-                    categories['Trend'].append(func_name)
+            for pattern in trend:
+                if pattern in name_lower:
+                    categories["Trend Indicators"].append(fn_data)
                     categorized = True
                     break
 
         if not categorized:
-            for keyword in volume:
-                if keyword in clean_name:
-                    categories['Volume'].append(func_name)
+            for pattern in volume:
+                if pattern in name_lower:
+                    categories["Volume Indicators"].append(fn_data)
                     categorized = True
                     break
 
         if not categorized:
-            for keyword in ma:
-                if keyword in clean_name:
-                    categories['Moving Averages'].append(func_name)
+            for pattern in overlap:
+                if pattern in name_lower:
+                    categories["Overlap/MA Indicators"].append(fn_data)
                     categorized = True
                     break
 
         if not categorized:
-            for keyword in candle:
-                if keyword in clean_name:
-                    categories['Candlestick Patterns'].append(func_name)
+            for pattern in patterns:
+                if pattern in name_lower:
+                    categories["Pattern Recognition"].append(fn_data)
                     categorized = True
                     break
 
         if not categorized:
-            for keyword in stat:
-                if keyword in clean_name:
-                    categories['Statistical'].append(func_name)
+            for pattern in statistical:
+                if pattern in name_lower:
+                    categories["Statistical Functions"].append(fn_data)
                     categorized = True
                     break
 
         if not categorized:
-            for keyword in price:
-                if keyword in clean_name:
-                    categories['Price Transform'].append(func_name)
+            for pattern in price_transforms:
+                if pattern in name_lower:
+                    categories["Price Transforms"].append(fn_data)
                     categorized = True
                     break
 
         if not categorized:
-            for keyword in math:
-                if keyword in clean_name:
-                    categories['Math Functions'].append(func_name)
+            for pattern in math_ops:
+                if pattern in name_lower:
+                    categories["Math Operators"].append(fn_data)
                     categorized = True
                     break
 
         if not categorized:
-            for keyword in fib:
-                if keyword in clean_name:
-                    categories['Fibonacci'].append(func_name)
+            for pattern in advanced:
+                if pattern in name_lower:
+                    categories["Advanced Indicators"].append(fn_data)
                     categorized = True
                     break
 
         if not categorized:
-            for keyword in pivot:
-                if keyword in clean_name:
-                    categories['Pivot Points'].append(func_name)
+            for pattern in hilbert:
+                if pattern in name_lower:
+                    categories["Hilbert Transform"].append(fn_data)
                     categorized = True
                     break
 
         if not categorized:
-            for keyword in ichimoku:
-                if keyword in clean_name:
-                    categories['Ichimoku'].append(func_name)
+            for pattern in utility:
+                if pattern in name_lower:
+                    categories["Utility Functions"].append(fn_data)
                     categorized = True
                     break
 
         if not categorized:
-            for keyword in cycle:
-                if keyword in clean_name:
-                    categories['Cycle'].append(func_name)
-                    categorized = True
-                    break
-
-        if not categorized:
-            for keyword in ml:
-                if keyword in clean_name:
-                    categories['ML/AI Indicators'].append(func_name)
-                    categorized = True
-                    break
-
-        if not categorized:
-            for keyword in signal:
-                if keyword in clean_name:
-                    categories['Signal Functions'].append(func_name)
-                    categorized = True
-                    break
-
-        if not categorized:
-            for keyword in pattern:
-                if keyword in clean_name:
-                    categories['Pattern Recognition'].append(func_name)
-                    categorized = True
-                    break
-
-        if not categorized:
-            for keyword in other_indicators:
-                if keyword in clean_name:
-                    categories['Other'].append(func_name)
-                    categorized = True
-                    break
-
-        if not categorized:
-            categories['Other'].append(func_name)
+            categories["Utility Functions"].append(fn_data)
 
     return categories
 
-def generate_function_stub(func_name: str, func_info: dict) -> str:
-    """生成单个函数的类型存根"""
-    params = func_info['params']
-    return_type = func_info['return_type']
 
-    # 构建参数列表
-    param_strs = []
-    for param in params:
-        if param['optional']:
-            param_strs.append(f"{param['name']}: Optional[{param['type']}] = None")
-        else:
-            param_strs.append(f"{param['name']}: {param['type']}")
+def generate_pyi(categories: Dict) -> str:
+    """Generate the .pyi file content."""
+    output = []
 
-    params_str = ', '.join(param_strs)
+    # Header
+    output.append('"""Type stubs for haze_library.haze_library')
+    output.append("")
+    output.append("Auto-generated from Rust source code.")
+    output.append("This module provides technical analysis indicators implemented in Rust.")
+    output.append('"""')
+    output.append("")
 
-    # 生成函数签名
-    stub = f"def {func_name}({params_str}) -> {return_type}: ..."
+    if PYCLASS_STUBS.strip():
+        output.extend(PYCLASS_STUBS.strip().splitlines())
+        output.append("")
 
-    return stub
-
-def generate_pyi_file(functions: Dict[str, dict], output_file: Path):
-    """生成完整的 .pyi 文件"""
-
-    # 分类函数
-    categories = categorize_functions(functions)
-
-    # 生成文件内容
-    lines = [
-        '"""',
-        'Haze-Library Type Stubs',
-        '=' * 80,
-        '',
-        'Type annotations for haze_library Rust extension module.',
-        'Provides IDE support for 225+ technical indicators.',
-        '',
-        'Auto-generated from Rust source code.',
-        '"""',
-        '',
-        'from typing import Any, Dict, List, Optional, Tuple',
-        '',
-        '__version__: str',
-        '__author__: str',
-        '',
-    ]
-
-    # 添加分类的函数
-    total_count = 0
-    for category, func_names in categories.items():
-        if not func_names:
+    # Generate functions by category
+    for category, fn_list in categories.items():
+        if not fn_list:
             continue
 
-        # 排序函数名
-        func_names.sort()
+        output.append(f"# {category}")
+        output.append("")
 
-        lines.append('')
-        lines.append('# ' + '=' * 78)
-        lines.append(f'# {category} ({len(func_names)} functions)')
-        lines.append('# ' + '=' * 78)
-        lines.append('')
+        for fn_data in sorted(fn_list, key=lambda x: x["name"]):
+            param_parts = []
+            for param_name, param_type, default in fn_data["params"]:
+                if default:
+                    param_parts.append(f"{param_name}: {param_type} = {default}")
+                else:
+                    param_parts.append(f"{param_name}: {param_type}")
 
-        for func_name in func_names:
-            stub = generate_function_stub(func_name, functions[func_name])
-            lines.append(stub)
-            total_count += 1
+            params_str = ", ".join(param_parts)
+            output.append(
+                f'def {fn_data["name"]}({params_str}) -> {fn_data["return_type"]}: ...'
+            )
 
-        lines.append('')
+        output.append("")
 
-    # 添加类定义(如果有的话)
-    lines.extend([
-        '',
-        '# ' + '=' * 78,
-        '# Classes',
-        '# ' + '=' * 78,
-        '',
-        'class Candle:',
-        '    """OHLCV candle data structure."""',
-        '    timestamp: int',
-        '    open: float',
-        '    high: float',
-        '    low: float',
-        '    close: float',
-        '    volume: float',
-        '    def __init__(self, timestamp: int, open: float, high: float, low: float, close: float, volume: float) -> None: ...',
-        '    def to_dict(self) -> Dict[str, float]: ...',
-        '    @property',
-        '    def typical_price(self) -> float: ...',
-        '    @property',
-        '    def median_price(self) -> float: ...',
-        '    @property',
-        '    def weighted_close(self) -> float: ...',
-        '    def __repr__(self) -> str: ...',
-        '',
-        'class IndicatorResult:',
-        '    """Single indicator calculation result."""',
-        '    name: str',
-        '    values: List[float]',
-        '    metadata: Dict[str, str]',
-        '    def __init__(self, name: str, values: List[float]) -> None: ...',
-        '    def add_metadata(self, key: str, value: str) -> None: ...',
-        '    @property',
-        '    def len(self) -> int: ...',
-        '    def is_empty(self) -> bool: ...',
-        '',
-        'class MultiIndicatorResult:',
-        '    """Multiple indicator calculation results."""',
-        '    name: str',
-        '    series: Dict[str, List[float]]',
-        '    metadata: Dict[str, str]',
-        '    def __init__(self, name: str) -> None: ...',
-        '    def add_series(self, key: str, values: List[float]) -> None: ...',
-        '    def add_metadata(self, key: str, value: str) -> None: ...',
-        '',
-        'class PyHarmonicPattern:',
-        '    """Harmonic pattern recognition result."""',
-        '    pattern_type: str',
-        '    pattern_type_zh: str',
-        '    is_bullish: bool',
-        '    state: str',
-        '    x_index: int',
-        '    x_price: float',
-        '    a_index: int',
-        '    a_price: float',
-        '    b_index: int',
-        '    b_price: float',
-        '    c_index: Optional[int]',
-        '    c_price: Optional[float]',
-        '    d_index: Optional[int]',
-        '    d_price: Optional[float]',
-        '    prz_high: Optional[float]',
-        '    prz_low: Optional[float]',
-        '    prz_center: Optional[float]',
-        '    probability: float',
-        '    target_prices: List[float]',
-        '    stop_loss: Optional[float]',
-        '',
-    ])
+    return "\n".join(output)
 
-    # 写入文件
-    content = '\n'.join(lines)
-    output_file.write_text(content)
-
-    print(f"Generated {output_file}")
-    print(f"Total functions: {total_count}")
-    print("\nBreakdown by category:")
-    for category, func_names in categories.items():
-        if func_names:
-            print(f"  {category}: {len(func_names)}")
 
 def main():
-    # 文件路径
-    project_root = Path(__file__).parent
-    rust_src = project_root / 'rust' / 'src' / 'lib.rs'
-    output_pyi = project_root / 'src' / 'haze_library' / 'haze_library.pyi'
+    """Main function."""
+    rust_file = Path(__file__).parent / "rust" / "src" / "lib.rs"
+    output_file = Path(__file__).parent / "src" / "haze_library" / "haze_library.pyi"
 
-    print(f"Parsing Rust source: {rust_src}")
-
-    # 提取函数
-    functions = extract_functions_from_rust(rust_src)
-
+    print(f"Reading Rust source: {rust_file}")
+    functions = extract_functions(rust_file)
     print(f"Found {len(functions)} functions")
 
-    # 生成 .pyi 文件
-    generate_pyi_file(functions, output_pyi)
+    print("Categorizing functions...")
+    categories = categorize_functions(functions)
 
-if __name__ == '__main__':
+    for category, fns in categories.items():
+        if fns:
+            print(f"  {category}: {len(fns)} functions")
+
+    print("Generating .pyi file...")
+    pyi_content = generate_pyi(categories)
+
+    print(f"Writing to: {output_file}")
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    output_file.write_text(pyi_content)
+
+    print("Done!")
+    print(f"\nTotal functions: {len(functions)}")
+
+
+if __name__ == "__main__":
     main()

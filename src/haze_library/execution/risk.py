@@ -39,7 +39,7 @@ def validate_create_order_request(
         raise ExecutionRiskError("max_notional_per_order must be > 0 when set")
 
     if req.order_type == OrderType.LIMIT:
-        assert req.price is not None
+        assert req.price is not None  # validated above
         notional = float(req.amount) * float(req.price)
         if notional > limit:
             raise ExecutionRiskError(f"order notional {notional} exceeds limit {limit}")
@@ -53,4 +53,3 @@ def validate_create_order_request(
     if notional > limit:
         raise ExecutionRiskError(f"order notional {notional} exceeds limit {limit}")
     return NotionalCheck(notional=notional, limit=limit)
-

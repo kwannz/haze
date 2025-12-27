@@ -1,0 +1,50 @@
+```mermaid
+graph TB
+    subgraph Python["Python API 层 (9,280 行)"]
+        PY_USER[用户代码<br/>User Code]
+        PY_ACCESSOR[DataFrame Accessor<br/>df.haze.rsi(14)]
+        PY_FUNCS[直接函数调用<br/>haze.py_rsi(close, 14)]
+    end
+
+    subgraph PyO3["PyO3 绑定层 (FFI Boundary)"]
+        PYMODULE[#[pymodule] haze_library]
+        PYCLASS[#[pyclass] PyOhlcvFrame]
+        PYFUNC[#[pyfunction] 285+ 函数<br/>py_rsi, py_macd, py_supertrend...]
+    end
+
+    subgraph Rust["Rust 核心计算层 (88,166 行)"]
+        direction TB
+        INDICATORS[indicators/ 模块<br/>43,594 行<br/>215+ 指标]
+        UTILS[utils/ 工具库<br/>~15,000 行<br/>MA, Stats, Streaming]
+        TYPES[types.rs<br/>数据结构]
+        ERRORS[errors.rs<br/>错误处理]
+        ML[ml/ 模块<br/>SVR, Linear Regression]
+    end
+
+    PY_USER --> PY_ACCESSOR
+    PY_USER --> PY_FUNCS
+    PY_ACCESSOR --> PYMODULE
+    PY_FUNCS --> PYMODULE
+
+    PYMODULE --> PYFUNC
+    PYMODULE --> PYCLASS
+
+    PYFUNC --> INDICATORS
+    PYCLASS --> TYPES
+
+    INDICATORS --> UTILS
+    INDICATORS --> TYPES
+    INDICATORS --> ERRORS
+    UTILS --> ERRORS
+    UTILS --> TYPES
+
+    ML --> UTILS
+
+    style Python fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    style PyO3 fill:#fff4e1,stroke:#e65100,stroke-width:2px
+    style Rust fill:#ffe1e1,stroke:#b71c1c,stroke-width:2px
+    style INDICATORS fill:#ffcdd2
+    style UTILS fill:#f8bbd0
+    style TYPES fill:#e1bee7
+    style ERRORS fill:#ffccbc
+```

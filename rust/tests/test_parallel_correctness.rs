@@ -340,13 +340,13 @@ fn test_parallel_stochastic_correctness() -> HazeResult<()> {
     // Sequential
     let sequential: Vec<(Vec<f64>, Vec<f64>)> = symbols_ohlc
         .iter()
-        .map(|(h, l, c)| momentum::stochastic(h, l, c, 14, 3).unwrap())
+        .map(|(h, l, c)| momentum::stochastic(h, l, c, 14, 3, 3).unwrap())
         .collect();
 
     // Parallel
     let parallel: Vec<(Vec<f64>, Vec<f64>)> = symbols_ohlc
         .par_iter()
-        .map(|(h, l, c)| momentum::stochastic(h, l, c, 14, 3).unwrap())
+        .map(|(h, l, c)| momentum::stochastic(h, l, c, 14, 3, 3).unwrap())
         .collect();
 
     // Verify %K and %D

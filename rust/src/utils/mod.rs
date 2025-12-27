@@ -21,7 +21,7 @@
 //! # Design Philosophy
 //! - **Building Blocks**: Utilities compose into higher-level indicators
 //! - **Performance First**: Critical paths optimized for speed
-//! - **NaN Consistency**: All functions handle NaN inputs gracefully
+//! - **Fail-Fast Validation**: Non-finite inputs are rejected; warmup NaNs are explicit
 //! - **Zero Allocation**: Hot paths avoid memory allocation where possible
 //!
 //! # Usage Examples
@@ -41,9 +41,9 @@
 //! let (slope, intercept, r_squared) = linear_regression(&prices, 5);
 //!
 //! // Real-time streaming
-//! let mut online_sma = OnlineSMA::new(20);
+//! let mut online_sma = OnlineSMA::new(20).unwrap();
 //! for price in prices {
-//!     if let Some(value) = online_sma.update(price) {
+//!     if let Some(value) = online_sma.update(price).unwrap() {
 //!         println!("SMA: {}", value);
 //!     }
 //! }

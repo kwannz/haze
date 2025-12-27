@@ -133,13 +133,12 @@ def test_known_result(self):
 测试极端情况：
 ```python
 def test_empty_array(self):
-    result = haze.py_obv([], [])
-    assert isinstance(result, list)
-    assert len(result) == 0
+    with pytest.raises(ValueError):
+        haze.py_obv([], [])
 
 def test_insufficient_data(self):
-    result = haze.py_sma([10.0], period=5)
-    assert all(np.isnan(x) for x in result)
+    with pytest.raises(ValueError):
+        haze.py_sma([10.0], period=5)
 ```
 
 ### 4. 参数验证测试
@@ -168,8 +167,8 @@ def test_different_periods(self, simple_prices):
 ### 边界测试
 - `empty_array`: 空数组
 - `single_value`: 单个值
-- `array_with_nan`: 包含NaN的数组
-- `all_nan_array`: 全NaN数组
+- `array_with_nan`: 包含NaN的数组（用于 Fail-Fast 验证）
+- `all_nan_array`: 全NaN数组（用于 Fail-Fast 验证）
 
 ### 数学验证
 - `math_test_values`: 完全平方数 [1, 4, 9, 16, 25]
@@ -195,7 +194,7 @@ def test_different_periods(self, simple_prices):
 **A:**
 1. 在对应文件中添加新的测试类（如果是新指标）
 2. 遵循现有命名规范：`class TestIndicatorName`
-3. 添加至少2个测试方法：`test_basic_calculation` 和 `test_empty_array`
+3. 添加至少2个测试方法：`test_basic_calculation` 和 `test_empty_array`（使用 `pytest.raises(ValueError)` 验证 Fail-Fast）
 4. 更新 `TEST_COVERAGE_SUMMARY.md`
 
 ## 测试覆盖率目标

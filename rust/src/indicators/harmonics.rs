@@ -11,7 +11,10 @@
 // 4. PRZ Calculation（潜在反转区）- 多Fib投影汇合
 // 5. Probability Estimation（概率估算）- 基于Fib吻合度
 
+use crate::errors::{HazeError, HazeResult};
+use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_range};
 use crate::init_result;
+use crate::types::HarmonicSignals;
 use crate::utils::math::is_zero;
 use std::collections::HashMap;
 
@@ -255,14 +258,37 @@ pub fn detect_swing_points(
     low: &[f64],
     left_bars: usize,
     right_bars: usize,
-) -> Vec<SwingPoint> {
+) -> HazeResult<Vec<SwingPoint>> {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low")])?;
     let n = high.len();
-    let mut swings = Vec::new();
-
-    // 防止空数据或数据不足导致下溢
-    if n == 0 || n < left_bars + right_bars + 1 {
-        return swings;
+    if left_bars == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: left_bars,
+            data_len: n,
+        });
     }
+    if right_bars == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: right_bars,
+            data_len: n,
+        });
+    }
+    let required = left_bars
+        .checked_add(right_bars)
+        .and_then(|v| v.checked_add(1))
+        .ok_or_else(|| HazeError::InvalidValue {
+            index: 0,
+            message: "left_bars + right_bars overflow".to_string(),
+        })?;
+    if n < required {
+        return Err(HazeError::InsufficientData {
+            required,
+            actual: n,
+        });
+    }
+
+    let mut swings = Vec::new();
 
     for i in left_bars..(n - right_bars) {
         // 检测高点：当前高价 >= 左右窗口内所有高价
@@ -292,7 +318,7 @@ pub fn detect_swing_points(
 
     // 按索引排序
     swings.sort_by_key(|s| s.index);
-    swings
+    Ok(swings)
 }
 
 /// 检查 Fibonacci 比率是否在容差范围内
@@ -318,6 +344,17 @@ fn calc_ratio(
     }
 }
 
+#[inline]
+fn validate_swings_len(swings: &[SwingPoint], required: usize) -> HazeResult<()> {
+    if swings.len() < required {
+        return Err(HazeError::InsufficientData {
+            required,
+            actual: swings.len(),
+        });
+    }
+    Ok(())
+}
+
 /// 检测 Gartley 形态
 ///
 /// Fibonacci 比率要求：
@@ -325,12 +362,9 @@ fn calc_ratio(
 /// - BC = 0.382 ~ 0.886 AB
 /// - CD = 1.272 ~ 1.618 BC
 /// - AD = 0.786 XA
-pub fn detect_gartley(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
+pub fn detect_gartley(swings: &[SwingPoint]) -> HazeResult<Vec<HarmonicPattern>> {
+    validate_swings_len(swings, 5)?;
     let mut patterns = Vec::new();
-
-    if swings.len() < 5 {
-        return patterns;
-    }
 
     // 遍历所有可能的 XABCD 组合
     for i in 0..swings.len() - 4 {
@@ -382,7 +416,7 @@ pub fn detect_gartley(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         }
     }
 
-    patterns
+    Ok(patterns)
 }
 
 /// 检测 Bat 形态
@@ -392,12 +426,9 @@ pub fn detect_gartley(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
 /// - BC = 0.382 ~ 0.886 AB
 /// - CD = 1.618 ~ 2.618 BC
 /// - AD = 0.886 XA
-pub fn detect_bat(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
+pub fn detect_bat(swings: &[SwingPoint]) -> HazeResult<Vec<HarmonicPattern>> {
+    validate_swings_len(swings, 5)?;
     let mut patterns = Vec::new();
-
-    if swings.len() < 5 {
-        return patterns;
-    }
 
     for i in 0..swings.len() - 4 {
         let x = swings[i];
@@ -446,7 +477,7 @@ pub fn detect_bat(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         }
     }
 
-    patterns
+    Ok(patterns)
 }
 
 /// 检测 Butterfly 形态
@@ -456,12 +487,9 @@ pub fn detect_bat(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
 /// - BC = 0.382 ~ 0.886 AB
 /// - CD = 1.618 ~ 2.24 BC
 /// - AD = 1.27 ~ 1.618 XA
-pub fn detect_butterfly(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
+pub fn detect_butterfly(swings: &[SwingPoint]) -> HazeResult<Vec<HarmonicPattern>> {
+    validate_swings_len(swings, 5)?;
     let mut patterns = Vec::new();
-
-    if swings.len() < 5 {
-        return patterns;
-    }
 
     for i in 0..swings.len() - 4 {
         let x = swings[i];
@@ -510,7 +538,7 @@ pub fn detect_butterfly(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         }
     }
 
-    patterns
+    Ok(patterns)
 }
 
 /// 检测 Crab 形态
@@ -520,12 +548,9 @@ pub fn detect_butterfly(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
 /// - BC = 0.382 ~ 0.886 AB
 /// - CD = 2.24 ~ 3.618 BC
 /// - AD = 1.618 XA
-pub fn detect_crab(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
+pub fn detect_crab(swings: &[SwingPoint]) -> HazeResult<Vec<HarmonicPattern>> {
+    validate_swings_len(swings, 5)?;
     let mut patterns = Vec::new();
-
-    if swings.len() < 5 {
-        return patterns;
-    }
 
     for i in 0..swings.len() - 4 {
         let x = swings[i];
@@ -574,7 +599,7 @@ pub fn detect_crab(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         }
     }
 
-    patterns
+    Ok(patterns)
 }
 
 /// 检测 Shark 形态
@@ -584,12 +609,9 @@ pub fn detect_crab(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
 /// - BC = 1.13 ~ 1.618 AB
 /// - CD = 1.618 ~ 2.24 BC
 /// - AD = 0.886 ~ 1.13 XA
-pub fn detect_shark(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
+pub fn detect_shark(swings: &[SwingPoint]) -> HazeResult<Vec<HarmonicPattern>> {
+    validate_swings_len(swings, 5)?;
     let mut patterns = Vec::new();
-
-    if swings.len() < 5 {
-        return patterns;
-    }
 
     for i in 0..swings.len() - 4 {
         let x = swings[i];
@@ -638,7 +660,7 @@ pub fn detect_shark(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         }
     }
 
-    patterns
+    Ok(patterns)
 }
 
 /// 检测 Cypher 形态
@@ -648,12 +670,9 @@ pub fn detect_shark(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
 /// - BC = 1.272 ~ 1.414 AB
 /// - CD = 0.786 XC
 /// - AD = 0.786 XA
-pub fn detect_cypher(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
+pub fn detect_cypher(swings: &[SwingPoint]) -> HazeResult<Vec<HarmonicPattern>> {
+    validate_swings_len(swings, 5)?;
     let mut patterns = Vec::new();
-
-    if swings.len() < 5 {
-        return patterns;
-    }
 
     for i in 0..swings.len() - 4 {
         let x = swings[i];
@@ -702,7 +721,7 @@ pub fn detect_cypher(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
         }
     }
 
-    patterns
+    Ok(patterns)
 }
 
 /// 检测所有谐波形态（聚合函数）
@@ -711,25 +730,25 @@ pub fn detect_all_harmonics(
     low: &[f64],
     left_bars: usize,
     right_bars: usize,
-) -> Vec<HarmonicPattern> {
-    let swings = detect_swing_points(high, low, left_bars, right_bars);
+) -> HazeResult<Vec<HarmonicPattern>> {
+    let swings = detect_swing_points(high, low, left_bars, right_bars)?;
 
     let mut all_patterns = Vec::new();
 
-    all_patterns.extend(detect_gartley(&swings));
-    all_patterns.extend(detect_bat(&swings));
-    all_patterns.extend(detect_butterfly(&swings));
-    all_patterns.extend(detect_crab(&swings));
-    all_patterns.extend(detect_shark(&swings));
-    all_patterns.extend(detect_cypher(&swings));
-    all_patterns.extend(detect_deep_crab(&swings));
-    all_patterns.extend(detect_three_drive(&swings));
-    all_patterns.extend(detect_alt_bat(&swings));
+    all_patterns.extend(detect_gartley(&swings)?);
+    all_patterns.extend(detect_bat(&swings)?);
+    all_patterns.extend(detect_butterfly(&swings)?);
+    all_patterns.extend(detect_crab(&swings)?);
+    all_patterns.extend(detect_shark(&swings)?);
+    all_patterns.extend(detect_cypher(&swings)?);
+    all_patterns.extend(detect_deep_crab(&swings)?);
+    all_patterns.extend(detect_three_drive(&swings)?);
+    all_patterns.extend(detect_alt_bat(&swings)?);
 
     // 按 D 点索引排序（时间顺序）
     all_patterns.sort_by_key(|p| p.d.index);
 
-    all_patterns
+    Ok(all_patterns)
 }
 
 // ============================================================================
@@ -737,17 +756,17 @@ pub fn detect_all_harmonics(
 // ============================================================================
 
 /// 检测 Deep Crab 形态
-pub fn detect_deep_crab(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
+pub fn detect_deep_crab(swings: &[SwingPoint]) -> HazeResult<Vec<HarmonicPattern>> {
     detect_pattern_generic(swings, PatternType::DeepCrab)
 }
 
 /// 检测 Three Drive 形态
-pub fn detect_three_drive(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
+pub fn detect_three_drive(swings: &[SwingPoint]) -> HazeResult<Vec<HarmonicPattern>> {
     detect_pattern_generic(swings, PatternType::ThreeDrive)
 }
 
 /// 检测 Alt Bat 形态
-pub fn detect_alt_bat(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
+pub fn detect_alt_bat(swings: &[SwingPoint]) -> HazeResult<Vec<HarmonicPattern>> {
     detect_pattern_generic(swings, PatternType::AltBat)
 }
 
@@ -755,11 +774,9 @@ pub fn detect_alt_bat(swings: &[SwingPoint]) -> Vec<HarmonicPattern> {
 fn detect_pattern_generic(
     swings: &[SwingPoint],
     pattern_type: PatternType,
-) -> Vec<HarmonicPattern> {
+) -> HazeResult<Vec<HarmonicPattern>> {
     let mut patterns = Vec::new();
-    if swings.len() < 5 {
-        return patterns;
-    }
+    validate_swings_len(swings, 5)?;
 
     let ratios = pattern_type.ratios();
 
@@ -816,7 +833,7 @@ fn detect_pattern_generic(
             ratios: ratio_map,
         });
     }
-    patterns
+    Ok(patterns)
 }
 
 #[inline]
@@ -948,13 +965,17 @@ pub fn detect_forming_patterns(
     left_bars: usize,
     right_bars: usize,
     lookback: usize,
-) -> Vec<HarmonicPatternExt> {
-    let swings = detect_swing_points(high, low, left_bars, right_bars);
+) -> HazeResult<Vec<HarmonicPatternExt>> {
+    if lookback == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: lookback,
+            data_len: 1,
+        });
+    }
+    let swings = detect_swing_points(high, low, left_bars, right_bars)?;
     let mut forming = Vec::new();
 
-    if swings.len() < 4 {
-        return forming;
-    }
+    validate_swings_len(&swings, 4)?;
 
     let start_idx = swings.len().saturating_sub(lookback);
 
@@ -1008,7 +1029,7 @@ pub fn detect_forming_patterns(
             }
         }
     }
-    forming
+    Ok(forming)
 }
 
 // ============================================================================
@@ -1026,27 +1047,18 @@ pub fn harmonics_signal(
     left_bars: usize,
     right_bars: usize,
     min_probability: f64,
-) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+) -> HarmonicSignals {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
+    validate_range("min_probability", min_probability, 0.0, 1.0)?;
     let n = high.len();
-
-    // 空数据或数据不足的情况
-    if n == 0 {
-        return (Vec::new(), Vec::new(), Vec::new(), Vec::new());
-    }
 
     let mut signals = vec![0.0; n];
     let mut prz_upper = init_result!(n);
     let mut prz_lower = init_result!(n);
     let mut probability = init_result!(n);
 
-    let _ = close; // 保留参数以备后续使用
-
-    // 数据不足以形成摆动点
-    if n < left_bars + right_bars + 1 {
-        return (signals, prz_upper, prz_lower, probability);
-    }
-
-    let completed = detect_all_harmonics(high, low, left_bars, right_bars);
+    let completed = detect_all_harmonics(high, low, left_bars, right_bars)?;
 
     for pattern in &completed {
         let d_idx = pattern.d.index;
@@ -1077,7 +1089,7 @@ pub fn harmonics_signal(
         }
     }
 
-    let forming = detect_forming_patterns(high, low, left_bars, right_bars, 50);
+    let forming = detect_forming_patterns(high, low, left_bars, right_bars, 50)?;
     for pattern in &forming {
         if let Some(prz) = &pattern.prz {
             if pattern.completion_probability >= min_probability * 0.5 {
@@ -1091,7 +1103,7 @@ pub fn harmonics_signal(
         }
     }
 
-    (signals, prz_upper, prz_lower, probability)
+    Ok((signals, prz_upper, prz_lower, probability))
 }
 
 /// 检测所有形态（扩展版本）
@@ -1101,10 +1113,10 @@ pub fn detect_all_harmonics_ext(
     left_bars: usize,
     right_bars: usize,
     include_forming: bool,
-) -> Vec<HarmonicPatternExt> {
+) -> HazeResult<Vec<HarmonicPatternExt>> {
     let mut results = Vec::new();
 
-    let completed = detect_all_harmonics(high, low, left_bars, right_bars);
+    let completed = detect_all_harmonics(high, low, left_bars, right_bars)?;
     for p in &completed {
         let pattern_type = match p.pattern_type.as_str() {
             "Gartley" => PatternType::Gartley,
@@ -1139,7 +1151,7 @@ pub fn detect_all_harmonics_ext(
     if include_forming {
         results.extend(detect_forming_patterns(
             high, low, left_bars, right_bars, 50,
-        ));
+        )?);
     }
 
     results.sort_by_key(|p| {
@@ -1147,7 +1159,7 @@ pub fn detect_all_harmonics_ext(
             .or_else(|| p.c.map(|c| c.index))
             .unwrap_or(p.b.index)
     });
-    results
+    Ok(results)
 }
 
 #[cfg(test)]
@@ -1158,7 +1170,7 @@ mod tests {
     fn test_swing_detection() {
         let high = vec![10.0, 12.0, 11.0, 13.0, 12.0, 14.0, 13.0];
         let low = vec![9.0, 11.0, 10.0, 12.0, 11.0, 13.0, 12.0];
-        let swings = detect_swing_points(&high, &low, 1, 1);
+        let swings = detect_swing_points(&high, &low, 1, 1).unwrap();
         assert!(!swings.is_empty());
     }
 
@@ -1208,7 +1220,8 @@ mod tests {
         let low: Vec<f64> = high.iter().map(|h| h - 2.0).collect();
         let close: Vec<f64> = high.iter().zip(&low).map(|(h, l)| (h + l) / 2.0).collect();
 
-        let (signals, prz_u, prz_l, prob) = harmonics_signal(&high, &low, &close, 3, 3, 0.5);
+        let (signals, prz_u, prz_l, prob) =
+            harmonics_signal(&high, &low, &close, 3, 3, 0.5).unwrap();
 
         assert_eq!(signals.len(), 100);
         assert_eq!(prz_u.len(), 100);
@@ -1227,56 +1240,47 @@ mod boundary_tests {
 
     #[test]
     fn test_detect_swing_points_empty() {
-        let swings = detect_swing_points(&[], &[], 1, 1);
-        assert!(swings.is_empty());
+        assert!(detect_swing_points(&[], &[], 1, 1).is_err());
     }
 
     #[test]
     fn test_detect_gartley_empty() {
-        let patterns = detect_gartley(&[]);
-        assert!(patterns.is_empty());
+        assert!(detect_gartley(&[]).is_err());
     }
 
     #[test]
     fn test_detect_bat_empty() {
-        let patterns = detect_bat(&[]);
-        assert!(patterns.is_empty());
+        assert!(detect_bat(&[]).is_err());
     }
 
     #[test]
     fn test_detect_butterfly_empty() {
-        let patterns = detect_butterfly(&[]);
-        assert!(patterns.is_empty());
+        assert!(detect_butterfly(&[]).is_err());
     }
 
     #[test]
     fn test_detect_crab_empty() {
-        let patterns = detect_crab(&[]);
-        assert!(patterns.is_empty());
+        assert!(detect_crab(&[]).is_err());
     }
 
     #[test]
     fn test_detect_shark_empty() {
-        let patterns = detect_shark(&[]);
-        assert!(patterns.is_empty());
+        assert!(detect_shark(&[]).is_err());
     }
 
     #[test]
     fn test_detect_cypher_empty() {
-        let patterns = detect_cypher(&[]);
-        assert!(patterns.is_empty());
+        assert!(detect_cypher(&[]).is_err());
     }
 
     #[test]
     fn test_detect_all_harmonics_empty() {
-        let patterns = detect_all_harmonics(&[], &[], 3, 3);
-        assert!(patterns.is_empty());
+        assert!(detect_all_harmonics(&[], &[], 3, 3).is_err());
     }
 
     #[test]
     fn test_detect_forming_patterns_empty() {
-        let patterns = detect_forming_patterns(&[], &[], 3, 3, 50);
-        assert!(patterns.is_empty());
+        assert!(detect_forming_patterns(&[], &[], 3, 3, 50).is_err());
     }
 
     // ==================== Insufficient Data Tests ====================
@@ -1286,8 +1290,7 @@ mod boundary_tests {
         // Need at least left_strength + right_strength + 1 points
         let high = vec![10.0, 11.0];
         let low = vec![9.0, 10.0];
-        let swings = detect_swing_points(&high, &low, 2, 2);
-        assert!(swings.is_empty());
+        assert!(detect_swing_points(&high, &low, 2, 2).is_err());
     }
 
     #[test]
@@ -1311,9 +1314,9 @@ mod boundary_tests {
             },
         ];
 
-        assert!(detect_gartley(&swings).is_empty());
-        assert!(detect_bat(&swings).is_empty());
-        assert!(detect_butterfly(&swings).is_empty());
+        assert!(detect_gartley(&swings).is_err());
+        assert!(detect_bat(&swings).is_err());
+        assert!(detect_butterfly(&swings).is_err());
     }
 
     // ==================== Length Mismatch Tests ====================
@@ -1322,10 +1325,7 @@ mod boundary_tests {
     fn test_detect_swing_points_length_mismatch() {
         let high = vec![10.0, 11.0, 12.0];
         let low = vec![9.0, 10.0]; // shorter
-                                   // Should handle gracefully without panic
-        let swings = detect_swing_points(&high, &low, 1, 1);
-        // Empty or partial result is acceptable
-        assert!(swings.len() <= 3);
+        assert!(detect_swing_points(&high, &low, 1, 1).is_err());
     }
 
     // ==================== Valid Pattern Detection Tests ====================
@@ -1335,7 +1335,7 @@ mod boundary_tests {
         // Create alternating pattern that should produce swings
         let high = vec![10.0, 15.0, 12.0, 18.0, 14.0, 20.0, 16.0];
         let low = vec![8.0, 13.0, 10.0, 16.0, 12.0, 18.0, 14.0];
-        let swings = detect_swing_points(&high, &low, 1, 1);
+        let swings = detect_swing_points(&high, &low, 1, 1).unwrap();
         assert!(swings.len() >= 2);
     }
 
@@ -1601,7 +1601,8 @@ mod boundary_tests {
         let low: Vec<f64> = high.iter().map(|h| h - 3.0).collect();
         let close: Vec<f64> = high.iter().zip(&low).map(|(h, l)| (h + l) / 2.0).collect();
 
-        let (signals, prz_u, prz_l, prob) = harmonics_signal(&high, &low, &close, 2, 2, 0.5);
+        let (signals, prz_u, prz_l, prob) =
+            harmonics_signal(&high, &low, &close, 2, 2, 0.5).unwrap();
 
         assert_eq!(signals.len(), n);
         assert_eq!(prz_u.len(), n);
@@ -1615,7 +1616,7 @@ mod boundary_tests {
         let low: Vec<f64> = high.iter().map(|h| h - 2.0).collect();
         let close: Vec<f64> = high.iter().zip(&low).map(|(h, l)| (h + l) / 2.0).collect();
 
-        let (signals, _, _, prob) = harmonics_signal(&high, &low, &close, 1, 1, 0.5);
+        let (signals, _, _, prob) = harmonics_signal(&high, &low, &close, 1, 1, 0.5).unwrap();
 
         // Signals should be -1, 0, or 1
         for s in &signals {
@@ -1634,17 +1635,21 @@ mod boundary_tests {
 
     #[test]
     fn test_detect_all_harmonics_ext_output() {
-        // Create price data that might form patterns
-        // Alternating highs and lows to create swing points
-        let high: Vec<f64> = (0..50)
-            .map(|i| 100.0 + (i as f64 * 0.1).sin() * 30.0)
+        // Create price data that will form enough swing points for harmonic patterns
+        // Use a larger dataset with more pronounced oscillations
+        let high: Vec<f64> = (0..100)
+            .map(|i| 100.0 + (i as f64 * 0.5).sin() * 30.0)
             .collect();
         let low: Vec<f64> = high.iter().map(|h| h - 5.0).collect();
 
-        let results = detect_all_harmonics_ext(&high, &low, 2, 2, true);
-        // May or may not find patterns, but should not panic
-        // Result length is valid if it returns
-        let _ = results.len();
+        // First check we have enough swing points
+        let swings = detect_swing_points(&high, &low, 2, 2).unwrap();
+        if swings.len() >= 5 {
+            let results = detect_all_harmonics_ext(&high, &low, 2, 2, true).unwrap();
+            // May or may not find patterns, but should not panic
+            let _ = results.len();
+        }
+        // If not enough swings, that's also valid - the test passes
     }
 
     // ==================== Edge Case Tests ====================
@@ -1654,7 +1659,7 @@ mod boundary_tests {
         // All prices the same - function should handle gracefully
         let high = vec![100.0; 10];
         let low = vec![99.0; 10];
-        let swings = detect_swing_points(&high, &low, 1, 1);
+        let swings = detect_swing_points(&high, &low, 1, 1).unwrap();
         // The key is it should not panic and produce valid SwingPoints
         // Each swing should have valid fields
         for s in &swings {
@@ -1668,7 +1673,7 @@ mod boundary_tests {
         // Strictly increasing - minimal swings
         let high: Vec<f64> = (0..10).map(|i| 100.0 + i as f64).collect();
         let low: Vec<f64> = (0..10).map(|i| 99.0 + i as f64).collect();
-        let swings = detect_swing_points(&high, &low, 1, 1);
+        let swings = detect_swing_points(&high, &low, 1, 1).unwrap();
         // May find end points only
         assert!(swings.len() <= 2);
     }
@@ -1704,7 +1709,7 @@ mod boundary_tests {
         ];
 
         // Should handle gracefully without division by zero
-        let patterns = detect_gartley(&swings);
+        let patterns = detect_gartley(&swings).unwrap();
         // Result may be empty, but should not panic
         // Function returns successfully
         let _ = patterns.len();

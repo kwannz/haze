@@ -60,6 +60,7 @@ use crate::errors::validation::{
 };
 use crate::errors::{HazeError, HazeResult};
 use crate::init_result;
+use crate::utils::ma::{ema_allow_nan, sma_allow_nan};
 use crate::utils::math::{is_not_zero, is_zero};
 use crate::utils::{ema, rolling_max, rolling_min, sma};
 
@@ -398,7 +399,7 @@ fn ema_with_seed(values: &[f64], period: usize, seed_index: usize) -> HazeResult
         });
     }
     if n == 0 {
-        return Ok(vec![]);
+        return Err(HazeError::EmptyInput { name: "values" });
     }
     if seed_index >= n {
         return Err(HazeError::InvalidPeriod {
@@ -429,14 +430,16 @@ fn ema_with_seed(values: &[f64], period: usize, seed_index: usize) -> HazeResult
 /// Stochastic Oscillator（随机振荡器）
 ///
 /// 算法：
-/// - %K = ((close - lowest_low) / (highest_high - lowest_low)) * 100
-/// - %D = SMA(%K, smooth_period)
+/// - fast %K = ((close - lowest_low) / (highest_high - lowest_low)) * 100
+/// - slow %K = SMA(fast %K, smooth_k)
+/// - %D = SMA(slow %K, d_period)
 ///
 /// # 参数
 /// - `high`: 最高价序列
 /// - `low`: 最低价序列
 /// - `close`: 收盘价序列
 /// - `k_period`: %K 周期（默认 14）
+/// - `smooth_k`: %K 平滑周期（默认 3）
 /// - `d_period`: %D 平滑周期（默认 3）
 ///
 /// # 返回
@@ -451,6 +454,7 @@ pub fn stochastic(
     low: &[f64],
     close: &[f64],
     k_period: usize,
+    smooth_k: usize,
     d_period: usize,
 ) -> HazeResult<(Vec<f64>, Vec<f64>)> {
     validate_not_empty(high, "high")?;
@@ -459,13 +463,14 @@ pub fn stochastic(
 
     let n = high.len();
     validate_period(k_period, n)?;
+    validate_period(smooth_k, n)?;
     validate_period(d_period, n)?;
 
     let highest_high = rolling_max(high, k_period);
     let lowest_low = rolling_min(low, k_period);
 
-    // 计算 %K
-    let k: Vec<f64> = (0..n)
+    // 计算 fast %K
+    let fast_k: Vec<f64> = (0..n)
         .map(|i| {
             if highest_high[i].is_nan() || lowest_low[i].is_nan() {
                 f64::NAN
@@ -480,8 +485,11 @@ pub fn stochastic(
         })
         .collect();
 
-    // 计算 %D（%K 的 SMA）
-    let d = sma(&k, d_period)?;
+    // 平滑 %K
+    let k = sma_allow_nan(&fast_k, smooth_k)?;
+
+    // 计算 %D（slow %K 的 SMA）
+    let d = sma_allow_nan(&k, d_period)?;
 
     Ok((k, d))
 }
@@ -564,8 +572,8 @@ pub fn stochrsi(
         .collect();
 
     // %K 和 %D
-    let k = sma(&stochrsi_raw, k_period)?;
-    let d = sma(&k, d_period)?;
+    let k = sma_allow_nan(&stochrsi_raw, k_period)?;
+    let d = sma_allow_nan(&k, d_period)?;
 
     Ok((k, d))
 }
@@ -830,6 +838,7 @@ pub fn fisher_transform(
 /// - `low`: 低价序列
 /// - `close`: 收盘价序列
 /// - `k_period`: K 线周期（默认 9）
+/// - `smooth_k`: K 线平滑周期（默认 3）
 /// - `d_period`: D 线平滑周期（默认 3）
 ///
 /// # 返回
@@ -844,10 +853,11 @@ pub fn kdj(
     low: &[f64],
     close: &[f64],
     k_period: usize,
+    smooth_k: usize,
     d_period: usize,
 ) -> HazeResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
     // 先计算 Stochastic 的 K 和 D
-    let (k, d) = stochastic(high, low, close, k_period, d_period)?;
+    let (k, d) = stochastic(high, low, close, k_period, smooth_k, d_period)?;
 
     // 计算 J = 3*K - 2*D
     let j: Vec<f64> = k
@@ -929,11 +939,11 @@ pub fn tsi(
     let abs_momentum: Vec<f64> = momentum.iter().map(|&m| m.abs()).collect();
 
     // 3. 双重 EMA 平滑
-    let ema_momentum_long = ema(&momentum, long_period)?;
-    let ema_momentum = ema(&ema_momentum_long, short_period)?;
+    let ema_momentum_long = ema_allow_nan(&momentum, long_period)?;
+    let ema_momentum = ema_allow_nan(&ema_momentum_long, short_period)?;
 
-    let ema_abs_momentum_long = ema(&abs_momentum, long_period)?;
-    let ema_abs_momentum = ema(&ema_abs_momentum_long, short_period)?;
+    let ema_abs_momentum_long = ema_allow_nan(&abs_momentum, long_period)?;
+    let ema_abs_momentum = ema_allow_nan(&ema_abs_momentum_long, short_period)?;
 
     // 4. 计算 TSI
     let mut tsi_values = init_result!(n);
@@ -947,7 +957,7 @@ pub fn tsi(
     }
 
     // 5. 信号线（TSI 的 EMA）
-    let signal = ema(&tsi_values, signal_period)?;
+    let signal = ema_allow_nan(&tsi_values, signal_period)?;
 
     Ok((tsi_values, signal))
 }
@@ -1189,10 +1199,10 @@ pub fn ppo(close: &[f64], fast_period: usize, slow_period: usize) -> HazeResult<
 /// - `HazeError::InvalidPeriod`: 如果 period == 0
 /// - `HazeError::InsufficientData`: 如果 period >= n
 ///
-/// # 算法
-/// 1. 上涨日：su = sum(up_changes, period)
-/// 2. 下跌日：sd = sum(down_changes, period)
-/// 3. CMO = 100 * (su - sd) / (su + sd)
+/// # 算法 (TA-Lib 对齐)
+/// 1. 计算涨跌幅（只保留正值/负值）
+/// 2. 使用 Wilder 平滑 (RMA) 得到平均涨/跌幅
+/// 3. CMO = 100 * (avg_up - avg_down) / (avg_up + avg_down)
 pub fn cmo(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     validate_not_empty(close, "close")?;
     let n = close.len();
@@ -1212,30 +1222,43 @@ pub fn cmo(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 
     let mut result = init_result!(n);
 
-    // 计算价格变化
-    let mut up_changes = vec![0.0; n];
-    let mut down_changes = vec![0.0; n];
+    let mut avg_gain = 0.0;
+    let mut avg_loss = 0.0;
 
-    for i in 1..n {
+    // 初始均值：使用第 1..=period 根的涨跌幅
+    for i in 1..=period {
         let change = close[i] - close[i - 1];
         if change > 0.0 {
-            up_changes[i] = change;
+            avg_gain += change;
         } else if change < 0.0 {
-            down_changes[i] = -change;
+            avg_loss += -change;
         }
     }
+    let period_f = period as f64;
+    avg_gain /= period_f;
+    avg_loss /= period_f;
 
-    // 滚动窗口计算
-    for i in period..n {
-        let sum_up: f64 = up_changes[i + 1 - period..=i].iter().sum();
-        let sum_down: f64 = down_changes[i + 1 - period..=i].iter().sum();
+    let sum_total = avg_gain + avg_loss;
+    result[period] = if is_zero(sum_total) {
+        0.0
+    } else {
+        100.0 * (avg_gain - avg_loss) / sum_total
+    };
 
-        let sum_total = sum_up + sum_down;
-        if is_zero(sum_total) {
-            result[i] = 0.0;
+    for i in (period + 1)..n {
+        let change = close[i] - close[i - 1];
+        let gain = if change > 0.0 { change } else { 0.0 };
+        let loss = if change < 0.0 { -change } else { 0.0 };
+
+        avg_gain = (avg_gain * (period_f - 1.0) + gain) / period_f;
+        avg_loss = (avg_loss * (period_f - 1.0) + loss) / period_f;
+
+        let sum_total = avg_gain + avg_loss;
+        result[i] = if is_zero(sum_total) {
+            0.0
         } else {
-            result[i] = 100.0 * (sum_up - sum_down) / sum_total;
-        }
+            100.0 * (avg_gain - avg_loss) / sum_total
+        };
     }
 
     Ok(result)
@@ -1351,11 +1374,12 @@ mod tests {
         let low = vec![100.0, 101.0, 102.0, 103.0, 104.0];
         let close = vec![105.0, 106.0, 107.0, 108.0, 109.0];
 
-        let (k, d) = stochastic(&high, &low, &close, 3, 2).unwrap();
+        let (k, d) = stochastic(&high, &low, &close, 3, 2, 2).unwrap();
 
         assert_eq!(k.len(), 5);
         assert_eq!(d.len(), 5);
-        assert!(k[2] >= 0.0 && k[2] <= 100.0);
+        let valid_k = k.iter().copied().find(|v| !v.is_nan()).expect("valid k");
+        assert!(valid_k >= 0.0 && valid_k <= 100.0);
     }
 
     #[test]
@@ -1364,7 +1388,7 @@ mod tests {
         let low = vec![100.0, 101.0];
         let close = vec![105.0, 106.0, 107.0];
 
-        let result = stochastic(&high, &low, &close, 3, 2);
+        let result = stochastic(&high, &low, &close, 3, 2, 2);
         assert!(matches!(result, Err(HazeError::LengthMismatch { .. })));
     }
 
@@ -1375,11 +1399,15 @@ mod tests {
         let close = vec![105.0, 106.0, 107.0];
 
         // k_period == 0
-        let result = stochastic(&high, &low, &close, 0, 2);
+        let result = stochastic(&high, &low, &close, 0, 2, 2);
+        assert!(matches!(result, Err(HazeError::InvalidPeriod { .. })));
+
+        // smooth_k == 0
+        let result = stochastic(&high, &low, &close, 3, 0, 2);
         assert!(matches!(result, Err(HazeError::InvalidPeriod { .. })));
 
         // d_period == 0
-        let result = stochastic(&high, &low, &close, 3, 0);
+        let result = stochastic(&high, &low, &close, 3, 2, 0);
         assert!(matches!(result, Err(HazeError::InvalidPeriod { .. })));
     }
 
@@ -1485,7 +1513,7 @@ mod kdj_tests {
         let low = vec![100.0; 30];
         let close = vec![105.0; 30];
 
-        let (k, d, j) = kdj(&high, &low, &close, 9, 3).unwrap();
+        let (k, d, j) = kdj(&high, &low, &close, 9, 3, 3).unwrap();
 
         // 横盘市场中，K=D=50，J=3*50-2*50=50
         let valid_idx = k

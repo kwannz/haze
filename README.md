@@ -3,7 +3,7 @@
 [![CI](https://github.com/your-org/haze-library/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/haze-library/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/your-org/haze-library/branch/main/graph/badge.svg)](https://codecov.io/gh/your-org/haze-library)
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
-[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/downloads/)
+[![Python Version](https://img.shields.io/badge/python-3.14%2B-blue)](https://www.python.org/downloads/)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange)](https://www.rust-lang.org/)
 [![PyO3](https://img.shields.io/badge/PyO3-0.27-green)](https://pyo3.rs/)
 
@@ -27,9 +27,17 @@
 - **🚀 215 Technical Indicators**: Complete coverage of TA-Lib, pandas-ta, harmonic patterns, and custom indicators
 - **⚡ Rust Performance**: 5-10x faster than pure Python implementations
 - **🎯 High Precision**: < 1e-9 error tolerance vs reference implementations
-- **🔒 Type Safe**: Full type annotations and Pydantic validation
-- **📦 Zero Dependencies**: All algorithms implemented from scratch
+- **🧩 Minimal Dependencies**: Core indicator algorithms are implemented in Rust; external crates are limited to infrastructure and feature-gated
+- **🔒 Type Safe**: Full type annotations
+- **📦 Easy Install**: Prebuilt wheels for Linux/Windows/macOS
 - **🐍 Pythonic API**: Seamless integration with pandas, numpy, and other Python libraries
+
+### 🧮 Numerical Stability & Performance Policy
+
+- `f64` as the numeric baseline with epsilon-based comparisons in Rust
+- Compensated summation (Kahan/Neumaier) for long sums and rolling windows, plus periodic re-normalization to reduce drift
+- Welford online variance for stable single-pass statistics
+- Correctness before speed: optimizations (Rayon/SIMD) are optional features and must pass precision validation (< 1e-9)
 
 ### 📦 Installation
 
@@ -38,16 +46,22 @@
 pip install haze-library
 ```
 
+#### Optional extras
+```bash
+# CCXT execution helpers
+pip install haze-library[execution]
+```
+
 #### From Source
 ```bash
 git clone https://github.com/kwannz/haze.git
-cd haze/rust
+cd haze
 pip install maturin
 maturin develop --release
 ```
 
 #### Prerequisites
-- Python 3.9+
+- Python 3.14+
 - Rust 1.75+ (required only for building from source)
 
 ### 🚀 Quick Start
@@ -338,9 +352,17 @@ For commercial licensing inquiries, please contact: team@haze-library.com
 - **🚀 215 个技术指标**：完整覆盖 TA-Lib、pandas-ta、谐波形态和自定义指标
 - **⚡ Rust 性能**：比纯 Python 实现快 5-10 倍
 - **🎯 高精度**：与参考实现相比误差容忍度 < 1e-9
-- **🔒 类型安全**：完整的类型注解和 Pydantic 验证
-- **📦 零依赖**：所有算法从零实现
+- **🧩 依赖最小化**：核心指标算法自研；外部依赖仅用于基础设施并通过 feature 控制
+- **🔒 类型安全**：完整的类型注解
+- **📦 安装省心**：Linux/Windows/macOS 预编译 wheels
 - **🐍 Pythonic API**：与 pandas、numpy 等 Python 库无缝集成
+
+### 🧮 数值稳定性与性能策略
+
+- 以 `f64` 为数值基线，并使用 epsilon 近似比较处理浮点误差
+- 长序列累加与滚动窗口使用 Kahan/Neumaier 补偿求和，并通过定期重算抑制误差累积
+- 方差/标准差等统计量使用 Welford 增量算法，避免多次遍历带来的误差放大
+- 先正确、后加速：Rayon/SIMD 通过 feature 启用，必须通过精度验证（< 1e-9）
 
 ### 📦 安装
 
@@ -349,16 +371,22 @@ For commercial licensing inquiries, please contact: team@haze-library.com
 pip install haze-library
 ```
 
+#### 可选扩展依赖
+```bash
+# CCXT 交易所执行辅助
+pip install haze-library[execution]
+```
+
 #### 从源码安装
 ```bash
 git clone https://github.com/kwannz/haze.git
-cd haze/rust
+cd haze
 pip install maturin
 maturin develop --release
 ```
 
 #### 前置要求
-- Python 3.9+
+- Python 3.14+
 - Rust 1.75+（从源码构建时需要）
 
 ### 🚀 快速开始

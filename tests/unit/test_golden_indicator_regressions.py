@@ -11,10 +11,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Mapping
 
 import numpy as np
-import pytest
 
 import haze_library as haze
 

@@ -151,8 +151,8 @@ class TestStatisticsVsTaLib:
             ref_lib=ReferenceLibrary.TALIB,
         )
         # BETA 算法实现可能与 TA-Lib 不同
-        assert result.metrics is not None, f"BETA should return valid metrics"
-        assert result.metrics.valid_count > 0, f"BETA should have valid data"
+        assert result.metrics is not None, "BETA should return valid metrics"
+        assert result.metrics.valid_count > 0, "BETA should have valid data"
 
 
 @pytest.mark.skipif(not HAS_HAZE, reason="haze-library not installed")

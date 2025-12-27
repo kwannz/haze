@@ -6,7 +6,7 @@ Mathematical Operations Unit Tests
 
 测试策略：
 - 已知结果验证：使用可精确计算的数学结果
-- 边界条件：空数组、特殊值（0、负数、NaN）
+- 边界条件：空数组、特殊值（0、负数、NaN）→ fail-fast 抛出错误
 - 数值精度：使用1e-10容差验证
 
 测试的数学函数：
@@ -78,9 +78,8 @@ class TestMAX:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_max([], period=3)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_max([], period=3)
 
 
 # ==================== 2. MIN ====================
@@ -161,10 +160,9 @@ class TestSQRT:
         assert abs(result[0] - 0.0) < 1e-10
 
     def test_negative_values(self):
-        """测试负值（应该返回NaN）"""
-        result = haze.py_sqrt([-1.0, -4.0])
-        for r in result:
-            assert np.isnan(r)
+        """测试负值（应触发错误）"""
+        with pytest.raises(ValueError):
+            haze.py_sqrt([-1.0, -4.0])
 
 
 # ==================== 5. LN ====================
@@ -187,10 +185,9 @@ class TestLN:
         assert abs(result[0] - 0.0) < 1e-10
 
     def test_negative_values(self):
-        """测试负值（应该返回NaN）"""
-        result = haze.py_ln([-1.0, -10.0])
-        for r in result:
-            assert np.isnan(r)
+        """测试负值（应触发错误）"""
+        with pytest.raises(ValueError):
+            haze.py_ln([-1.0, -10.0])
 
 
 # ==================== 6. LOG10 ====================
@@ -348,10 +345,9 @@ class TestASIN:
             assert abs(r - e) < 1e-10
 
     def test_out_of_range(self):
-        """测试超出范围值（应该返回NaN）"""
-        result = haze.py_asin([1.5, -1.5])
-        for r in result:
-            assert np.isnan(r)
+        """测试超出范围值（应触发错误）"""
+        with pytest.raises(ValueError):
+            haze.py_asin([1.5, -1.5])
 
 
 class TestACOS:
@@ -532,13 +528,11 @@ class TestDIV:
             assert abs(r - x) < 1e-10
 
     def test_div_by_zero(self):
-        """测试除以0（应该返回inf或NaN）"""
+        """测试除以0（应触发错误）"""
         a = [1.0, 2.0, 3.0]
         b = [0.0, 0.0, 0.0]
-        result = haze.py_div(a, b)
-
-        for r in result:
-            assert np.isinf(r) or np.isnan(r)
+        with pytest.raises(ValueError):
+            haze.py_div(a, b)
 
 
 # ==================== 24-25. 最小最大值函数 ====================
@@ -615,18 +609,19 @@ class TestMathOpsEdgeCases:
         empty = []
 
         # 单数组函数
-        assert haze.py_sqrt(empty) == []
-        assert haze.py_abs(empty) == []
-        assert haze.py_sin(empty) == []
+        with pytest.raises(ValueError):
+            haze.py_sqrt(empty)
+        with pytest.raises(ValueError):
+            haze.py_abs(empty)
+        with pytest.raises(ValueError):
+            haze.py_sin(empty)
 
     def test_nan_propagation(self):
         """测试NaN传播"""
         data_with_nan = [1.0, float('nan'), 3.0]
 
-        result = haze.py_sqrt(data_with_nan)
-
-        # 第二个值应该是NaN
-        assert np.isnan(result[1])
+        with pytest.raises(ValueError):
+            haze.py_sqrt(data_with_nan)
 
     def test_single_value(self):
         """测试单个值"""

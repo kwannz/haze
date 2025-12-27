@@ -6,6 +6,9 @@
 
 use std::collections::HashMap;
 
+use crate::errors::{HazeError, HazeResult};
+use crate::errors::validation::{validate_not_empty, validate_range};
+
 /// SFG 信号结构体
 ///
 /// 统一所有 SFG 指标的信号输出格式
@@ -100,6 +103,61 @@ impl SFGSignal {
     }
 }
 
+fn validate_signal_lengths(signal: &SFGSignal, name: &'static str) -> HazeResult<usize> {
+    let len = signal.buy_signals.len();
+    if len == 0 {
+        return Err(HazeError::EmptyInput { name });
+    }
+    let fields = [
+        ("sell_signals", signal.sell_signals.len()),
+        ("signal_strength", signal.signal_strength.len()),
+        ("stop_loss", signal.stop_loss.len()),
+        ("take_profit", signal.take_profit.len()),
+        ("max_profit", signal.max_profit.len()),
+    ];
+    for (field, field_len) in fields {
+        if field_len != len {
+            return Err(HazeError::LengthMismatch {
+                name1: "buy_signals",
+                len1: len,
+                name2: field,
+                len2: field_len,
+            });
+        }
+    }
+    if let Some(ref trend_line) = signal.trend_line {
+        if trend_line.len() != len {
+            return Err(HazeError::LengthMismatch {
+                name1: "buy_signals",
+                len1: len,
+                name2: "trend_line",
+                len2: trend_line.len(),
+            });
+        }
+    }
+    if let Some(ref upper_band) = signal.upper_band {
+        if upper_band.len() != len {
+            return Err(HazeError::LengthMismatch {
+                name1: "buy_signals",
+                len1: len,
+                name2: "upper_band",
+                len2: upper_band.len(),
+            });
+        }
+    }
+    if let Some(ref lower_band) = signal.lower_band {
+        if lower_band.len() != len {
+            return Err(HazeError::LengthMismatch {
+                name1: "buy_signals",
+                len1: len,
+                name2: "lower_band",
+                len2: lower_band.len(),
+            });
+        }
+    }
+    Ok(len)
+}
+
 /// 信号生成器 trait
 ///
 /// 所有 SFG 指标实现此接口
@@ -162,17 +220,39 @@ impl SignalInput {
 ///
 /// # 返回
 /// - 组合后的信号
-pub fn combine_signals(signals: &[&SFGSignal], weights: Option<&[f64]>) -> SFGSignal {
+pub fn combine_signals(
+    signals: &[&SFGSignal],
+    weights: Option<&[f64]>,
+) -> HazeResult<SFGSignal> {
     if signals.is_empty() {
-        return SFGSignal::new(0);
+        return Err(HazeError::EmptyInput { name: "signals" });
     }
 
-    let len = signals[0].len();
-    let n = signals.len();
+    let len = validate_signal_lengths(signals[0], "signals[0]")?;
+    for sig in signals.iter().skip(1) {
+        let sig_len = validate_signal_lengths(sig, "signals[n]")?;
+        if sig_len != len {
+            return Err(HazeError::LengthMismatch {
+                name1: "signals[0]",
+                len1: len,
+                name2: "signals[n]",
+                len2: sig_len,
+            });
+        }
+    }
 
-    // 默认等权重
+    let n = signals.len();
     let default_weights: Vec<f64> = vec![1.0 / n as f64; n];
     let weights = weights.unwrap_or(&default_weights);
+    if weights.len() != n {
+        return Err(HazeError::LengthMismatch {
+            name1: "signals",
+            len1: n,
+            name2: "weights",
+            len2: weights.len(),
+        });
+    }
+    validate_not_empty(weights, "weights")?;
 
     let mut combined = SFGSignal::new(len);
 
@@ -182,7 +262,7 @@ pub fn combine_signals(signals: &[&SFGSignal], weights: Option<&[f64]>) -> SFGSi
         let mut total_weight = 0.0;
 
         for (j, sig) in signals.iter().enumerate() {
-            let w = weights.get(j).copied().unwrap_or(1.0 / n as f64);
+            let w = weights[j];
 
             if sig.buy_signals[i] > 0.5 {
                 buy_score += w * sig.signal_strength[i];
@@ -197,6 +277,11 @@ pub fn combine_signals(signals: &[&SFGSignal], weights: Option<&[f64]>) -> SFGSi
         if total_weight > 0.0 {
             buy_score /= total_weight;
             sell_score /= total_weight;
+        } else {
+            return Err(HazeError::InvalidValue {
+                index: i,
+                message: "total weight is zero".to_string(),
+            });
         }
 
         // 生成组合信号 (阈值 0.5)
@@ -208,7 +293,7 @@ pub fn combine_signals(signals: &[&SFGSignal], weights: Option<&[f64]>) -> SFGSi
         }
     }
 
-    combined
+    Ok(combined)
 }
 
 // ============================================================
@@ -224,13 +309,42 @@ pub fn calculate_stops(
     signals: &SFGSignal,
     sl_multiplier: f64,
     tp_multiplier: f64,
-) -> (Vec<f64>, Vec<f64>) {
+) -> HazeResult<(Vec<f64>, Vec<f64>)> {
+    validate_not_empty(close, "close")?;
+    validate_range("sl_multiplier", sl_multiplier, 0.0, f64::INFINITY)?;
+    validate_range("tp_multiplier", tp_multiplier, 0.0, f64::INFINITY)?;
     let len = close.len();
+    if atr.len() != len {
+        return Err(HazeError::LengthMismatch {
+            name1: "close",
+            len1: len,
+            name2: "atr",
+            len2: atr.len(),
+        });
+    }
+    let sig_len = validate_signal_lengths(signals, "signals")?;
+    if sig_len != len {
+        return Err(HazeError::LengthMismatch {
+            name1: "close",
+            len1: len,
+            name2: "signals",
+            len2: sig_len,
+        });
+    }
     let mut stop_loss = vec![f64::NAN; len];
     let mut take_profit = vec![f64::NAN; len];
 
     for i in 0..len {
-        let atr_val = if atr[i].is_nan() { 0.0 } else { atr[i] };
+        let atr_val = atr[i];
+        if atr_val.is_infinite() {
+            return Err(HazeError::InvalidValue {
+                index: i,
+                message: "atr contains infinite value".to_string(),
+            });
+        }
+        if atr_val.is_nan() {
+            continue;
+        }
 
         // 买入信号
         if signals.buy_signals[i] > 0.5 {
@@ -244,7 +358,7 @@ pub fn calculate_stops(
         }
     }
 
-    (stop_loss, take_profit)
+    Ok((stop_loss, take_profit))
 }
 
 /// 计算追踪止损
@@ -253,19 +367,42 @@ pub fn trailing_stop(
     atr: &[f64],
     direction: &[f64], // 1.0 = 多, -1.0 = 空
     multiplier: f64,
-) -> Vec<f64> {
+) -> HazeResult<Vec<f64>> {
+    validate_not_empty(close, "close")?;
+    validate_range("multiplier", multiplier, 0.0, f64::INFINITY)?;
     let len = close.len();
-    let mut trail_stop = vec![f64::NAN; len];
-
-    if len == 0 {
-        return trail_stop;
+    if atr.len() != len {
+        return Err(HazeError::LengthMismatch {
+            name1: "close",
+            len1: len,
+            name2: "atr",
+            len2: atr.len(),
+        });
     }
+    if direction.len() != len {
+        return Err(HazeError::LengthMismatch {
+            name1: "close",
+            len1: len,
+            name2: "direction",
+            len2: direction.len(),
+        });
+    }
+    let mut trail_stop = vec![f64::NAN; len];
 
     let mut max_high = close[0];
     let mut min_low = close[0];
 
     for i in 0..len {
-        let atr_val = if atr[i].is_nan() { 0.0 } else { atr[i] };
+        let atr_val = atr[i];
+        if atr_val.is_infinite() {
+            return Err(HazeError::InvalidValue {
+                index: i,
+                message: "atr contains infinite value".to_string(),
+            });
+        }
+        if atr_val.is_nan() {
+            continue;
+        }
 
         if direction[i] > 0.5 {
             // 多头追踪
@@ -282,7 +419,7 @@ pub fn trailing_stop(
         }
     }
 
-    trail_stop
+    Ok(trail_stop)
 }
 
 // ============================================================
@@ -344,7 +481,7 @@ mod tests {
         sig1.set_buy(2, 0.9);
         sig2.set_buy(2, 0.7);
 
-        let combined = combine_signals(&[&sig1, &sig2], None);
+        let combined = combine_signals(&[&sig1, &sig2], None).unwrap();
 
         assert_eq!(combined.count_buy_signals(), 1);
         // 平均强度 = (0.9 + 0.7) / 2 = 0.8
@@ -359,7 +496,7 @@ mod tests {
         let mut signals = SFGSignal::new(5);
         signals.set_buy(2, 1.0);
 
-        let (sl, tp) = calculate_stops(&close, &atr, &signals, 2.0, 3.0);
+        let (sl, tp) = calculate_stops(&close, &atr, &signals, 2.0, 3.0).unwrap();
 
         // 买入信号: SL = 102 - 2*2 = 98, TP = 102 + 3*2 = 108
         assert_eq!(sl[2], 98.0);
@@ -372,7 +509,7 @@ mod tests {
         let atr = vec![2.0, 2.0, 2.0, 2.0, 2.0];
         let direction = vec![1.0, 1.0, 1.0, 1.0, 1.0];
 
-        let trail = trailing_stop(&close, &atr, &direction, 2.0);
+        let trail = trailing_stop(&close, &atr, &direction, 2.0).unwrap();
 
         // 追踪最高点
         // i=0: max=100, trail=100-4=96

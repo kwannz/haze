@@ -7,8 +7,38 @@
 
 #[cfg(feature = "python")]
 use pyo3::prelude::*;
+
+use crate::errors::HazeResult;
+
+// ==================== Type Aliases for Complex Returns ====================
+
+/// SuperTrend indicator result: (supertrend_line, direction, upper_band, lower_band)
+pub type SuperTrendResult<T> = HazeResult<(T, T, T, T)>;
+
+/// SuperTrend slices for cached data
+pub type SuperTrendSlices<'a> = HazeResult<(&'a [f64], &'a [f64], &'a [f64], &'a [f64])>;
+
+/// SuperTrend owned vectors for Python FFI
+#[cfg(feature = "python")]
+pub type SuperTrendVecs = PyResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)>;
+
 #[cfg(not(feature = "python"))]
 type PyResult<T> = Result<T, String>;
+
+// ==================== Signal Type Aliases (消除 type_complexity 警告) ====================
+
+/// Trading signals with stop-loss and take-profit levels
+/// Returns: (buy_signals, sell_signals, stop_loss, take_profit)
+pub type TradingSignals = HazeResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)>;
+
+/// Zone-based signals with upper/lower bounds
+/// Returns: (bullish_zone, bearish_zone, upper_bound, lower_bound)
+pub type ZoneSignals = HazeResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)>;
+
+/// Harmonic pattern signals with PRZ and probability
+/// Returns: (signals, prz_upper, prz_lower, probability)
+pub type HarmonicSignals = HazeResult<(Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>)>;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

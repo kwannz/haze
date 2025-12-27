@@ -9,20 +9,181 @@ mod dataframe;
 pub mod errors;
 pub mod indicators;
 mod ml;
+#[cfg(feature = "python")]
+mod streaming_py;
 pub mod types;
 pub mod utils;
 #[macro_use]
 mod macros;
 
-// 可选模块：Polars 集成
-#[cfg(feature = "polars")]
-mod polars_compat;
 
 pub use dataframe::{create_ohlcv_frame, OhlcvFrame};
 pub use errors::{HazeError, HazeResult};
 
 #[cfg(feature = "python")]
 use types::{Candle, IndicatorResult, MultiIndicatorResult};
+
+// ==================== OhlcvFrame (Python) ====================
+//
+// Expose the cached Rust OHLCV frame to Python so users can compute many
+// indicators without repeatedly copying OHLCV arrays across the FFI boundary.
+
+#[cfg(feature = "python")]
+#[pyclass(name = "OhlcvFrame")]
+pub struct PyOhlcvFrame {
+    inner: OhlcvFrame,
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl PyOhlcvFrame {
+    #[new]
+    pub fn new(
+        timestamps: Vec<i64>,
+        open: Vec<f64>,
+        high: Vec<f64>,
+        low: Vec<f64>,
+        close: Vec<f64>,
+        volume: Vec<f64>,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: OhlcvFrame::new(timestamps, open, high, low, close, volume)?,
+        })
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub fn __len__(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    pub fn clear_cache(&mut self) {
+        self.inner.clear_cache();
+    }
+
+    pub fn cached_indicators(&self) -> Vec<String> {
+        self.inner
+            .cached_indicators()
+            .into_iter()
+            .cloned()
+            .collect()
+    }
+
+    pub fn get_cached(&self, name: String) -> Option<Vec<f64>> {
+        self.inner.get_cached(&name).map(|v| v.to_vec())
+    }
+
+    pub fn compute_common_indicators(&mut self) -> PyResult<std::collections::HashMap<String, Vec<f64>>> {
+        Ok(self.inner.compute_common_indicators()?)
+    }
+
+    // -------------------- Moving averages --------------------
+
+    pub fn sma(&mut self, period: usize) -> PyResult<Vec<f64>> {
+        Ok(self.inner.sma(period)?.to_vec())
+    }
+
+    pub fn ema(&mut self, period: usize) -> PyResult<Vec<f64>> {
+        Ok(self.inner.ema(period)?.to_vec())
+    }
+
+    pub fn wma(&mut self, period: usize) -> PyResult<Vec<f64>> {
+        Ok(self.inner.wma(period)?.to_vec())
+    }
+
+    pub fn hma(&mut self, period: usize) -> PyResult<Vec<f64>> {
+        Ok(self.inner.hma(period)?.to_vec())
+    }
+
+    // -------------------- Volatility --------------------
+
+    pub fn atr(&mut self, period: usize) -> PyResult<Vec<f64>> {
+        Ok(self.inner.atr(period)?.to_vec())
+    }
+
+    pub fn true_range(&mut self) -> PyResult<Vec<f64>> {
+        Ok(self.inner.true_range()?.to_vec())
+    }
+
+    pub fn bollinger_bands(
+        &mut self,
+        period: usize,
+        std_dev: f64,
+    ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+        let (upper, middle, lower) = self.inner.bollinger_bands(period, std_dev)?;
+        Ok((upper.to_vec(), middle.to_vec(), lower.to_vec()))
+    }
+
+    // -------------------- Momentum --------------------
+
+    pub fn rsi(&mut self, period: usize) -> PyResult<Vec<f64>> {
+        Ok(self.inner.rsi(period)?.to_vec())
+    }
+
+    pub fn macd(
+        &mut self,
+        fast: usize,
+        slow: usize,
+        signal: usize,
+    ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+        let (macd, signal_line, hist) = self.inner.macd(fast, slow, signal)?;
+        Ok((macd.to_vec(), signal_line.to_vec(), hist.to_vec()))
+    }
+
+    pub fn stochastic(
+        &mut self,
+        k_period: usize,
+        smooth_k: usize,
+        d_period: usize,
+    ) -> PyResult<(Vec<f64>, Vec<f64>)> {
+        let (k, d) = self.inner.stochastic(k_period, smooth_k, d_period)?;
+        Ok((k.to_vec(), d.to_vec()))
+    }
+
+    pub fn cci(&mut self, period: usize) -> PyResult<Vec<f64>> {
+        Ok(self.inner.cci(period)?.to_vec())
+    }
+
+    pub fn williams_r(&mut self, period: usize) -> PyResult<Vec<f64>> {
+        Ok(self.inner.williams_r(period)?.to_vec())
+    }
+
+    // -------------------- Trend --------------------
+
+    pub fn supertrend(
+        &mut self,
+        period: usize,
+        multiplier: f64,
+    ) -> types::SuperTrendVecs {
+        let (st, dir, upper, lower) = self.inner.supertrend(period, multiplier)?;
+        Ok((st.to_vec(), dir.to_vec(), upper.to_vec(), lower.to_vec()))
+    }
+
+    pub fn adx(&mut self, period: usize) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+        let (adx, plus_di, minus_di) = self.inner.adx(period)?;
+        Ok((adx.to_vec(), plus_di.to_vec(), minus_di.to_vec()))
+    }
+
+    // -------------------- Volume --------------------
+
+    pub fn obv(&mut self) -> PyResult<Vec<f64>> {
+        Ok(self.inner.obv()?.to_vec())
+    }
+
+    pub fn vwap(&mut self, period: usize) -> PyResult<Vec<f64>> {
+        Ok(self.inner.vwap(period)?.to_vec())
+    }
+
+    pub fn mfi(&mut self, period: usize) -> PyResult<Vec<f64>> {
+        Ok(self.inner.mfi(period)?.to_vec())
+    }
+}
 
 #[cfg(feature = "python")]
 type Vec4F64 = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
@@ -47,26 +208,10 @@ type Vec7F64 = (
 #[cfg(feature = "python")]
 type Pivots9F64 = (f64, f64, f64, f64, f64, f64, f64, f64, f64);
 
-/// Creates a NaN-filled vector of specified length.
+/// Macro for fail-fast error handling in Python FFI.
 ///
-/// Used as fallback for graceful degradation when indicator
-/// calculations fail due to insufficient data or invalid parameters.
-#[cfg(feature = "python")]
-#[inline]
-fn nan_vec(len: usize) -> Vec<f64> {
-    vec![f64::NAN; len]
-}
-
-/// Macro for graceful error handling in Python FFI.
-///
-/// Converts `HazeResult<T>` to `PyResult<T>`, returning NaN-filled
-/// fallback values for recoverable errors (empty input, insufficient
-/// data, invalid period) and propagating other errors to Python.
-///
-/// # Design Philosophy
-/// Follows the Fail-Safe principle: instead of raising exceptions for
-/// common edge cases like insufficient data, we return NaN vectors that
-/// are compatible with downstream processing in pandas/numpy.
+/// Converts `HazeResult<T>` to `PyResult<T>` and propagates all errors
+/// to Python without NaN fallbacks.
 ///
 /// # Usage
 /// ```ignore
@@ -83,119 +228,82 @@ fn nan_vec(len: usize) -> Vec<f64> {
 macro_rules! ok_or_nan {
     // Single vector case: ok_or_nan!(result, len)
     ($result:expr, $len:expr) => {
-        match $result {
-            Ok(values) => Ok(values),
-            Err(
-                HazeError::EmptyInput { .. }
-                | HazeError::InsufficientData { .. }
-                | HazeError::InvalidPeriod { .. },
-            ) => Ok(nan_vec($len)),
-            Err(err) => Err(err.into()),
+        {
+            let _ = $len;
+            match $result {
+                Ok(values) => Ok(values),
+                Err(err) => Err(err.into()),
+            }
         }
     };
     // 2-tuple case: ok_or_nan!(result, len, 2)
     ($result:expr, $len:expr, 2) => {
-        match $result {
-            Ok(values) => Ok(values),
-            Err(
-                HazeError::EmptyInput { .. }
-                | HazeError::InsufficientData { .. }
-                | HazeError::InvalidPeriod { .. },
-            ) => Ok((nan_vec($len), nan_vec($len))),
-            Err(err) => Err(err.into()),
+        {
+            let _ = $len;
+            match $result {
+                Ok(values) => Ok(values),
+                Err(err) => Err(err.into()),
+            }
         }
     };
     // 3-tuple case: ok_or_nan!(result, len, 3)
     ($result:expr, $len:expr, 3) => {
-        match $result {
-            Ok(values) => Ok(values),
-            Err(
-                HazeError::EmptyInput { .. }
-                | HazeError::InsufficientData { .. }
-                | HazeError::InvalidPeriod { .. },
-            ) => Ok((nan_vec($len), nan_vec($len), nan_vec($len))),
-            Err(err) => Err(err.into()),
+        {
+            let _ = $len;
+            match $result {
+                Ok(values) => Ok(values),
+                Err(err) => Err(err.into()),
+            }
         }
     };
     // 4-tuple case: ok_or_nan!(result, len, 4)
     ($result:expr, $len:expr, 4) => {
-        match $result {
-            Ok(values) => Ok(values),
-            Err(
-                HazeError::EmptyInput { .. }
-                | HazeError::InsufficientData { .. }
-                | HazeError::InvalidPeriod { .. },
-            ) => Ok((nan_vec($len), nan_vec($len), nan_vec($len), nan_vec($len))),
-            Err(err) => Err(err.into()),
+        {
+            let _ = $len;
+            match $result {
+                Ok(values) => Ok(values),
+                Err(err) => Err(err.into()),
+            }
         }
     };
     // 5-tuple case: ok_or_nan!(result, len, 5)
     ($result:expr, $len:expr, 5) => {
-        match $result {
-            Ok(values) => Ok(values),
-            Err(
-                HazeError::EmptyInput { .. }
-                | HazeError::InsufficientData { .. }
-                | HazeError::InvalidPeriod { .. },
-            ) => Ok((
-                nan_vec($len),
-                nan_vec($len),
-                nan_vec($len),
-                nan_vec($len),
-                nan_vec($len),
-            )),
-            Err(err) => Err(err.into()),
+        {
+            let _ = $len;
+            match $result {
+                Ok(values) => Ok(values),
+                Err(err) => Err(err.into()),
+            }
         }
     };
     // 6-tuple case: ok_or_nan!(result, len, 6)
     ($result:expr, $len:expr, 6) => {
-        match $result {
-            Ok(values) => Ok(values),
-            Err(
-                HazeError::EmptyInput { .. }
-                | HazeError::InsufficientData { .. }
-                | HazeError::InvalidPeriod { .. },
-            ) => Ok((
-                nan_vec($len),
-                nan_vec($len),
-                nan_vec($len),
-                nan_vec($len),
-                nan_vec($len),
-                nan_vec($len),
-            )),
-            Err(err) => Err(err.into()),
+        {
+            let _ = $len;
+            match $result {
+                Ok(values) => Ok(values),
+                Err(err) => Err(err.into()),
+            }
         }
     };
     // 7-tuple case: ok_or_nan!(result, len, 7)
     ($result:expr, $len:expr, 7) => {
-        match $result {
-            Ok(values) => Ok(values),
-            Err(
-                HazeError::EmptyInput { .. }
-                | HazeError::InsufficientData { .. }
-                | HazeError::InvalidPeriod { .. },
-            ) => Ok((
-                nan_vec($len),
-                nan_vec($len),
-                nan_vec($len),
-                nan_vec($len),
-                nan_vec($len),
-                nan_vec($len),
-                nan_vec($len),
-            )),
-            Err(err) => Err(err.into()),
+        {
+            let _ = $len;
+            match $result {
+                Ok(values) => Ok(values),
+                Err(err) => Err(err.into()),
+            }
         }
     };
     // Special case: 2 vectors + 1 f64: ok_or_nan!(result, len, 2, f64)
     ($result:expr, $len:expr, 2, f64) => {
-        match $result {
-            Ok(values) => Ok(values),
-            Err(
-                HazeError::EmptyInput { .. }
-                | HazeError::InsufficientData { .. }
-                | HazeError::InvalidPeriod { .. },
-            ) => Ok((nan_vec($len), nan_vec($len), f64::NAN)),
-            Err(err) => Err(err.into()),
+        {
+            let _ = $len;
+            match $result {
+                Ok(values) => Ok(values),
+                Err(err) => Err(err.into()),
+            }
         }
     };
 }
@@ -269,6 +377,7 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<Candle>()?;
     m.add_class::<IndicatorResult>()?;
     m.add_class::<MultiIndicatorResult>()?;
+    m.add_class::<PyOhlcvFrame>()?;
 
     // Volatility 指标
     m.add_function(wrap_pyfunction!(py_true_range, m)?)?;
@@ -287,6 +396,7 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_macd, m)?)?;
     m.add_function(wrap_pyfunction!(py_stochastic, m)?)?;
     m.add_function(wrap_pyfunction!(py_stochrsi, m)?)?;
+    m.add_function(wrap_pyfunction!(py_stoch_rsi, m)?)?;
     m.add_function(wrap_pyfunction!(py_cci, m)?)?;
     m.add_function(wrap_pyfunction!(py_williams_r, m)?)?;
     m.add_function(wrap_pyfunction!(py_awesome_oscillator, m)?)?;
@@ -295,8 +405,10 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Trend 指标
     m.add_function(wrap_pyfunction!(py_supertrend, m)?)?;
     m.add_function(wrap_pyfunction!(py_adx, m)?)?;
+    m.add_function(wrap_pyfunction!(py_dmi, m)?)?;
     m.add_function(wrap_pyfunction!(py_aroon, m)?)?;
     m.add_function(wrap_pyfunction!(py_psar, m)?)?;
+    m.add_function(wrap_pyfunction!(py_parabolic_sar, m)?)?;
     m.add_function(wrap_pyfunction!(py_trix, m)?)?;
     m.add_function(wrap_pyfunction!(py_dpo, m)?)?;
 
@@ -321,14 +433,30 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // Fibonacci 指标
     m.add_function(wrap_pyfunction!(py_fib_retracement, m)?)?;
     m.add_function(wrap_pyfunction!(py_fib_extension, m)?)?;
+    m.add_function(wrap_pyfunction!(py_fibonacci_retracement, m)?)?;
+    m.add_function(wrap_pyfunction!(py_fibonacci_extension, m)?)?;
+    m.add_function(wrap_pyfunction!(py_dynamic_fib_retracement, m)?)?;
+    m.add_function(wrap_pyfunction!(py_detect_fib_touch, m)?)?;
+    m.add_function(wrap_pyfunction!(py_fib_fan_lines, m)?)?;
+    m.add_function(wrap_pyfunction!(py_fib_time_zones, m)?)?;
 
     // Ichimoku 指标
     m.add_function(wrap_pyfunction!(py_ichimoku_cloud, m)?)?;
+    m.add_function(wrap_pyfunction!(py_ichimoku_signals, m)?)?;
+    m.add_function(wrap_pyfunction!(py_ichimoku_tk_cross, m)?)?;
+    m.add_function(wrap_pyfunction!(py_cloud_thickness, m)?)?;
+    m.add_function(wrap_pyfunction!(py_cloud_color, m)?)?;
 
     // Pivot Points 指标
     m.add_function(wrap_pyfunction!(py_standard_pivots, m)?)?;
+    m.add_function(wrap_pyfunction!(py_classic_pivots, m)?)?;
     m.add_function(wrap_pyfunction!(py_fibonacci_pivots, m)?)?;
     m.add_function(wrap_pyfunction!(py_camarilla_pivots, m)?)?;
+    m.add_function(wrap_pyfunction!(py_woodie_pivots, m)?)?;
+    m.add_function(wrap_pyfunction!(py_demark_pivots, m)?)?;
+    m.add_function(wrap_pyfunction!(py_calc_pivot_series, m)?)?;
+    m.add_function(wrap_pyfunction!(py_detect_pivot_touch, m)?)?;
+    m.add_function(wrap_pyfunction!(py_pivot_zone, m)?)?;
 
     // 扩展 Momentum 指标
     m.add_function(wrap_pyfunction!(py_kdj, m)?)?;
@@ -489,6 +617,7 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     // SFG 信号工具
     m.add_function(wrap_pyfunction!(py_combine_signals, m)?)?;
     m.add_function(wrap_pyfunction!(py_calculate_stops, m)?)?;
+    m.add_function(wrap_pyfunction!(py_trailing_stop, m)?)?;
 
     // SFG 新增指标 (PD Array, Breaker Block, General Parameters, LinReg S/D)
     m.add_function(wrap_pyfunction!(py_pd_array_signals, m)?)?;
@@ -564,9 +693,17 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_harmonics_patterns, m)?)?;
     m.add_function(wrap_pyfunction!(py_swing_points, m)?)?;
 
-    // Polars 集成（可选）
-    #[cfg(feature = "polars")]
-    polars_compat::register_polars_functions(m)?;
+    // 流式/在线计算器 (Streaming Calculators)
+    streaming_py::register_streaming_classes(m)?;
+
+    // ML 模块 (Machine Learning)
+    m.add_class::<PySFGModel>()?;
+    m.add_function(wrap_pyfunction!(py_train_supertrend_model, m)?)?;
+    m.add_function(wrap_pyfunction!(py_train_atr2_model, m)?)?;
+    m.add_function(wrap_pyfunction!(py_train_momentum_model, m)?)?;
+    m.add_function(wrap_pyfunction!(py_prepare_supertrend_features, m)?)?;
+    m.add_function(wrap_pyfunction!(py_prepare_atr2_features, m)?)?;
+    m.add_function(wrap_pyfunction!(py_prepare_momentum_features, m)?)?;
 
     Ok(())
 }
@@ -732,7 +869,8 @@ fn py_bollinger_bands(
 
 #[cfg(feature = "python")]
 #[pyfunction]
-#[pyo3(text_signature = "(high, low, close, period=20, atr_period=10, multiplier=2.0)")]
+#[pyo3(signature = (high, low, close, period=20, atr_period=None, multiplier=2.0))]
+#[pyo3(text_signature = "(high, low, close, period=20, atr_period=None, multiplier=2.0)")]
 /// Calculate Keltner Channel
 ///
 /// Volatility-based envelope using ATR instead of standard deviation.
@@ -748,7 +886,7 @@ fn py_bollinger_bands(
 /// period : int, optional
 ///     EMA period (default: 20)
 /// atr_period : int, optional
-///     ATR period (default: 10)
+///     ATR period (default: period)
 /// multiplier : float, optional
 ///     ATR multiplier (default: 2.0)
 ///
@@ -764,19 +902,20 @@ fn py_keltner_channel(
     high: Vec<f64>,
     low: Vec<f64>,
     close: Vec<f64>,
-    period: Option<usize>,
+    period: usize,
     atr_period: Option<usize>,
-    multiplier: Option<f64>,
+    multiplier: f64,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
     let len = close.len();
+    let atr_period = atr_period.unwrap_or(period);
     ok_or_nan_vec3(
         indicators::keltner_channel(
             &high,
             &low,
             &close,
-            period.unwrap_or(20),
-            atr_period.unwrap_or(10),
-            multiplier.unwrap_or(2.0),
+            period,
+            atr_period,
+            multiplier,
         ),
         len,
     )
@@ -940,7 +1079,8 @@ fn py_ulcer_index(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> 
 
 #[cfg(feature = "python")]
 #[pyfunction]
-#[pyo3(text_signature = "(high, low, period=25, ema_period=9)")]
+#[pyo3(signature = (high, low, fast=9, slow=25))]
+#[pyo3(text_signature = "(high, low, fast=9, slow=25)")]
 /// Calculate Mass Index
 ///
 /// Identifies trend reversals by analyzing the range between high and low prices.
@@ -953,10 +1093,10 @@ fn py_ulcer_index(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> 
 ///     High prices
 /// low : list of float
 ///     Low prices
-/// period : int, optional
-///     Summation period (default: 25)
-/// ema_period : int, optional
+/// fast : int, optional
 ///     EMA calculation period (default: 9)
+/// slow : int, optional
+///     Summation period (default: 25)
 ///
 /// Returns
 /// -------
@@ -969,18 +1109,18 @@ fn py_ulcer_index(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> 
 ///
 /// Examples
 /// --------
-/// >>> mi = py_mass_index([10.5, 10.8, 11.0], [10.0, 10.3, 10.5], period=25, ema_period=9)
+/// >>> mi = py_mass_index([10.5, 10.8, 11.0], [10.0, 10.3, 10.5], fast=9, slow=25)
 /// >>> mi[33]  # First valid value after warmup
 /// 26.8
 fn py_mass_index(
     high: Vec<f64>,
     low: Vec<f64>,
-    period: Option<usize>,
-    ema_period: Option<usize>,
+    fast: usize,
+    slow: usize,
 ) -> PyResult<Vec<f64>> {
     let len = high.len();
     ok_or_nan_vec(
-        indicators::mass_index(&high, &low, period.unwrap_or(25), ema_period.unwrap_or(9)),
+        indicators::mass_index(&high, &low, fast, slow),
         len,
     )
 }
@@ -1068,7 +1208,8 @@ fn py_macd(
 
 #[cfg(feature = "python")]
 #[pyfunction]
-#[pyo3(text_signature = "(high, low, close, k_period=14, d_period=3)")]
+#[pyo3(signature = (high, low, close, k_period=14, smooth_k=3, d_period=3))]
+#[pyo3(text_signature = "(high, low, close, k_period=14, smooth_k=3, d_period=3)")]
 /// Calculate Stochastic Oscillator
 ///
 /// Compares closing price to price range over a period.
@@ -1084,6 +1225,8 @@ fn py_macd(
 ///     Closing prices
 /// k_period : int, optional
 ///     %K period (default: 14)
+/// smooth_k : int, optional
+///     %K smoothing period (default: 3)
 /// d_period : int, optional
 ///     %D period (default: 3)
 ///
@@ -1099,18 +1242,13 @@ fn py_stochastic(
     high: Vec<f64>,
     low: Vec<f64>,
     close: Vec<f64>,
-    k_period: Option<usize>,
-    d_period: Option<usize>,
+    k_period: usize,
+    smooth_k: usize,
+    d_period: usize,
 ) -> PyResult<(Vec<f64>, Vec<f64>)> {
     let len = close.len();
     ok_or_nan_vec2(
-        indicators::stochastic(
-            &high,
-            &low,
-            &close,
-            k_period.unwrap_or(14),
-            d_period.unwrap_or(3),
-        ),
+        indicators::stochastic(&high, &low, &close, k_period, smooth_k, d_period),
         len,
     )
 }
@@ -1161,6 +1299,19 @@ fn py_stochrsi(
         ),
         len,
     )
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(text_signature = "(close, rsi_period=14, stoch_period=14, k_period=3, d_period=3)")]
+fn py_stoch_rsi(
+    close: Vec<f64>,
+    rsi_period: Option<usize>,
+    stoch_period: Option<usize>,
+    k_period: Option<usize>,
+    d_period: Option<usize>,
+) -> PyResult<(Vec<f64>, Vec<f64>)> {
+    py_stochrsi(close, rsi_period, stoch_period, k_period, d_period)
 }
 
 #[cfg(feature = "python")]
@@ -1418,6 +1569,19 @@ fn py_adx(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+#[pyo3(text_signature = "(high, low, close, period=14)")]
+fn py_dmi(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    period: Option<usize>,
+) -> PyResult<(Vec<f64>, Vec<f64>)> {
+    let len = close.len();
+    ok_or_nan_vec2(indicators::dmi(&high, &low, &close, period.unwrap_or(14)), len)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
 #[pyo3(text_signature = "(high, low, period=25)")]
 /// Calculate Aroon Indicator
 ///
@@ -1501,6 +1665,20 @@ fn py_psar(
         ),
         len,
     )
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(text_signature = "(high, low, close, af_init=0.02, af_increment=0.02, af_max=0.2)")]
+fn py_parabolic_sar(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    af_init: Option<f64>,
+    af_increment: Option<f64>,
+    af_max: Option<f64>,
+) -> PyResult<(Vec<f64>, Vec<f64>)> {
+    py_psar(high, low, close, af_init, af_increment, af_max)
 }
 
 #[cfg(feature = "python")]
@@ -2030,10 +2208,16 @@ fn py_tema(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_fib_retracement(start_price: f64, end_price: f64) -> PyResult<Vec<(String, f64)>> {
-    let fib = indicators::fibonacci::fib_retracement(start_price, end_price, None);
+    let fib = indicators::fibonacci::fib_retracement(start_price, end_price, None)?;
     let mut levels: Vec<(String, f64)> = fib.levels.into_iter().collect();
-    levels.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    levels.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(levels)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_fibonacci_retracement(start_price: f64, end_price: f64) -> PyResult<Vec<(String, f64)>> {
+    py_fib_retracement(start_price, end_price)
 }
 
 #[cfg(feature = "python")]
@@ -2043,10 +2227,74 @@ fn py_fib_extension(
     end_price: f64,
     retracement_price: f64,
 ) -> PyResult<Vec<(String, f64)>> {
-    let ext = indicators::fibonacci::fib_extension(start_price, end_price, retracement_price, None);
+    let ext = indicators::fibonacci::fib_extension(start_price, end_price, retracement_price, None)?;
     let mut levels: Vec<(String, f64)> = ext.levels.into_iter().collect();
-    levels.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    levels.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(levels)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_fibonacci_extension(
+    start_price: f64,
+    end_price: f64,
+    retracement_price: f64,
+) -> PyResult<Vec<(String, f64)>> {
+    py_fib_extension(start_price, end_price, retracement_price)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_dynamic_fib_retracement(
+    prices: Vec<f64>,
+    lookback: Option<usize>,
+) -> PyResult<Vec<std::collections::HashMap<String, f64>>> {
+    Ok(indicators::dynamic_fib_retracement(
+        &prices,
+        lookback.unwrap_or(20),
+    )?)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_detect_fib_touch(
+    current_price: f64,
+    levels: Vec<(String, f64)>,
+    tolerance: Option<f64>,
+) -> PyResult<Option<String>> {
+    let mut map = std::collections::HashMap::with_capacity(levels.len());
+    for (k, v) in levels {
+        map.insert(k, v);
+    }
+    Ok(indicators::detect_fib_touch(
+        current_price,
+        &map,
+        tolerance.unwrap_or(0.001),
+    )?)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_fib_fan_lines(
+    start_index: usize,
+    end_index: usize,
+    start_price: f64,
+    end_price: f64,
+    target_index: usize,
+) -> PyResult<(f64, f64, f64)> {
+    Ok(indicators::fib_fan_lines(
+        start_index,
+        end_index,
+        start_price,
+        end_price,
+        target_index,
+    )?)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_fib_time_zones(start_index: usize, max_zones: usize) -> PyResult<Vec<usize>> {
+    Ok(indicators::fib_time_zones(start_index, max_zones)?)
 }
 
 // ==================== Ichimoku 指标包装 ====================
@@ -2096,7 +2344,7 @@ fn py_ichimoku_cloud(
         tenkan_period.unwrap_or(9),
         kijun_period.unwrap_or(26),
         senkou_b_period.unwrap_or(52),
-    );
+    )?;
 
     Ok((
         ichimoku.tenkan_sen,
@@ -2105,6 +2353,93 @@ fn py_ichimoku_cloud(
         ichimoku.senkou_span_b,
         ichimoku.chikou_span,
     ))
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_ichimoku_signals(
+    close: Vec<f64>,
+    tenkan_sen: Vec<f64>,
+    kijun_sen: Vec<f64>,
+    senkou_span_a: Vec<f64>,
+    senkou_span_b: Vec<f64>,
+    chikou_span: Vec<f64>,
+) -> PyResult<Vec<i32>> {
+    let ichimoku = indicators::ichimoku::IchimokuCloud {
+        tenkan_sen,
+        kijun_sen,
+        senkou_span_a,
+        senkou_span_b,
+        chikou_span,
+    };
+    let signals = indicators::ichimoku::ichimoku_signals(&close, &ichimoku)?;
+    Ok(signals
+        .into_iter()
+        .map(|s| match s {
+            indicators::ichimoku::IchimokuSignal::StrongBullish => 2,
+            indicators::ichimoku::IchimokuSignal::Bullish => 1,
+            indicators::ichimoku::IchimokuSignal::Neutral => 0,
+            indicators::ichimoku::IchimokuSignal::Bearish => -1,
+            indicators::ichimoku::IchimokuSignal::StrongBearish => -2,
+        })
+        .collect())
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_ichimoku_tk_cross(
+    tenkan_sen: Vec<f64>,
+    kijun_sen: Vec<f64>,
+    senkou_span_a: Vec<f64>,
+    senkou_span_b: Vec<f64>,
+    chikou_span: Vec<f64>,
+) -> PyResult<Vec<f64>> {
+    let ichimoku = indicators::ichimoku::IchimokuCloud {
+        tenkan_sen,
+        kijun_sen,
+        senkou_span_a,
+        senkou_span_b,
+        chikou_span,
+    };
+    Ok(indicators::ichimoku::ichimoku_tk_cross(&ichimoku)?)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_cloud_thickness(
+    tenkan_sen: Vec<f64>,
+    kijun_sen: Vec<f64>,
+    senkou_span_a: Vec<f64>,
+    senkou_span_b: Vec<f64>,
+    chikou_span: Vec<f64>,
+) -> PyResult<Vec<f64>> {
+    let ichimoku = indicators::ichimoku::IchimokuCloud {
+        tenkan_sen,
+        kijun_sen,
+        senkou_span_a,
+        senkou_span_b,
+        chikou_span,
+    };
+    Ok(indicators::ichimoku::cloud_thickness(&ichimoku)?)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_cloud_color(
+    tenkan_sen: Vec<f64>,
+    kijun_sen: Vec<f64>,
+    senkou_span_a: Vec<f64>,
+    senkou_span_b: Vec<f64>,
+    chikou_span: Vec<f64>,
+) -> PyResult<Vec<f64>> {
+    let ichimoku = indicators::ichimoku::IchimokuCloud {
+        tenkan_sen,
+        kijun_sen,
+        senkou_span_a,
+        senkou_span_b,
+        chikou_span,
+    };
+    Ok(indicators::ichimoku::cloud_color(&ichimoku)?)
 }
 
 // ==================== Pivot Points 指标包装 ====================
@@ -2116,7 +2451,7 @@ fn py_standard_pivots(
     low: f64,
     close: f64,
 ) -> PyResult<(f64, f64, f64, f64, f64, f64, f64)> {
-    let pivots = indicators::pivots::standard_pivots(high, low, close);
+    let pivots = indicators::pivots::standard_pivots(high, low, close)?;
     Ok((
         pivots.pivot,
         pivots.r1,
@@ -2130,12 +2465,22 @@ fn py_standard_pivots(
 
 #[cfg(feature = "python")]
 #[pyfunction]
+fn py_classic_pivots(
+    high: f64,
+    low: f64,
+    close: f64,
+) -> PyResult<(f64, f64, f64, f64, f64, f64, f64)> {
+    py_standard_pivots(high, low, close)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
 fn py_fibonacci_pivots(
     high: f64,
     low: f64,
     close: f64,
 ) -> PyResult<(f64, f64, f64, f64, f64, f64, f64)> {
-    let pivots = indicators::pivots::fibonacci_pivots(high, low, close);
+    let pivots = indicators::pivots::fibonacci_pivots(high, low, close)?;
     Ok((
         pivots.pivot,
         pivots.r1,
@@ -2150,7 +2495,7 @@ fn py_fibonacci_pivots(
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_camarilla_pivots(high: f64, low: f64, close: f64) -> PyResult<Pivots9F64> {
-    let pivots = indicators::pivots::camarilla_pivots(high, low, close);
+    let pivots = indicators::pivots::camarilla_pivots(high, low, close)?;
     Ok((
         pivots.pivot,
         pivots.r1,
@@ -2164,11 +2509,122 @@ fn py_camarilla_pivots(high: f64, low: f64, close: f64) -> PyResult<Pivots9F64> 
     ))
 }
 
+#[cfg(feature = "python")]
+fn pivot_levels_from_tuple(levels: Pivots9F64) -> indicators::pivots::PivotLevels {
+    let (pivot, r1, r2, r3, r4, s1, s2, s3, s4) = levels;
+    indicators::pivots::PivotLevels {
+        pivot,
+        r1,
+        r2,
+        r3,
+        r4: if r4.is_finite() { Some(r4) } else { None },
+        s1,
+        s2,
+        s3,
+        s4: if s4.is_finite() { Some(s4) } else { None },
+    }
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_woodie_pivots(
+    high: f64,
+    low: f64,
+    close: f64,
+) -> PyResult<(f64, f64, f64, f64, f64, f64, f64)> {
+    let pivots = indicators::pivots::woodie_pivots(high, low, close)?;
+    Ok((
+        pivots.pivot,
+        pivots.r1,
+        pivots.r2,
+        pivots.r3,
+        pivots.s1,
+        pivots.s2,
+        pivots.s3,
+    ))
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_demark_pivots(
+    open: f64,
+    high: f64,
+    low: f64,
+    close: f64,
+) -> PyResult<(f64, f64, f64, f64, f64, f64, f64)> {
+    let pivots = indicators::pivots::demark_pivots(open, high, low, close)?;
+    Ok((
+        pivots.pivot,
+        pivots.r1,
+        pivots.r2,
+        pivots.r3,
+        pivots.s1,
+        pivots.s2,
+        pivots.s3,
+    ))
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_calc_pivot_series(
+    open: Vec<f64>,
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    method: String,
+) -> PyResult<Vec<Pivots9F64>> {
+    let pivots = indicators::pivots::calc_pivot_series(
+        &open,
+        &high,
+        &low,
+        &close,
+        &method,
+    )?;
+    let mut out = Vec::with_capacity(pivots.len());
+    for p in pivots {
+        out.push((
+            p.pivot,
+            p.r1,
+            p.r2,
+            p.r3,
+            p.r4.unwrap_or(f64::NAN),
+            p.s1,
+            p.s2,
+            p.s3,
+            p.s4.unwrap_or(f64::NAN),
+        ));
+    }
+    Ok(out)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_detect_pivot_touch(
+    current_price: f64,
+    levels: Pivots9F64,
+    tolerance: Option<f64>,
+) -> PyResult<Option<String>> {
+    let pivots = pivot_levels_from_tuple(levels);
+    Ok(indicators::pivots::detect_pivot_touch(
+        current_price,
+        &pivots,
+        tolerance.unwrap_or(0.001),
+    )?)
+}
+
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_pivot_zone(current_price: f64, levels: Pivots9F64) -> PyResult<String> {
+    let pivots = pivot_levels_from_tuple(levels);
+    Ok(indicators::pivots::pivot_zone(current_price, &pivots)?)
+}
+
 // ==================== 扩展 Momentum 指标包装 ====================
 
 #[cfg(feature = "python")]
 #[pyfunction]
-#[pyo3(text_signature = "(high, low, close, k_period=9, d_period=3)")]
+#[pyo3(signature = (high, low, close, k_period=9, smooth_k=3, d_period=3))]
+#[pyo3(text_signature = "(high, low, close, k_period=9, smooth_k=3, d_period=3)")]
 /// Calculate KDJ Indicator
 ///
 /// Extension of Stochastic Oscillator popular in Asian markets.
@@ -2184,6 +2640,8 @@ fn py_camarilla_pivots(high: f64, low: f64, close: f64) -> PyResult<Pivots9F64> 
 ///     Closing prices
 /// k_period : int, optional
 ///     %K period (default: 9)
+/// smooth_k : int, optional
+///     %K smoothing period (default: 3)
 /// d_period : int, optional
 ///     %D period (default: 3)
 ///
@@ -2199,18 +2657,13 @@ fn py_kdj(
     high: Vec<f64>,
     low: Vec<f64>,
     close: Vec<f64>,
-    k_period: Option<usize>,
-    d_period: Option<usize>,
+    k_period: usize,
+    smooth_k: usize,
+    d_period: usize,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
     let len = close.len();
     ok_or_nan_vec3(
-        indicators::kdj(
-            &high,
-            &low,
-            &close,
-            k_period.unwrap_or(9),
-            d_period.unwrap_or(3),
-        ),
+        indicators::kdj(&high, &low, &close, k_period, smooth_k, d_period),
         len,
     )
 }
@@ -2332,7 +2785,10 @@ fn py_ultimate_oscillator(
 /// -------
 /// list of float - Momentum values (price[i] - price[i-period])
 fn py_mom(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(utils::stats::momentum(&values, period.unwrap_or(10)))
+    let period = period.unwrap_or(10);
+    let len = validate_single!(&values, "values");
+    validate_period!(period, len);
+    Ok(utils::stats::momentum(&values, period))
 }
 
 #[cfg(feature = "python")]
@@ -2354,7 +2810,10 @@ fn py_mom(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
 /// -------
 /// list of float - ROC values as percentages
 fn py_roc(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
-    Ok(utils::stats::roc(&values, period.unwrap_or(10)))
+    let period = period.unwrap_or(10);
+    let len = validate_single!(&values, "values");
+    validate_period!(period, len);
+    Ok(utils::stats::roc(&values, period))
 }
 
 // ==================== 扩展 Trend 指标包装 ====================
@@ -2857,6 +3316,8 @@ fn py_linear_regression(
     y_values: Vec<f64>,
     period: usize,
 ) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
+    let len = validate_single!(&y_values, "y_values");
+    validate_period!(period, len);
     Ok(utils::linear_regression(&y_values, period))
 }
 
@@ -2880,6 +3341,8 @@ fn py_linear_regression(
 /// -------
 /// list of float - Correlation values (-1 to +1)
 fn py_correlation(x: Vec<f64>, y: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    let len = validate_pair!(&x, "x", &y, "y");
+    validate_period!(period, len);
     Ok(utils::correlation(&x, &y, period))
 }
 
@@ -2902,6 +3365,8 @@ fn py_correlation(x: Vec<f64>, y: Vec<f64>, period: usize) -> PyResult<Vec<f64>>
 /// -------
 /// list of float - Z-score values
 fn py_zscore(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    let len = validate_single!(&values, "values");
+    validate_period!(period, len);
     Ok(utils::zscore(&values, period))
 }
 
@@ -2925,6 +3390,8 @@ fn py_zscore(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
 /// -------
 /// list of float - Covariance values
 fn py_covariance(x: Vec<f64>, y: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    let len = validate_pair!(&x, "x", &y, "y");
+    validate_period!(period, len);
     Ok(utils::covariance(&x, &y, period))
 }
 
@@ -2953,6 +3420,13 @@ fn py_beta(
     benchmark_returns: Vec<f64>,
     period: usize,
 ) -> PyResult<Vec<f64>> {
+    let len = validate_pair!(
+        &asset_returns,
+        "asset_returns",
+        &benchmark_returns,
+        "benchmark_returns"
+    );
+    validate_period!(period, len);
     Ok(utils::beta(&asset_returns, &benchmark_returns, period))
 }
 
@@ -2974,6 +3448,8 @@ fn py_beta(
 /// -------
 /// list of float - Standard error values
 fn py_standard_error(y_values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    let len = validate_single!(&y_values, "y_values");
+    validate_period!(period, len);
     Ok(utils::standard_error(&y_values, period))
 }
 
@@ -2982,6 +3458,8 @@ fn py_standard_error(y_values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
 #[pyo3(text_signature = "(y_values, period)")]
 /// Calculate Standard Error (alias for standard_error)
 fn py_stderr(y_values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    let len = validate_single!(&y_values, "y_values");
+    validate_period!(period, len);
     Ok(utils::standard_error(&y_values, period))
 }
 
@@ -3049,151 +3527,176 @@ fn py_wclprice(high: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_max(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(utils::max(&values, period))
+    let len = values.len();
+    ok_or_nan_vec(utils::max(&values, period), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_min(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(utils::min(&values, period))
+    let len = values.len();
+    ok_or_nan_vec(utils::min(&values, period), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_sum(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
-    Ok(utils::sum(&values, period))
+    let len = values.len();
+    ok_or_nan_vec(utils::sum(&values, period), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_sqrt(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::sqrt(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::sqrt(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_ln(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::ln(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::ln(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_log10(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::log10(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::log10(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_exp(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::exp(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::exp(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_abs(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::abs(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::abs(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_ceil(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::ceil(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::ceil(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_floor(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::floor(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::floor(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_sin(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::sin(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::sin(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_cos(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::cos(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::cos(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_tan(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::tan(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::tan(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_asin(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::asin(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::asin(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_acos(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::acos(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::acos(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_atan(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::atan(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::atan(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_sinh(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::sinh(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::sinh(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_cosh(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::cosh(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::cosh(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_tanh(values: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::tanh(&values))
+    let len = values.len();
+    ok_or_nan_vec(utils::tanh(&values), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_add(values1: Vec<f64>, values2: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::add(&values1, &values2))
+    let len = values1.len();
+    ok_or_nan_vec(utils::add(&values1, &values2), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_sub(values1: Vec<f64>, values2: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::sub(&values1, &values2))
+    let len = values1.len();
+    ok_or_nan_vec(utils::sub(&values1, &values2), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_mult(values1: Vec<f64>, values2: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::mult(&values1, &values2))
+    let len = values1.len();
+    ok_or_nan_vec(utils::mult(&values1, &values2), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_div(values1: Vec<f64>, values2: Vec<f64>) -> PyResult<Vec<f64>> {
-    Ok(utils::div(&values1, &values2))
+    let len = values1.len();
+    ok_or_nan_vec(utils::div(&values1, &values2), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_minmax(values: Vec<f64>, period: usize) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(utils::minmax(&values, period))
+    let len = values.len();
+    ok_or_nan_vec2(utils::minmax(&values, period), len)
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_minmaxindex(values: Vec<f64>, period: usize) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    Ok(utils::minmaxindex(&values, period))
+    let len = values.len();
+    ok_or_nan_vec2(utils::minmaxindex(&values, period), len)
 }
 
 // ==================== 扩展蜡烛图形态包装 ====================
@@ -5024,7 +5527,7 @@ fn py_detect_divergence(
         &indicator,
         lookback.unwrap_or(5),
         threshold.unwrap_or(0.01),
-    );
+    )?;
     let divergence_type: Vec<i32> = result
         .divergence_type
         .iter()
@@ -5044,7 +5547,7 @@ fn py_detect_divergence(
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_fvg_signals(high: Vec<f64>, low: Vec<f64>) -> PyResult<Vec4F64> {
-    let (bullish, bearish, upper, lower) = indicators::fvg_signals(&high, &low);
+    let (bullish, bearish, upper, lower) = indicators::fvg_signals(&high, &low)?;
     Ok((bullish, bearish, upper, lower))
 }
 
@@ -5056,7 +5559,7 @@ fn py_volume_filter(
     volume: Vec<f64>,
     period: Option<usize>,
 ) -> PyResult<(Vec<bool>, Vec<f64>, Vec<bool>)> {
-    let result = indicators::volume_filter(&volume, period.unwrap_or(20));
+    let result = indicators::volume_filter(&volume, period.unwrap_or(20))?;
     Ok((
         result.above_average,
         result.relative_volume,
@@ -5065,6 +5568,22 @@ fn py_volume_filter(
 }
 
 // ==================== SFG 信号工具包装 ====================
+
+#[cfg(feature = "python")]
+fn build_sfg_signal(buy: Vec<f64>, sell: Vec<f64>) -> HazeResult<indicators::SFGSignal> {
+    let len = validate_pair!(&buy, "buy", &sell, "sell");
+    let mut signal = indicators::SFGSignal::new(len);
+
+    for i in 0..len {
+        let buy_val = buy[i];
+        let sell_val = sell[i];
+        signal.buy_signals[i] = buy_val;
+        signal.sell_signals[i] = sell_val;
+        signal.signal_strength[i] = buy_val.max(sell_val).clamp(0.0, 1.0);
+    }
+
+    Ok(signal)
+}
 
 /// 简单信号组合 (加权平均)
 /// 返回: (combined_buy, combined_sell)
@@ -5076,19 +5595,18 @@ fn py_combine_signals(
     buy2: Vec<f64>,
     sell2: Vec<f64>,
     weight1: Option<f64>,
-) -> PyResult<(Vec<f64>, Vec<f64>)> {
-    let len = buy1.len();
+) -> PyResult<(Vec<f64>, Vec<f64>, Vec<f64>)> {
     let w1 = weight1.unwrap_or(0.5);
-    let w2 = 1.0 - w1;
-    let mut combined_buy = vec![0.0; len];
-    let mut combined_sell = vec![0.0; len];
-
-    for i in 0..len {
-        combined_buy[i] = buy1[i] * w1 + buy2[i] * w2;
-        combined_sell[i] = sell1[i] * w1 + sell2[i] * w2;
-    }
-
-    Ok((combined_buy, combined_sell))
+    crate::errors::validation::validate_range("weight1", w1, 0.0, 1.0)?;
+    let weights = [w1, 1.0 - w1];
+    let sig1 = build_sfg_signal(buy1, sell1)?;
+    let sig2 = build_sfg_signal(buy2, sell2)?;
+    let combined = indicators::combine_signals(&[&sig1, &sig2], Some(&weights))?;
+    Ok((
+        combined.buy_signals,
+        combined.sell_signals,
+        combined.signal_strength,
+    ))
 }
 
 /// 计算止损止盈
@@ -5096,28 +5614,36 @@ fn py_combine_signals(
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_calculate_stops(
-    entry_price: f64,
-    atr_value: f64,
-    is_long: bool,
+    close: Vec<f64>,
+    atr_values: Vec<f64>,
+    buy_signals: Vec<f64>,
+    sell_signals: Vec<f64>,
     sl_multiplier: Option<f64>,
     tp_multiplier: Option<f64>,
-) -> PyResult<(f64, f64)> {
+) -> PyResult<(Vec<f64>, Vec<f64>)> {
     let sl_mult = sl_multiplier.unwrap_or(1.5);
     let tp_mult = tp_multiplier.unwrap_or(2.5);
+    let signals = build_sfg_signal(buy_signals, sell_signals)?;
+    Ok(indicators::calculate_stops(
+        &close,
+        &atr_values,
+        &signals,
+        sl_mult,
+        tp_mult,
+    )?)
+}
 
-    let (stop_loss, take_profit) = if is_long {
-        (
-            entry_price - atr_value * sl_mult,
-            entry_price + atr_value * tp_mult,
-        )
-    } else {
-        (
-            entry_price + atr_value * sl_mult,
-            entry_price - atr_value * tp_mult,
-        )
-    };
-
-    Ok((stop_loss, take_profit))
+/// 计算追踪止损
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_trailing_stop(
+    close: Vec<f64>,
+    atr_values: Vec<f64>,
+    direction: Vec<f64>,
+    multiplier: Option<f64>,
+) -> PyResult<Vec<f64>> {
+    let mult = multiplier.unwrap_or(2.0);
+    Ok(indicators::trailing_stop(&close, &atr_values, &direction, mult)?)
 }
 
 // ==================== SFG 新增指标包装 ====================
@@ -5140,7 +5666,7 @@ fn py_pd_array_signals(
         &close,
         swing_lookback.unwrap_or(20),
         &atr_values,
-    );
+    )?;
     Ok((buy, sell, sl, tp))
 }
 
@@ -5156,7 +5682,7 @@ fn py_breaker_block_signals(
     lookback: Option<usize>,
 ) -> PyResult<Vec4F64> {
     let (buy, sell, upper, lower) =
-        indicators::breaker_block_signals(&open, &high, &low, &close, lookback.unwrap_or(20));
+        indicators::breaker_block_signals(&open, &high, &low, &close, lookback.unwrap_or(20))?;
     Ok((buy, sell, upper, lower))
 }
 
@@ -5210,7 +5736,7 @@ fn py_linreg_supply_demand_signals(
         &atr_values,
         linreg_period.unwrap_or(20),
         tolerance.unwrap_or(0.02),
-    );
+    )?;
     Ok((buy, sell, sl, tp))
 }
 
@@ -5252,42 +5778,56 @@ mod coverage_tests;
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_correl(values1: Vec<f64>, values2: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    let len = validate_pair!(&values1, "values1", &values2, "values2");
+    validate_period!(period, len);
     Ok(utils::correl(&values1, &values2, period))
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_linearreg(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    let len = validate_single!(&values, "values");
+    validate_period!(period, len);
     Ok(utils::linearreg(&values, period))
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_linearreg_slope(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    let len = validate_single!(&values, "values");
+    validate_period!(period, len);
     Ok(utils::linearreg_slope(&values, period))
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_linearreg_angle(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    let len = validate_single!(&values, "values");
+    validate_period!(period, len);
     Ok(utils::linearreg_angle(&values, period))
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_linearreg_intercept(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    let len = validate_single!(&values, "values");
+    validate_period!(period, len);
     Ok(utils::linearreg_intercept(&values, period))
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_var(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    let len = validate_single!(&values, "values");
+    validate_period!(period, len);
     Ok(utils::var(&values, period))
 }
 
 #[cfg(feature = "python")]
 #[pyfunction]
 fn py_tsf(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+    let len = validate_single!(&values, "values");
+    validate_period!(period, len);
     Ok(utils::tsf(&values, period))
 }
 
@@ -6222,7 +6762,7 @@ fn py_harmonics(
         left_bars.unwrap_or(5),
         right_bars.unwrap_or(5),
         min_probability.unwrap_or(0.5),
-    ))
+    )?)
 }
 
 /// 谐波形态详细信息
@@ -6243,7 +6783,7 @@ fn py_harmonics_patterns(
         left_bars.unwrap_or(5),
         right_bars.unwrap_or(5),
         include_forming.unwrap_or(true),
-    );
+    )?;
 
     let result = patterns
         .iter()
@@ -6296,9 +6836,263 @@ fn py_swing_points(
         &low,
         left_bars.unwrap_or(5),
         right_bars.unwrap_or(5),
-    );
+    )?;
     Ok(swings
         .iter()
         .map(|s| (s.index, s.price, s.is_high))
         .collect())
+}
+
+// ==================== ML 模块 PyO3 绑定 ====================
+
+/// Python-accessible ML model wrapper
+#[cfg(feature = "python")]
+#[pyclass(name = "SFGModel")]
+pub struct PySFGModel {
+    inner: ml::SFGModel,
+    features_dim: usize,
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl PySFGModel {
+    /// Check if model is trained
+    pub fn is_trained(&self) -> bool {
+        self.inner.is_trained()
+    }
+
+    /// Get feature dimension
+    pub fn features_dim(&self) -> usize {
+        self.features_dim
+    }
+
+    /// Predict using the trained model
+    ///
+    /// # Arguments
+    /// * `features` - Flattened feature array (n_samples * n_features)
+    /// * `n_samples` - Number of samples
+    ///
+    /// # Returns
+    /// Predictions for each sample
+    pub fn predict(&self, features: Vec<f64>, n_samples: usize) -> PyResult<Vec<f64>> {
+        if !self.inner.is_trained() {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "Model is not trained",
+            ));
+        }
+
+        let n_features = self.features_dim;
+        if features.len() != n_samples * n_features {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "Expected {} features ({}x{}), got {}",
+                n_samples * n_features,
+                n_samples,
+                n_features,
+                features.len()
+            )));
+        }
+
+        let features_array =
+            ndarray::Array2::from_shape_vec((n_samples, n_features), features)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{e}")))?;
+
+        Ok(self.inner.predict(&features_array).to_vec())
+    }
+}
+
+/// Train an AI SuperTrend model
+///
+/// # Arguments
+/// * `close` - Close prices
+/// * `atr` - ATR values (same length as close)
+/// * `train_window` - Training window size (default: 200)
+/// * `lookback` - Feature lookback period (default: 10)
+/// * `use_ridge` - Use Ridge regression instead of OLS (default: false)
+/// * `ridge_alpha` - Ridge regularization strength (default: 1.0)
+///
+/// # Returns
+/// Trained SFGModel
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (close, atr, train_window=None, lookback=None, use_ridge=None, ridge_alpha=None))]
+fn py_train_supertrend_model(
+    close: Vec<f64>,
+    atr: Vec<f64>,
+    train_window: Option<usize>,
+    lookback: Option<usize>,
+    use_ridge: Option<bool>,
+    ridge_alpha: Option<f64>,
+) -> PyResult<PySFGModel> {
+    use ml::models::ModelType;
+    use ml::trainer::{train_supertrend_model, TrainConfig};
+
+    let config = TrainConfig {
+        train_window: train_window.unwrap_or(200),
+        lookback: lookback.unwrap_or(10),
+        rolling: true,
+        model_type: if use_ridge.unwrap_or(false) {
+            ModelType::Ridge
+        } else {
+            ModelType::LinearRegression
+        },
+        ridge_alpha: ridge_alpha.unwrap_or(1.0),
+        use_polynomial: false,
+    };
+
+    let result = train_supertrend_model(&close, &atr, &config)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+
+    Ok(PySFGModel {
+        inner: result.model,
+        features_dim: result.features_dim,
+    })
+}
+
+/// Train an ATR2 model with volume features
+///
+/// # Arguments
+/// * `close` - Close prices
+/// * `atr` - ATR values
+/// * `volume` - Volume values
+/// * `train_window` - Training window size (default: 200)
+/// * `lookback` - Feature lookback period (default: 10)
+/// * `ridge_alpha` - Ridge regularization strength (default: 1.0)
+///
+/// # Returns
+/// Trained SFGModel
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (close, atr, volume, train_window=None, lookback=None, ridge_alpha=None))]
+fn py_train_atr2_model(
+    close: Vec<f64>,
+    atr: Vec<f64>,
+    volume: Vec<f64>,
+    train_window: Option<usize>,
+    lookback: Option<usize>,
+    ridge_alpha: Option<f64>,
+) -> PyResult<PySFGModel> {
+    use ml::models::ModelType;
+    use ml::trainer::{train_atr2_model, TrainConfig};
+
+    let config = TrainConfig {
+        train_window: train_window.unwrap_or(200),
+        lookback: lookback.unwrap_or(10),
+        rolling: true,
+        model_type: ModelType::Ridge,
+        ridge_alpha: ridge_alpha.unwrap_or(1.0),
+        use_polynomial: false,
+    };
+
+    let result = train_atr2_model(&close, &atr, &volume, &config)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+
+    Ok(PySFGModel {
+        inner: result.model,
+        features_dim: result.features_dim,
+    })
+}
+
+/// Train a momentum model
+///
+/// # Arguments
+/// * `rsi` - RSI indicator values (pre-computed)
+/// * `train_window` - Training window size (default: 200)
+/// * `lookback` - Feature lookback period (default: 10)
+///
+/// # Returns
+/// Trained SFGModel
+#[cfg(feature = "python")]
+#[pyfunction]
+#[pyo3(signature = (rsi, train_window=None, lookback=None))]
+fn py_train_momentum_model(
+    rsi: Vec<f64>,
+    train_window: Option<usize>,
+    lookback: Option<usize>,
+) -> PyResult<PySFGModel> {
+    use ml::models::ModelType;
+    use ml::trainer::{train_momentum_model, TrainConfig};
+
+    let config = TrainConfig {
+        train_window: train_window.unwrap_or(200),
+        lookback: lookback.unwrap_or(10),
+        rolling: true,
+        model_type: ModelType::LinearRegression,
+        ridge_alpha: 1.0,
+        use_polynomial: false,
+    };
+
+    let result = train_momentum_model(&rsi, &config)
+        .map_err(pyo3::exceptions::PyValueError::new_err)?;
+
+    Ok(PySFGModel {
+        inner: result.model,
+        features_dim: result.features_dim,
+    })
+}
+
+/// Prepare SuperTrend features for prediction
+///
+/// # Arguments
+/// * `close` - Close prices
+/// * `atr` - ATR values
+/// * `lookback` - Feature lookback period
+///
+/// # Returns
+/// Tuple of (features_flat, n_samples, n_features)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_prepare_supertrend_features(
+    close: Vec<f64>,
+    atr: Vec<f64>,
+    lookback: usize,
+) -> PyResult<(Vec<f64>, usize, usize)> {
+    let (features, _targets) = ml::features::prepare_supertrend_features(&close, &atr, lookback);
+    let (n_samples, n_features) = features.dim();
+    let flat: Vec<f64> = features.into_iter().collect();
+    Ok((flat, n_samples, n_features))
+}
+
+/// Prepare ATR2 features for prediction
+///
+/// # Arguments
+/// * `close` - Close prices
+/// * `atr` - ATR values
+/// * `volume` - Volume values
+/// * `lookback` - Feature lookback period
+///
+/// # Returns
+/// Tuple of (features_flat, n_samples, n_features)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_prepare_atr2_features(
+    close: Vec<f64>,
+    atr: Vec<f64>,
+    volume: Vec<f64>,
+    lookback: usize,
+) -> PyResult<(Vec<f64>, usize, usize)> {
+    let (features, _targets) =
+        ml::features::prepare_atr2_features(&close, &atr, &volume, lookback);
+    let (n_samples, n_features) = features.dim();
+    let flat: Vec<f64> = features.into_iter().collect();
+    Ok((flat, n_samples, n_features))
+}
+
+/// Prepare momentum features for prediction
+///
+/// # Arguments
+/// * `rsi` - RSI indicator values (pre-computed)
+/// * `lookback` - Feature lookback period
+///
+/// # Returns
+/// Tuple of (features_flat, n_samples, n_features)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_prepare_momentum_features(
+    rsi: Vec<f64>,
+    lookback: usize,
+) -> PyResult<(Vec<f64>, usize, usize)> {
+    let (features, _targets) = ml::features::prepare_momentum_features(&rsi, lookback);
+    let (n_samples, n_features) = features.dim();
+    let flat: Vec<f64> = features.into_iter().collect();
+    Ok((flat, n_samples, n_features))
 }

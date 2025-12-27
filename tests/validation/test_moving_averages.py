@@ -140,7 +140,7 @@ class TestMovingAveragesVsTaLib:
             ref_lib=ReferenceLibrary.TALIB,
         )
         # TRIMA 算法实现可能有差异
-        assert result.metrics is not None, f"TRIMA should return valid metrics"
+        assert result.metrics is not None, "TRIMA should return valid metrics"
         assert result.metrics.correlation > 0.99, f"TRIMA correlation too low: {result}"
 
 
@@ -263,10 +263,8 @@ class TestMovingAveragesEdgeCases:
     def test_period_greater_than_length(self):
         """周期大于数据长度"""
         prices = [10.0, 11.0, 12.0]
-        result = haze.py_sma(prices, 5)
-
-        # 数据不足, 全部为 NaN
-        assert all(np.isnan(r) for r in result)
+        with pytest.raises(ValueError):
+            haze.py_sma(prices, 5)
 
     def test_period_one(self):
         """周期为 1 (恒等变换)"""

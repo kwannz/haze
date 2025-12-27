@@ -11,6 +11,8 @@
 //
 // "云"（Kumo）由先行带 A 和 B 形成，提供动态支撑/阻力区域
 
+use crate::errors::{HazeError, HazeResult};
+use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_period};
 use crate::init_result;
 use crate::utils::stats::{rolling_max, rolling_min};
 
@@ -22,6 +24,49 @@ pub struct IchimokuCloud {
     pub senkou_span_a: Vec<f64>, // 先行带 A
     pub senkou_span_b: Vec<f64>, // 先行带 B
     pub chikou_span: Vec<f64>,   // 延迟线
+}
+
+#[inline]
+fn validate_ichimoku_lengths(ichimoku: &IchimokuCloud) -> HazeResult<usize> {
+    let n = ichimoku.tenkan_sen.len();
+    if n == 0 {
+        return Err(HazeError::EmptyInput {
+            name: "ichimoku.tenkan_sen",
+        });
+    }
+    if ichimoku.kijun_sen.len() != n {
+        return Err(HazeError::LengthMismatch {
+            name1: "ichimoku.tenkan_sen",
+            len1: n,
+            name2: "ichimoku.kijun_sen",
+            len2: ichimoku.kijun_sen.len(),
+        });
+    }
+    if ichimoku.senkou_span_a.len() != n {
+        return Err(HazeError::LengthMismatch {
+            name1: "ichimoku.tenkan_sen",
+            len1: n,
+            name2: "ichimoku.senkou_span_a",
+            len2: ichimoku.senkou_span_a.len(),
+        });
+    }
+    if ichimoku.senkou_span_b.len() != n {
+        return Err(HazeError::LengthMismatch {
+            name1: "ichimoku.tenkan_sen",
+            len1: n,
+            name2: "ichimoku.senkou_span_b",
+            len2: ichimoku.senkou_span_b.len(),
+        });
+    }
+    if ichimoku.chikou_span.len() != n {
+        return Err(HazeError::LengthMismatch {
+            name1: "ichimoku.tenkan_sen",
+            len1: n,
+            name2: "ichimoku.chikou_span",
+            len2: ichimoku.chikou_span.len(),
+        });
+    }
+    Ok(n)
 }
 
 /// 计算 Ichimoku Cloud（一目均衡表）
@@ -50,7 +95,7 @@ pub struct IchimokuCloud {
 /// let low = vec![100.0; 100];
 /// let close = vec![105.0; 100];
 ///
-/// let ichimoku = ichimoku_cloud(&high, &low, &close, 9, 26, 52);
+/// let ichimoku = ichimoku_cloud(&high, &low, &close, 9, 26, 52).unwrap();
 /// assert_eq!(ichimoku.tenkan_sen.len(), close.len());
 /// ```
 pub fn ichimoku_cloud(
@@ -60,8 +105,13 @@ pub fn ichimoku_cloud(
     tenkan_period: usize,
     kijun_period: usize,
     senkou_b_period: usize,
-) -> IchimokuCloud {
+) -> HazeResult<IchimokuCloud> {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
     let n = high.len();
+    validate_period(tenkan_period, n)?;
+    validate_period(kijun_period, n)?;
+    validate_period(senkou_b_period, n)?;
 
     // 1. Tenkan-sen (Conversion Line): (9-period high + low) / 2
     let tenkan_sen = calc_donchian_midline(high, low, tenkan_period);
@@ -98,13 +148,13 @@ pub fn ichimoku_cloud(
     let mut chikou_span = init_result!(n);
     chikou_span[..(n - kijun_period)].copy_from_slice(&close[kijun_period..n]);
 
-    IchimokuCloud {
+    Ok(IchimokuCloud {
         tenkan_sen,
         kijun_sen,
         senkou_span_a,
         senkou_span_b,
         chikou_span,
-    }
+    })
 }
 
 /// 计算 Donchian 中线（高低价的平均）
@@ -142,8 +192,17 @@ pub enum IchimokuSignal {
 /// - `ichimoku`: Ichimoku Cloud 结构体
 ///
 /// 返回：每个价格对应的信号向量
-pub fn ichimoku_signals(close: &[f64], ichimoku: &IchimokuCloud) -> Vec<IchimokuSignal> {
-    let n = close.len();
+pub fn ichimoku_signals(close: &[f64], ichimoku: &IchimokuCloud) -> HazeResult<Vec<IchimokuSignal>> {
+    validate_not_empty(close, "close")?;
+    let n = validate_ichimoku_lengths(ichimoku)?;
+    if close.len() != n {
+        return Err(HazeError::LengthMismatch {
+            name1: "close",
+            len1: close.len(),
+            name2: "ichimoku.tenkan_sen",
+            len2: n,
+        });
+    }
     let mut signals = Vec::with_capacity(n);
 
     for i in 0..n {
@@ -184,7 +243,7 @@ pub fn ichimoku_signals(close: &[f64], ichimoku: &IchimokuCloud) -> Vec<Ichimoku
         signals.push(signal);
     }
 
-    signals
+    Ok(signals)
 }
 
 /// TK Cross（转换线与基准线交叉）信号
@@ -196,8 +255,8 @@ pub fn ichimoku_signals(close: &[f64], ichimoku: &IchimokuCloud) -> Vec<Ichimoku
 /// # 算法
 /// - 金叉（Bullish TK Cross）：Tenkan 向上穿过 Kijun
 /// - 死叉（Bearish TK Cross）：Tenkan 向下穿过 Kijun
-pub fn ichimoku_tk_cross(ichimoku: &IchimokuCloud) -> Vec<f64> {
-    let n = ichimoku.tenkan_sen.len();
+pub fn ichimoku_tk_cross(ichimoku: &IchimokuCloud) -> HazeResult<Vec<f64>> {
+    let n = validate_ichimoku_lengths(ichimoku)?;
     let mut signals = vec![0.0; n];
 
     for i in 1..n {
@@ -224,7 +283,7 @@ pub fn ichimoku_tk_cross(ichimoku: &IchimokuCloud) -> Vec<f64> {
         }
     }
 
-    signals
+    Ok(signals)
 }
 
 /// 云厚度（Cloud Thickness）
@@ -234,8 +293,8 @@ pub fn ichimoku_tk_cross(ichimoku: &IchimokuCloud) -> Vec<f64> {
 /// - `ichimoku`: Ichimoku Cloud 结构体
 ///
 /// 返回：云厚度向量（绝对值）
-pub fn cloud_thickness(ichimoku: &IchimokuCloud) -> Vec<f64> {
-    let n = ichimoku.senkou_span_a.len();
+pub fn cloud_thickness(ichimoku: &IchimokuCloud) -> HazeResult<Vec<f64>> {
+    let n = validate_ichimoku_lengths(ichimoku)?;
     let mut thickness = Vec::with_capacity(n);
 
     for i in 0..n {
@@ -249,7 +308,7 @@ pub fn cloud_thickness(ichimoku: &IchimokuCloud) -> Vec<f64> {
         }
     }
 
-    thickness
+    Ok(thickness)
 }
 
 /// Ichimoku 云颜色（Cloud Color）
@@ -257,8 +316,8 @@ pub fn cloud_thickness(ichimoku: &IchimokuCloud) -> Vec<f64> {
 /// - `ichimoku`: Ichimoku Cloud 结构体
 ///
 /// 返回：云颜色向量（1.0=绿色/看涨，-1.0=红色/看跌，0.0=中性）
-pub fn cloud_color(ichimoku: &IchimokuCloud) -> Vec<f64> {
-    let n = ichimoku.senkou_span_a.len();
+pub fn cloud_color(ichimoku: &IchimokuCloud) -> HazeResult<Vec<f64>> {
+    let n = validate_ichimoku_lengths(ichimoku)?;
     let mut colors = Vec::with_capacity(n);
 
     for i in 0..n {
@@ -276,7 +335,7 @@ pub fn cloud_color(ichimoku: &IchimokuCloud) -> Vec<f64> {
         }
     }
 
-    colors
+    Ok(colors)
 }
 
 #[cfg(test)]
@@ -289,7 +348,7 @@ mod tests {
         let low = vec![100.0; 100];
         let close = vec![105.0; 100];
 
-        let ichimoku = ichimoku_cloud(&high, &low, &close, 9, 26, 52);
+        let ichimoku = ichimoku_cloud(&high, &low, &close, 9, 26, 52).unwrap();
 
         // 在横盘市场中，Tenkan 和 Kijun 应为 (110+100)/2 = 105
         let valid_idx = 26; // 第一个有效的索引（Kijun 周期）
@@ -299,16 +358,13 @@ mod tests {
 
     #[test]
     fn test_tk_cross() {
-        let high = vec![
-            100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0, 107.0, 108.0, 109.0, 110.0, 111.0,
-            112.0, 113.0, 114.0, 115.0, 116.0, 117.0, 118.0, 119.0, 120.0, 121.0, 122.0, 123.0,
-            124.0, 125.0, 126.0, 127.0, 128.0, 129.0,
-        ];
+        // Need at least 52 data points for senkou_span_b_period=52
+        let high: Vec<f64> = (0..60).map(|i| 100.0 + i as f64).collect();
         let low: Vec<f64> = high.iter().map(|&h| h - 2.0).collect();
         let close: Vec<f64> = high.iter().map(|&h| h - 1.0).collect();
 
-        let ichimoku = ichimoku_cloud(&low, &high, &close, 9, 26, 52);
-        let crosses = ichimoku_tk_cross(&ichimoku);
+        let ichimoku = ichimoku_cloud(&low, &high, &close, 9, 26, 52).unwrap();
+        let crosses = ichimoku_tk_cross(&ichimoku).unwrap();
 
         // 在上升趋势中，应该有金叉信号
         let has_golden_cross = crosses.iter().any(|&c| c > 0.0);
@@ -324,7 +380,7 @@ mod tests {
             senkou_span_b: vec![109.9, 110.2, 111.6],
             chikou_span: vec![0.0; 3],
         };
-        let thickness = cloud_thickness(&ichimoku);
+        let thickness = cloud_thickness(&ichimoku).unwrap();
 
         // 横盘市场中，Span A 和 Span B 应接近，厚度接近 0
         let valid_idx = 2;

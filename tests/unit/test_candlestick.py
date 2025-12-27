@@ -19,7 +19,6 @@ Author: Haze Team
 Date: 2025-12-26
 """
 
-import pytest
 import numpy as np
 import haze_library as haze
 
@@ -130,31 +129,29 @@ class TestEngulfing:
 class TestBullishEngulfing:
     """Bullish Engulfing (看涨吞没)"""
 
-    @pytest.mark.skip(reason="需要检查函数是否存在")
     def test_bullish_engulfing(self, ohlcv_data):
         """测试看涨吞没形态"""
+        # py_bullish_engulfing only takes (open, close)
         result = haze.py_bullish_engulfing(
             ohlcv_data['open'],
-            ohlcv_data['high'],
-            ohlcv_data['low'],
             ohlcv_data['close']
         )
         assert isinstance(result, list)
+        assert len(result) == len(ohlcv_data['close'])
 
 
 class TestBearishEngulfing:
     """Bearish Engulfing (看跌吞没)"""
 
-    @pytest.mark.skip(reason="需要检查函数是否存在")
     def test_bearish_engulfing(self, ohlcv_data):
         """测试看跌吞没形态"""
+        # py_bearish_engulfing only takes (open, close)
         result = haze.py_bearish_engulfing(
             ohlcv_data['open'],
-            ohlcv_data['high'],
-            ohlcv_data['low'],
             ohlcv_data['close']
         )
         assert isinstance(result, list)
+        assert len(result) == len(ohlcv_data['close'])
 
 
 # ==================== Harami形态 ====================
@@ -441,20 +438,6 @@ class TestKicking:
 
 # ==================== 三蜡烛形态 ====================
 
-class TestThreeInside:
-    """Three Inside Up/Down (内部三法)"""
-
-    def test_three_inside(self, ohlcv_data):
-        """测试内部三法形态"""
-        result = haze.py_three_inside(
-            ohlcv_data['open'],
-            ohlcv_data['high'],
-            ohlcv_data['low'],
-            ohlcv_data['close']
-        )
-        assert isinstance(result, list)
-
-
 class TestThreeOutside:
     """Three Outside Up/Down (外部三法)"""
 
@@ -469,51 +452,19 @@ class TestThreeOutside:
         assert isinstance(result, list)
 
 
-class TestThreeLineStrike:
-    """Three Line Strike (三线打击)"""
+class TestThreeInside:
+    """Three Inside (三内部形态)"""
 
-    @pytest.mark.skip(reason="py_three_line_strike not implemented in library")
-    def test_three_line_strike(self, ohlcv_data):
-        """测试三线打击形态"""
-        result = haze.py_three_line_strike(
+    def test_three_inside(self, ohlcv_data):
+        """测试三内部形态"""
+        result = haze.py_three_inside(
             ohlcv_data['open'],
             ohlcv_data['high'],
             ohlcv_data['low'],
             ohlcv_data['close']
         )
         assert isinstance(result, list)
-
-
-# ==================== 缺口形态 ====================
-
-class TestGapUp:
-    """Gap Up (向上跳空)"""
-
-    @pytest.mark.skip(reason="py_gap_up not implemented in library")
-    def test_gap_up(self, ohlcv_data):
-        """测试向上跳空"""
-        result = haze.py_gap_up(
-            ohlcv_data['open'],
-            ohlcv_data['high'],
-            ohlcv_data['low'],
-            ohlcv_data['close']
-        )
-        assert isinstance(result, list)
-
-
-class TestGapDown:
-    """Gap Down (向下跳空)"""
-
-    @pytest.mark.skip(reason="py_gap_down not implemented in library")
-    def test_gap_down(self, ohlcv_data):
-        """测试向下跳空"""
-        result = haze.py_gap_down(
-            ohlcv_data['open'],
-            ohlcv_data['high'],
-            ohlcv_data['low'],
-            ohlcv_data['close']
-        )
-        assert isinstance(result, list)
+        assert len(result) == len(ohlcv_data['close'])
 
 
 # ==================== 高级TA-Lib形态 ====================
@@ -837,21 +788,6 @@ class TestTakuri:
         assert isinstance(result, list)
 
 
-class TestTasukiGap:
-    """Tasuki Gap (跳空并列)"""
-
-    @pytest.mark.skip(reason="py_tasuki_gap not implemented in library")
-    def test_tasuki_gap(self, ohlcv_data):
-        """测试跳空并列形态"""
-        result = haze.py_tasuki_gap(
-            ohlcv_data['open'],
-            ohlcv_data['high'],
-            ohlcv_data['low'],
-            ohlcv_data['close']
-        )
-        assert isinstance(result, list)
-
-
 class TestThrusting:
     """Thrusting (插入)"""
 
@@ -941,3 +877,200 @@ class TestCandlestickReturnValues:
             if not np.isnan(value):
                 assert value in [-1.0, 0.0, 1.0], \
                     f"py_bullish_engulfing returned invalid value: {value}"
+
+
+# ==================== 缺失形态补充测试 ====================
+
+class TestGapSideSideWhite:
+    """Gap Side Side White (缺口并列白色蜡烛)"""
+
+    def test_gap_sidesidewhite_pattern(self, ohlcv_data_extended):
+        """测试Gap Side Side White形态"""
+        result = haze.py_gap_sidesidewhite(
+            ohlcv_data_extended['open'],
+            ohlcv_data_extended['high'],
+            ohlcv_data_extended['low'],
+            ohlcv_data_extended['close']
+        )
+        assert isinstance(result, list)
+        assert len(result) == len(ohlcv_data_extended['close'])
+
+    def test_gap_sidesidewhite_values(self, ohlcv_data_extended):
+        """测试返回值范围"""
+        result = haze.py_gap_sidesidewhite(
+            ohlcv_data_extended['open'],
+            ohlcv_data_extended['high'],
+            ohlcv_data_extended['low'],
+            ohlcv_data_extended['close']
+        )
+        for value in result:
+            if not np.isnan(value):
+                assert value in [-1.0, 0.0, 1.0]
+
+
+class TestStalledPattern:
+    """Stalled Pattern (停滞形态)"""
+
+    def test_stalled_pattern(self, ohlcv_data_extended):
+        """测试Stalled Pattern形态"""
+        result = haze.py_stalled_pattern(
+            ohlcv_data_extended['open'],
+            ohlcv_data_extended['high'],
+            ohlcv_data_extended['low'],
+            ohlcv_data_extended['close']
+        )
+        assert isinstance(result, list)
+        assert len(result) == len(ohlcv_data_extended['close'])
+
+    def test_stalled_pattern_values(self, ohlcv_data_extended):
+        """测试返回值范围"""
+        result = haze.py_stalled_pattern(
+            ohlcv_data_extended['open'],
+            ohlcv_data_extended['high'],
+            ohlcv_data_extended['low'],
+            ohlcv_data_extended['close']
+        )
+        for value in result:
+            if not np.isnan(value):
+                assert value in [-1.0, 0.0, 1.0]
+
+
+class TestHikkake:
+    """Hikkake Pattern (骗线形态)"""
+
+    def test_hikkake_pattern(self, ohlcv_data_extended):
+        """测试Hikkake形态"""
+        result = haze.py_hikkake(
+            ohlcv_data_extended['open'],
+            ohlcv_data_extended['high'],
+            ohlcv_data_extended['low'],
+            ohlcv_data_extended['close']
+        )
+        assert isinstance(result, list)
+        assert len(result) == len(ohlcv_data_extended['close'])
+
+    def test_hikkake_values(self, ohlcv_data_extended):
+        """测试返回值范围"""
+        result = haze.py_hikkake(
+            ohlcv_data_extended['open'],
+            ohlcv_data_extended['high'],
+            ohlcv_data_extended['low'],
+            ohlcv_data_extended['close']
+        )
+        for value in result:
+            if not np.isnan(value):
+                assert value in [-1.0, 0.0, 1.0]
+
+
+class TestHikkakeMod:
+    """Hikkake Modified Pattern (修改版骗线形态)"""
+
+    def test_hikkake_mod_pattern(self, ohlcv_data_extended):
+        """测试Hikkake Modified形态"""
+        result = haze.py_hikkake_mod(
+            ohlcv_data_extended['open'],
+            ohlcv_data_extended['high'],
+            ohlcv_data_extended['low'],
+            ohlcv_data_extended['close']
+        )
+        assert isinstance(result, list)
+        assert len(result) == len(ohlcv_data_extended['close'])
+
+    def test_hikkake_mod_values(self, ohlcv_data_extended):
+        """测试返回值范围"""
+        result = haze.py_hikkake_mod(
+            ohlcv_data_extended['open'],
+            ohlcv_data_extended['high'],
+            ohlcv_data_extended['low'],
+            ohlcv_data_extended['close']
+        )
+        for value in result:
+            if not np.isnan(value):
+                assert value in [-1.0, 0.0, 1.0]
+
+
+class TestXsideGap3Methods:
+    """Upside/Downside Gap Three Methods (跳空三法)"""
+
+    def test_xside_gap_3_methods_pattern(self, ohlcv_data_extended):
+        """测试Xside Gap Three Methods形态"""
+        result = haze.py_xside_gap_3_methods(
+            ohlcv_data_extended['open'],
+            ohlcv_data_extended['high'],
+            ohlcv_data_extended['low'],
+            ohlcv_data_extended['close']
+        )
+        assert isinstance(result, list)
+        assert len(result) == len(ohlcv_data_extended['close'])
+
+    def test_xside_gap_3_methods_values(self, ohlcv_data_extended):
+        """测试返回值范围"""
+        result = haze.py_xside_gap_3_methods(
+            ohlcv_data_extended['open'],
+            ohlcv_data_extended['high'],
+            ohlcv_data_extended['low'],
+            ohlcv_data_extended['close']
+        )
+        for value in result:
+            if not np.isnan(value):
+                assert value in [-1.0, 0.0, 1.0]
+
+
+class TestCandlestickEdgeCasesExtended:
+    """扩展边界条件测试"""
+
+    def test_all_missing_patterns_with_short_data(self):
+        """测试短数据的所有缺失形态"""
+        short_data = {
+            'open': [100.0, 101.0, 102.0],
+            'high': [102.0, 103.0, 104.0],
+            'low': [99.0, 100.0, 101.0],
+            'close': [101.0, 102.0, 103.0]
+        }
+
+        patterns = [
+            haze.py_gap_sidesidewhite,
+            haze.py_stalled_pattern,
+            haze.py_hikkake,
+            haze.py_hikkake_mod,
+            haze.py_xside_gap_3_methods,
+        ]
+
+        for pattern_func in patterns:
+            result = pattern_func(
+                short_data['open'],
+                short_data['high'],
+                short_data['low'],
+                short_data['close']
+            )
+            assert len(result) == 3
+
+    def test_all_missing_patterns_with_constant_data(self):
+        """测试常数数据的所有缺失形态"""
+        const_data = {
+            'open': [100.0] * 10,
+            'high': [100.0] * 10,
+            'low': [100.0] * 10,
+            'close': [100.0] * 10
+        }
+
+        patterns = [
+            haze.py_gap_sidesidewhite,
+            haze.py_stalled_pattern,
+            haze.py_hikkake,
+            haze.py_hikkake_mod,
+            haze.py_xside_gap_3_methods,
+        ]
+
+        for pattern_func in patterns:
+            result = pattern_func(
+                const_data['open'],
+                const_data['high'],
+                const_data['low'],
+                const_data['close']
+            )
+            assert len(result) == 10
+            # 常数数据不应识别出任何形态
+            for value in result:
+                if not np.isnan(value):
+                    assert value == 0.0

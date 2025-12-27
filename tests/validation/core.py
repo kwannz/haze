@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from enum import Enum
 import warnings
 

@@ -214,7 +214,7 @@ fn test_oscillator_combination() -> HazeResult<()> {
     let low: Vec<f64> = (0..50).map(|i| 95.0 + (i as f64 % 20.0)).collect();
     let close: Vec<f64> = (0..50).map(|i| 98.0 + (i as f64 % 20.0)).collect();
 
-    let (stoch_k, stoch_d) = momentum::stochastic(&high, &low, &close, 14, 3)?;
+    let (stoch_k, stoch_d) = momentum::stochastic(&high, &low, &close, 14, 3, 3)?;
     let rsi = momentum::rsi(&close, 14)?;
 
     assert_eq!(stoch_k.len(), close.len());

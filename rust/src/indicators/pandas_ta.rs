@@ -13,8 +13,12 @@ use crate::errors::validation::{
 use crate::errors::{HazeError, HazeResult};
 use crate::indicators::{atr, bollinger_bands, keltner_channel, rsi};
 use crate::init_result;
+use crate::utils::ma::{ema_allow_nan, sma_allow_nan};
 use crate::utils::math::{is_not_zero, is_zero};
-use crate::utils::{ema, rma, rolling_max, rolling_min, sma, stdev, tsf};
+use crate::utils::{
+    correlation, ema, linear_regression, rma, rolling_max, rolling_min, rolling_sum_kahan, sma,
+    stdev, tsf,
+};
 
 /// Entropy - 信息熵指标（价格不确定性度量）
 ///
@@ -281,7 +285,7 @@ pub fn qqe(
     let rsi_values = rsi(close, rsi_period)?;
 
     // 2. EMA 平滑 RSI
-    let rsi_ema = ema(&rsi_values, smooth)?;
+    let rsi_ema = ema_allow_nan(&rsi_values, smooth)?;
 
     // 3. 计算 RSI 差值的 EMA
     let mut rsi_diff = init_result!(n);
@@ -290,10 +294,10 @@ pub fn qqe(
             rsi_diff[i] = (rsi_ema[i] - rsi_ema[i - 1]).abs();
         }
     }
-    let tr_rsi = ema(&rsi_diff, smooth)?;
+    let tr_rsi = ema_allow_nan(&rsi_diff, smooth)?;
 
-    // 4. 计算 Fast/Slow Lines
-    let fast_line = rsi_ema.clone();
+    // 4. 计算 Fast/Slow Lines (rsi_ema becomes fast_line - no clone needed)
+    let fast_line = rsi_ema;
     let mut slow_line = init_result!(n);
     let mut signal = vec![0.0; n];
 
@@ -341,41 +345,16 @@ pub fn cti(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 
     // [2] 计算逻辑
     let n = close.len();
-    let mut result = init_result!(n);
-
-    for i in period..n {
-        let window = &close[i + 1 - period..=i];
-
-        // 构造 x 序列（时间索引）
-        let x: Vec<f64> = (0..period).map(|j| j as f64).collect();
-
-        // 计算均值
-        let mean_x = (period - 1) as f64 / 2.0;
-        let mean_y: f64 = window.iter().sum::<f64>() / (period as f64);
-
-        // 计算协方差和标准差
-        let mut cov = 0.0;
-        let mut var_x = 0.0;
-        let mut var_y = 0.0;
-
-        for j in 0..period {
-            let dx = x[j] - mean_x;
-            let dy = window[j] - mean_y;
-            cov += dx * dy;
-            var_x += dx * dx;
-            var_y += dy * dy;
-        }
-
-        // 计算皮尔逊相关系数
-        let denom = (var_x * var_y).sqrt();
-        if denom > 1e-10 {
-            result[i] = cov / denom;
-        } else {
+    if period == 1 {
+        let mut result = init_result!(n);
+        for i in 1..n {
             result[i] = 0.0;
         }
+        return Ok(result);
     }
 
-    Ok(result)
+    let x: Vec<f64> = (0..n).map(|i| i as f64).collect();
+    Ok(correlation(&x, close, period))
 }
 
 /// ER - Efficiency Ratio（效率比）
@@ -398,18 +377,26 @@ pub fn er(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 
     // [2] 计算逻辑
     let n = close.len();
+    if period >= n {
+        return Err(HazeError::InsufficientData {
+            required: period + 1,
+            actual: n,
+        });
+    }
+
+    let mut abs_diff = vec![0.0; n];
+    for i in 1..n {
+        abs_diff[i] = (close[i] - close[i - 1]).abs();
+    }
+    let volatility = rolling_sum_kahan(&abs_diff, period);
+
     let mut result = init_result!(n);
 
     for i in period..n {
         let change = (close[i] - close[i - period]).abs();
-
-        let mut volatility = 0.0;
-        for j in (i - period + 1)..=i {
-            volatility += (close[j] - close[j - 1]).abs();
-        }
-
-        if volatility > 1e-10 {
-            result[i] = change / volatility;
+        let denom = volatility[i];
+        if denom.is_finite() && denom > 1e-10 {
+            result[i] = change / denom;
         } else {
             result[i] = 0.0;
         }
@@ -543,8 +530,8 @@ pub fn rvi(
         denominator[i] = denom / 6.0;
     }
 
-    let num_sma = sma(&numerator, period)?;
-    let denom_sma = sma(&denominator, period)?;
+    let num_sma = sma_allow_nan(&numerator, period)?;
+    let denom_sma = sma_allow_nan(&denominator, period)?;
 
     let rvi_values: Vec<f64> = num_sma
         .iter()
@@ -558,7 +545,7 @@ pub fn rvi(
         })
         .collect();
 
-    let signal = sma(&rvi_values, signal_period)?;
+    let signal = sma_allow_nan(&rvi_values, signal_period)?;
 
     Ok((rvi_values, signal))
 }
@@ -602,34 +589,15 @@ pub fn inertia(
     // [2] 计算逻辑
     let (rvi_values, _) = rvi(open, high, low, close, rvi_period, 4)?;
     let n = rvi_values.len();
-
     let mut result = init_result!(n);
+    let (slope, intercept, _) = linear_regression(&rvi_values, regression_period);
+    let x_last = regression_period as f64 - 1.0;
 
     for i in regression_period..n {
-        let window = &rvi_values[i + 1 - regression_period..=i];
-
-        // 线性回归
-        let x: Vec<f64> = (0..regression_period).map(|j| j as f64).collect();
-        let mean_x = (regression_period - 1) as f64 / 2.0;
-        let mean_y: f64 = window.iter().filter(|&&v| !v.is_nan()).sum::<f64>()
-            / window.iter().filter(|&&v| !v.is_nan()).count() as f64;
-
-        let mut num = 0.0;
-        let mut denom = 0.0;
-
-        for j in 0..regression_period {
-            if !window[j].is_nan() {
-                let dx = x[j] - mean_x;
-                let dy = window[j] - mean_y;
-                num += dx * dy;
-                denom += dx * dx;
-            }
-        }
-
-        if denom > 1e-10 {
-            let slope = num / denom;
-            let intercept = mean_y - slope * mean_x;
-            result[i] = slope * (regression_period - 1) as f64 + intercept;
+        let s = slope[i];
+        let b = intercept[i];
+        if s.is_finite() && b.is_finite() {
+            result[i] = s * x_last + b;
         }
     }
 
@@ -722,7 +690,7 @@ pub fn efi(close: &[f64], volume: &[f64], period: usize) -> HazeResult<Vec<f64>>
         force[i] = (close[i] - close[i - 1]) * volume[i];
     }
 
-    ema(&force, period)
+    ema_allow_nan(&force, period)
 }
 
 /// KST - Know Sure Thing（确然指标）
@@ -767,10 +735,10 @@ pub fn kst(
     let roc_4 = roc_helper(close, roc4);
 
     // SMA 平滑
-    let rcma1 = sma(&roc_1, 10)?;
-    let rcma2 = sma(&roc_2, 10)?;
-    let rcma3 = sma(&roc_3, 10)?;
-    let rcma4 = sma(&roc_4, 15)?;
+    let rcma1 = sma_allow_nan(&roc_1, 10)?;
+    let rcma2 = sma_allow_nan(&roc_2, 10)?;
+    let rcma3 = sma_allow_nan(&roc_3, 10)?;
+    let rcma4 = sma_allow_nan(&roc_4, 15)?;
 
     // 加权求和
     let kst_values: Vec<f64> = rcma1
@@ -787,7 +755,7 @@ pub fn kst(
         })
         .collect();
 
-    let signal = sma(&kst_values, signal_period)?;
+    let signal = sma_allow_nan(&kst_values, signal_period)?;
 
     Ok((kst_values, signal))
 }
@@ -901,7 +869,7 @@ pub fn tdfi(close: &[f64], period: usize, smooth: usize) -> HazeResult<Vec<f64>>
         tdf[i] = (close[i] - close[i - period]).abs();
     }
 
-    ema(&tdf, smooth)
+    ema_allow_nan(&tdf, smooth)
 }
 
 /// WAE - Waddah Attar Explosion（瓦达赫爆发指标）
@@ -956,7 +924,7 @@ pub fn wae(
         .collect();
 
     // 2. 信号线
-    let signal_line = sma(&macd, signal)?;
+    let signal_line = sma_allow_nan(&macd, signal)?;
 
     // 3. Explosion
     let explosion: Vec<f64> = macd
@@ -1035,11 +1003,11 @@ pub fn smi(
         .collect();
 
     // 双重 EMA
-    let distance_ema1 = ema(&distance, smooth1)?;
-    let distance_ema2 = ema(&distance_ema1, smooth2)?;
+    let distance_ema1 = ema_allow_nan(&distance, smooth1)?;
+    let distance_ema2 = ema_allow_nan(&distance_ema1, smooth2)?;
 
-    let diff_ema1 = ema(&hl_diff, smooth1)?;
-    let diff_ema2 = ema(&diff_ema1, smooth2)?;
+    let diff_ema1 = ema_allow_nan(&hl_diff, smooth1)?;
+    let diff_ema2 = ema_allow_nan(&diff_ema1, smooth2)?;
 
     // SMI
     let result = distance_ema2
@@ -2319,24 +2287,28 @@ mod boundary_tests {
     #[test]
     fn test_cti_nan_handling() {
         let close = vec![f64::NAN, 100.0, 101.0, 102.0, 103.0, 104.0, 105.0];
-        let result = cti(&close, 3).unwrap();
-        assert_eq!(result.len(), 7);
-        // NaN input should propagate
-        assert!(result[0].is_nan());
+        assert!(matches!(
+            cti(&close, 3),
+            Err(crate::errors::HazeError::InvalidValue { .. })
+        ));
     }
 
     #[test]
     fn test_er_nan_handling() {
         let close = vec![100.0, f64::NAN, 102.0, 103.0, 104.0, 105.0, 106.0];
-        let result = er(&close, 3).unwrap();
-        assert_eq!(result.len(), 7);
+        assert!(matches!(
+            er(&close, 3),
+            Err(crate::errors::HazeError::InvalidValue { .. })
+        ));
     }
 
     #[test]
     fn test_slope_nan_handling() {
         let values = vec![100.0, 101.0, f64::NAN, 103.0, 104.0];
-        let result = slope(&values, 3).unwrap();
-        assert_eq!(result.len(), 5);
+        assert!(matches!(
+            slope(&values, 3),
+            Err(crate::errors::HazeError::InvalidValue { .. })
+        ));
     }
 
     // ==================== Period 1 Tests (Edge Case) ====================

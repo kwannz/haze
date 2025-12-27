@@ -4,7 +4,7 @@ Installation
 Requirements
 ------------
 
-- Python 3.9 or higher
+- Python 3.14 or higher
 - Rust 1.75 or higher (for building from source)
 
 Install from PyPI
@@ -13,6 +13,13 @@ Install from PyPI
 .. code-block:: bash
 
    pip install haze-library
+
+If you want to ensure you always install a prebuilt wheel (no local Rust build),
+you can force binary-only installs:
+
+.. code-block:: bash
+
+   pip install --only-binary=:all: haze-library
 
 Install from Source
 -------------------
@@ -39,6 +46,12 @@ Install from Source
 
 Optional Dependencies
 ---------------------
+
+For CCXT execution helpers:
+
+.. code-block:: bash
+
+   pip install haze-library[execution]
 
 For Polars support:
 

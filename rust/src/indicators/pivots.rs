@@ -11,6 +11,10 @@
 
 use std::collections::HashMap;
 
+use crate::errors::{HazeError, HazeResult};
+use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_range};
+use crate::utils::math::is_zero;
+
 /// Pivot 计算结果结构体
 #[derive(Debug, Clone)]
 pub struct PivotLevels {
@@ -23,6 +27,43 @@ pub struct PivotLevels {
     pub s2: f64,         // 支撑位 2
     pub s3: f64,         // 支撑位 3
     pub s4: Option<f64>, // 支撑位 4（Camarilla 专用）
+}
+
+#[inline]
+fn validate_finite_value(value: f64, name: &'static str) -> HazeResult<()> {
+    if !value.is_finite() {
+        return Err(HazeError::InvalidValue {
+            index: 0,
+            message: format!("{name} contains non-finite value: {value}"),
+        });
+    }
+    Ok(())
+}
+
+#[inline]
+fn validate_pivot_levels(levels: &PivotLevels) -> HazeResult<()> {
+    let values = [
+        ("pivot", levels.pivot),
+        ("r1", levels.r1),
+        ("r2", levels.r2),
+        ("r3", levels.r3),
+        ("s1", levels.s1),
+        ("s2", levels.s2),
+        ("s3", levels.s3),
+    ];
+    for (name, value) in values {
+        if value.is_nan() {
+            continue;
+        }
+        validate_finite_value(value, name)?;
+    }
+    if let Some(r4) = levels.r4 {
+        validate_finite_value(r4, "r4")?;
+    }
+    if let Some(s4) = levels.s4 {
+        validate_finite_value(s4, "s4")?;
+    }
+    Ok(())
 }
 
 /// 标准枢轴点（Standard/Classic Pivots）
@@ -43,7 +84,10 @@ pub struct PivotLevels {
 /// S2 = PP - (H - L)
 /// S3 = L - 2*(H - PP)
 /// ```
-pub fn standard_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
+pub fn standard_pivots(high: f64, low: f64, close: f64) -> HazeResult<PivotLevels> {
+    validate_finite_value(high, "high")?;
+    validate_finite_value(low, "low")?;
+    validate_finite_value(close, "close")?;
     let pp = (high + low + close) / 3.0;
     let range = high - low;
 
@@ -55,7 +99,7 @@ pub fn standard_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
     let s2 = pp - range;
     let s3 = low - 2.0 * (high - pp);
 
-    PivotLevels {
+    Ok(PivotLevels {
         pivot: pp,
         r1,
         r2,
@@ -65,7 +109,7 @@ pub fn standard_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
         s2,
         s3,
         s4: None,
-    }
+    })
 }
 
 /// Fibonacci 枢轴点
@@ -86,7 +130,10 @@ pub fn standard_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
 /// S2 = PP - 0.618 * (H - L)
 /// S3 = PP - 1.000 * (H - L)
 /// ```
-pub fn fibonacci_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
+pub fn fibonacci_pivots(high: f64, low: f64, close: f64) -> HazeResult<PivotLevels> {
+    validate_finite_value(high, "high")?;
+    validate_finite_value(low, "low")?;
+    validate_finite_value(close, "close")?;
     let pp = (high + low + close) / 3.0;
     let range = high - low;
 
@@ -98,7 +145,7 @@ pub fn fibonacci_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
     let s2 = pp - 0.618 * range;
     let s3 = pp - 1.000 * range;
 
-    PivotLevels {
+    Ok(PivotLevels {
         pivot: pp,
         r1,
         r2,
@@ -108,7 +155,7 @@ pub fn fibonacci_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
         s2,
         s3,
         s4: None,
-    }
+    })
 }
 
 /// Woodie 枢轴点
@@ -127,7 +174,10 @@ pub fn fibonacci_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
 /// S1 = 2*PP - H
 /// S2 = PP - (H - L)
 /// ```
-pub fn woodie_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
+pub fn woodie_pivots(high: f64, low: f64, close: f64) -> HazeResult<PivotLevels> {
+    validate_finite_value(high, "high")?;
+    validate_finite_value(low, "low")?;
+    validate_finite_value(close, "close")?;
     let pp = (high + low + 2.0 * close) / 4.0;
     let range = high - low;
 
@@ -139,7 +189,7 @@ pub fn woodie_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
     let s2 = pp - range;
     let s3 = low - 2.0 * (high - pp); // S3 同标准计算
 
-    PivotLevels {
+    Ok(PivotLevels {
         pivot: pp,
         r1,
         r2,
@@ -149,7 +199,7 @@ pub fn woodie_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
         s2,
         s3,
         s4: None,
-    }
+    })
 }
 
 /// Camarilla 枢轴点（短线交易者常用）
@@ -172,7 +222,10 @@ pub fn woodie_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
 /// S3 = C - 1.1/4 * (H - L)
 /// S4 = C - 1.1/2 * (H - L)
 /// ```
-pub fn camarilla_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
+pub fn camarilla_pivots(high: f64, low: f64, close: f64) -> HazeResult<PivotLevels> {
+    validate_finite_value(high, "high")?;
+    validate_finite_value(low, "low")?;
+    validate_finite_value(close, "close")?;
     let pp = (high + low + close) / 3.0;
     let range = high - low;
 
@@ -186,7 +239,7 @@ pub fn camarilla_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
     let s3 = close - 1.1 / 4.0 * range;
     let s4 = close - 1.1 / 2.0 * range;
 
-    PivotLevels {
+    Ok(PivotLevels {
         pivot: pp,
         r1,
         r2,
@@ -196,7 +249,7 @@ pub fn camarilla_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
         s2,
         s3,
         s4: Some(s4),
-    }
+    })
 }
 
 /// DeMark 枢轴点
@@ -217,7 +270,11 @@ pub fn camarilla_pivots(high: f64, low: f64, close: f64) -> PivotLevels {
 /// R1 = X/2 - L
 /// S1 = X/2 - H
 /// ```
-pub fn demark_pivots(open: f64, high: f64, low: f64, close: f64) -> PivotLevels {
+pub fn demark_pivots(open: f64, high: f64, low: f64, close: f64) -> HazeResult<PivotLevels> {
+    validate_finite_value(open, "open")?;
+    validate_finite_value(high, "high")?;
+    validate_finite_value(low, "low")?;
+    validate_finite_value(close, "close")?;
     let x = if close < open {
         high + 2.0 * low + close
     } else if close > open {
@@ -231,7 +288,7 @@ pub fn demark_pivots(open: f64, high: f64, low: f64, close: f64) -> PivotLevels 
     let s1 = x / 2.0 - high;
 
     // DeMark 通常只有 R1/S1，其余设为 NaN
-    PivotLevels {
+    Ok(PivotLevels {
         pivot: pp,
         r1,
         r2: f64::NAN,
@@ -241,7 +298,7 @@ pub fn demark_pivots(open: f64, high: f64, low: f64, close: f64) -> PivotLevels 
         s2: f64::NAN,
         s3: f64::NAN,
         s4: None,
-    }
+    })
 }
 
 /// 计算时间序列的 Pivot Points
@@ -261,7 +318,20 @@ pub fn calc_pivot_series(
     low: &[f64],
     close: &[f64],
     method: &str,
-) -> Vec<PivotLevels> {
+) -> HazeResult<Vec<PivotLevels>> {
+    validate_not_empty(high, "high")?;
+    validate_lengths_match(&[
+        (open, "open"),
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+    ])?;
+    if method.trim().is_empty() {
+        return Err(HazeError::InvalidValue {
+            index: 0,
+            message: "method cannot be empty".to_string(),
+        });
+    }
     let n = high.len();
     let mut pivots = Vec::with_capacity(n);
 
@@ -270,7 +340,7 @@ pub fn calc_pivot_series(
             // 第一个周期没有前一周期数据，使用当前数据
             pivots.push(calc_single_pivot(
                 open[i], high[i], low[i], close[i], method,
-            ));
+            )?);
         } else {
             // 使用前一周期的数据计算当前枢轴点
             pivots.push(calc_single_pivot(
@@ -279,22 +349,31 @@ pub fn calc_pivot_series(
                 low[i - 1],
                 close[i - 1],
                 method,
-            ));
+            )?);
         }
     }
 
-    pivots
+    Ok(pivots)
 }
 
 /// 计算单个 Pivot（辅助函数）
-fn calc_single_pivot(open: f64, high: f64, low: f64, close: f64, method: &str) -> PivotLevels {
+fn calc_single_pivot(
+    open: f64,
+    high: f64,
+    low: f64,
+    close: f64,
+    method: &str,
+) -> HazeResult<PivotLevels> {
     match method.to_lowercase().as_str() {
         "standard" | "classic" => standard_pivots(high, low, close),
         "fibonacci" | "fib" => fibonacci_pivots(high, low, close),
         "woodie" | "woodies" => woodie_pivots(high, low, close),
         "camarilla" => camarilla_pivots(high, low, close),
         "demark" | "dm" => demark_pivots(open, high, low, close),
-        _ => standard_pivots(high, low, close), // 默认使用标准方法
+        _ => Err(HazeError::InvalidValue {
+            index: 0,
+            message: format!("unknown pivot method: {method}"),
+        }),
     }
 }
 
@@ -309,7 +388,10 @@ pub fn detect_pivot_touch(
     current_price: f64,
     pivot_levels: &PivotLevels,
     tolerance: f64,
-) -> Option<String> {
+) -> HazeResult<Option<String>> {
+    validate_finite_value(current_price, "current_price")?;
+    validate_range("tolerance", tolerance, 0.0, f64::INFINITY)?;
+    validate_pivot_levels(pivot_levels)?;
     let mut levels = HashMap::new();
     levels.insert("PP", pivot_levels.pivot);
     levels.insert("R1", pivot_levels.r1);
@@ -331,13 +413,19 @@ pub fn detect_pivot_touch(
         if level.is_nan() {
             continue;
         }
+        if is_zero(level) {
+            return Err(HazeError::InvalidValue {
+                index: 0,
+                message: format!("pivot level {name} is zero"),
+            });
+        }
         let diff_pct = ((current_price - level) / level).abs();
         if diff_pct <= tolerance {
-            return Some(name.to_string());
+            return Ok(Some(name.to_string()));
         }
     }
 
-    None
+    Ok(None)
 }
 
 /// 判断价格位于 Pivot 哪个区域
@@ -346,23 +434,41 @@ pub fn detect_pivot_touch(
 /// - `pivot_levels`: Pivot 价位
 ///
 /// 返回：价格所在区域（"Above R3", "R2-R3", "R1-R2", "PP-R1", "PP-S1", "S1-S2", "S2-S3", "Below S3"）
-pub fn pivot_zone(current_price: f64, pivot_levels: &PivotLevels) -> String {
+pub fn pivot_zone(current_price: f64, pivot_levels: &PivotLevels) -> HazeResult<String> {
+    validate_finite_value(current_price, "current_price")?;
+    validate_pivot_levels(pivot_levels)?;
+    for (name, value) in [
+        ("r3", pivot_levels.r3),
+        ("r2", pivot_levels.r2),
+        ("r1", pivot_levels.r1),
+        ("pivot", pivot_levels.pivot),
+        ("s1", pivot_levels.s1),
+        ("s2", pivot_levels.s2),
+        ("s3", pivot_levels.s3),
+    ] {
+        if value.is_nan() {
+            return Err(HazeError::InvalidValue {
+                index: 0,
+                message: format!("pivot level {name} is NaN; pivot_zone requires full levels"),
+            });
+        }
+    }
     if current_price > pivot_levels.r3 {
-        "Above R3".to_string()
+        Ok("Above R3".to_string())
     } else if current_price > pivot_levels.r2 {
-        "R2-R3".to_string()
+        Ok("R2-R3".to_string())
     } else if current_price > pivot_levels.r1 {
-        "R1-R2".to_string()
+        Ok("R1-R2".to_string())
     } else if current_price > pivot_levels.pivot {
-        "PP-R1".to_string()
+        Ok("PP-R1".to_string())
     } else if current_price > pivot_levels.s1 {
-        "PP-S1".to_string()
+        Ok("PP-S1".to_string())
     } else if current_price > pivot_levels.s2 {
-        "S1-S2".to_string()
+        Ok("S1-S2".to_string())
     } else if current_price > pivot_levels.s3 {
-        "S2-S3".to_string()
+        Ok("S2-S3".to_string())
     } else {
-        "Below S3".to_string()
+        Ok("Below S3".to_string())
     }
 }
 
@@ -376,7 +482,7 @@ mod tests {
         let low = 100.0;
         let close = 105.0;
 
-        let pivots = standard_pivots(high, low, close);
+        let pivots = standard_pivots(high, low, close).unwrap();
 
         // PP = (110 + 100 + 105) / 3 = 105
         assert!((pivots.pivot - 105.0).abs() < 0.1);
@@ -394,7 +500,7 @@ mod tests {
         let low = 100.0;
         let close = 105.0;
 
-        let pivots = fibonacci_pivots(high, low, close);
+        let pivots = fibonacci_pivots(high, low, close).unwrap();
 
         // PP = 105
         assert!((pivots.pivot - 105.0).abs() < 0.1);
@@ -412,7 +518,7 @@ mod tests {
         let low = 100.0;
         let close = 105.0;
 
-        let pivots = camarilla_pivots(high, low, close);
+        let pivots = camarilla_pivots(high, low, close).unwrap();
 
         // 验证有 R4/S4
         assert!(pivots.r4.is_some());
@@ -429,7 +535,7 @@ mod tests {
         let low = 100.0;
         let close = 108.0;
 
-        let pivots = demark_pivots(open, high, low, close);
+        let pivots = demark_pivots(open, high, low, close).unwrap();
 
         // Close > Open: X = 2*110 + 100 + 108 = 428
         // PP = 428 / 4 = 107
@@ -445,14 +551,14 @@ mod tests {
         let low = 100.0;
         let close = 105.0;
 
-        let pivots = standard_pivots(high, low, close);
+        let pivots = standard_pivots(high, low, close).unwrap();
 
         // 价格 112 应在 R1-R2 区域
-        let zone = pivot_zone(112.0, &pivots);
+        let zone = pivot_zone(112.0, &pivots).unwrap();
         assert_eq!(zone, "R1-R2");
 
         // 价格 103 应在 PP-S1 区域
-        let zone = pivot_zone(103.0, &pivots);
+        let zone = pivot_zone(103.0, &pivots).unwrap();
         assert_eq!(zone, "PP-S1");
     }
 }

@@ -74,9 +74,8 @@ class TestLinearRegression:
 
     def test_empty_array(self):
         """测试空数组"""
-        slope, intercept, r_squared = haze.py_linear_regression([], period=5)
-        assert isinstance(slope, list)
-        assert len(slope) == 0
+        with pytest.raises(ValueError):
+            haze.py_linear_regression([], period=5)
 
 
 # ==================== 2. Correlation ====================
@@ -170,9 +169,8 @@ class TestZScore:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_zscore([], period=5)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_zscore([], period=5)
 
 
 # ==================== 4. Covariance ====================
@@ -217,9 +215,8 @@ class TestCovariance:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_covariance([], [], period=5)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_covariance([], [], period=5)
 
 
 # ==================== 5. Beta ====================
@@ -310,9 +307,8 @@ class TestStandardError:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_stderr([], period=5)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_stderr([], period=5)
 
 
 # ==================== 7. CORREL (TA-Lib) ====================
@@ -348,9 +344,8 @@ class TestCORREL:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_correl([], [], period=5)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_correl([], [], period=5)
 
 
 # ==================== 8. LINEARREG (TA-Lib) ====================
@@ -379,9 +374,8 @@ class TestLINEARREG:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_linearreg([], period=5)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_linearreg([], period=5)
 
 
 # ==================== 9. LINEARREG_SLOPE ====================
@@ -458,9 +452,8 @@ class TestLINEARREG_ANGLE:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_linearreg_angle([], period=5)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_linearreg_angle([], period=5)
 
 
 # ==================== 11. LINEARREG_INTERCEPT ====================
@@ -492,9 +485,8 @@ class TestLINEARREG_INTERCEPT:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_linearreg_intercept([], period=5)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_linearreg_intercept([], period=5)
 
 
 # ==================== 12. VAR ====================
@@ -586,6 +578,5 @@ class TestTSF:
 
     def test_empty_array(self):
         """测试空数组"""
-        result = haze.py_tsf([], period=5)
-        assert isinstance(result, list)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_tsf([], period=5)

@@ -194,10 +194,10 @@ fn bfill_in_place(values: &mut [f64]) {
 
 fn ma_by_name(mamode: &str, values: &[f64], length: usize) -> HazeResult<Vec<f64>> {
     match mamode.to_ascii_lowercase().as_str() {
-        "ema" => crate::utils::ema(values, length),
-        "rma" | "smma" => crate::utils::rma(values, length),
-        "wma" => crate::utils::wma(values, length),
-        _ => crate::utils::sma(values, length),
+        "ema" => crate::utils::ma::ema_allow_nan(values, length),
+        "rma" | "smma" => crate::utils::ma::rma_allow_nan(values, length),
+        "wma" => crate::utils::ma::wma_allow_nan(values, length),
+        _ => crate::utils::ma::sma_allow_nan(values, length),
     }
 }
 
@@ -3854,7 +3854,7 @@ pub fn pvo(
         pvo[i] = scalar * (fastma[i] - den) / den;
     }
 
-    let signalma = ema(&pvo, signal)?;
+    let signalma = crate::utils::ma::ema_allow_nan(&pvo, signal)?;
     let histogram: Vec<f64> = pvo
         .iter()
         .zip(&signalma)

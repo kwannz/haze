@@ -10,6 +10,7 @@ use crate::errors::validation::{
 };
 use crate::errors::{HazeError, HazeResult};
 use crate::init_result;
+use crate::utils::ma::sma_allow_nan;
 use crate::utils::math::is_zero;
 #[allow(unused_imports)]
 pub use crate::utils::{dema, ema, hma, rma, sma, tema, wma};
@@ -154,8 +155,9 @@ pub fn midprice(high: &[f64], low: &[f64], period: usize) -> HazeResult<Vec<f64>
 
 /// TRIMA - Triangular Moving Average
 ///
-/// 三角移动平均 = SMA(SMA(values, period), period)
-/// 双重平滑，更加平滑但滞后性更强
+/// TA-Lib 对齐：
+/// - 奇数周期：SMA(SMA(values, (period+1)/2), (period+1)/2)
+/// - 偶数周期：SMA(SMA(values, period/2), period/2 + 1)
 ///
 /// # 参数
 /// - `values`: 输入序列
@@ -171,13 +173,15 @@ pub fn trima(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     validate_not_empty(values, "values")?;
     validate_period(period, values.len())?;
 
-    // Step 1: 第一次 SMA
-    let first_sma = sma(values, period)?;
+    let n1 = if period % 2 == 0 {
+        period / 2
+    } else {
+        period.div_ceil(2)
+    };
+    let n2 = if period % 2 == 0 { n1 + 1 } else { n1 };
 
-    // Step 2: 对 SMA 结果再次应用 SMA
-    // 注意：需要调整周期以匹配 TA-Lib 的行为
-    let n = period.div_ceil(2);
-    sma(&first_sma, n)
+    let first_sma = sma(values, n1)?;
+    sma_allow_nan(&first_sma, n2)
 }
 
 /// SAR - Parabolic SAR (Stop and Reverse)
@@ -225,70 +229,47 @@ pub fn sar(high: &[f64], low: &[f64], acceleration: f64, maximum: f64) -> HazeRe
     let n = high.len();
     let mut result = init_result!(n);
 
-    // 初始化：假设上升趋势
-    let mut is_long = true;
-    let mut sar_value = low[0];
-    let mut ep = high[0]; // Extreme Point
-    let mut af = acceleration; // Acceleration Factor
+    // TA-Lib 对齐初始化：基于 HL2 判断初始趋势方向
+    let mut is_long = (high[1] + low[1]) > (high[0] + low[0]);
+    let mut sar_value = if is_long { low[0] } else { high[0] };
+    let mut ep = if is_long { high[1] } else { low[1] };
+    let mut af = acceleration;
 
-    result[0] = sar_value;
+    result[0] = f64::NAN;
+    result[1] = sar_value;
 
-    for i in 1..n {
-        // 更新 SAR 值
+    for i in 2..n {
         sar_value = sar_value + af * (ep - sar_value);
 
-        // 检查反转
-        let mut reversed = false;
         if is_long {
-            // 上升趋势中
+            sar_value = sar_value.min(low[i - 1]);
+            if i >= 3 {
+                sar_value = sar_value.min(low[i - 2]);
+            }
+
             if low[i] < sar_value {
-                // 反转为下降趋势
                 is_long = false;
-                reversed = true;
-                sar_value = ep; // SAR 设为前期最高点
-                ep = low[i]; // EP 设为当前最低点
-                af = acceleration; // 重置 AF
+                sar_value = ep;
+                ep = low[i];
+                af = acceleration;
+            } else if high[i] > ep {
+                ep = high[i];
+                af = (af + acceleration).min(maximum);
             }
         } else {
-            // 下降趋势中
-            if high[i] > sar_value {
-                // 反转为上升趋势
-                is_long = true;
-                reversed = true;
-                sar_value = ep; // SAR 设为前期最低点
-                ep = high[i]; // EP 设为当前最高点
-                af = acceleration; // 重置 AF
+            sar_value = sar_value.max(high[i - 1]);
+            if i >= 3 {
+                sar_value = sar_value.max(high[i - 2]);
             }
-        }
 
-        // 如果没有反转，更新 EP 和 AF
-        if !reversed {
-            if is_long {
-                // 上升趋势中，EP 是最高点
-                if high[i] > ep {
-                    ep = high[i];
-                    af = (af + acceleration).min(maximum);
-                }
-                // SAR 不能高于前两根 K 线的最低点
-                if i >= 1 {
-                    sar_value = sar_value.min(low[i - 1]);
-                }
-                if i >= 2 {
-                    sar_value = sar_value.min(low[i - 2]);
-                }
-            } else {
-                // 下降趋势中，EP 是最低点
-                if low[i] < ep {
-                    ep = low[i];
-                    af = (af + acceleration).min(maximum);
-                }
-                // SAR 不能低于前两根 K 线的最高点
-                if i >= 1 {
-                    sar_value = sar_value.max(high[i - 1]);
-                }
-                if i >= 2 {
-                    sar_value = sar_value.max(high[i - 2]);
-                }
+            if high[i] > sar_value {
+                is_long = true;
+                sar_value = ep;
+                ep = high[i];
+                af = acceleration;
+            } else if low[i] < ep {
+                ep = low[i];
+                af = (af + acceleration).min(maximum);
             }
         }
 

@@ -1,8 +1,8 @@
 Haze-Library Documentation
 ===========================
 
-.. image:: https://img.shields.io/badge/python-3.9%2B-blue
-   :alt: Python 3.9+
+.. image:: https://img.shields.io/badge/python-3.14%2B-blue
+   :alt: Python 3.14+
 
 .. image:: https://img.shields.io/badge/rust-1.75%2B-orange
    :alt: Rust 1.75+

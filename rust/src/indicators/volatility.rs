@@ -55,9 +55,11 @@
 use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_period};
 use crate::errors::{HazeError, HazeResult};
 use crate::init_result;
-use crate::utils::math::{is_not_zero, is_zero};
+use crate::utils::ma::ema_allow_nan;
+use crate::utils::math::{is_not_zero, is_zero, kahan_sum};
 use crate::utils::{
-    ema, mean_and_stdev_population, rolling_max, rolling_min, sma, stdev, stdev_population,
+    ema, mean_and_stdev_population, rolling_max, rolling_min, rolling_sum_kahan, sma, stdev,
+    stdev_population,
 };
 
 /// True Range (TR)
@@ -246,10 +248,7 @@ pub fn atr(high: &[f64], low: &[f64], close: &[f64], period: usize) -> HazeResul
     let mut result = init_result!(n);
 
     // TA-Lib compatible: ignore TR[0], initial ATR = mean(TR[1..=period])
-    let mut sum = 0.0;
-    for i in 1..=period {
-        sum += tr[i];
-    }
+    let sum = kahan_sum(&tr[1..=period]);
     let period_f = period as f64;
     result[period] = sum / period_f;
 
@@ -821,8 +820,8 @@ pub fn historical_volatility(close: &[f64], period: usize) -> HazeResult<Vec<f64
 ///
 /// # Algorithm
 /// ```text
-/// drawdown[i] = ((close[i] - max_close) / max_close) * 100
-/// Ulcer Index = sqrt(mean(drawdown^2))
+/// drawdown[i] = ((close[i] - rolling_max[i]) / rolling_max[i]) * 100
+/// Ulcer Index[i] = sqrt(mean(drawdown[i-period+1..i]^2))
 /// ```
 ///
 /// # Parameters
@@ -849,29 +848,37 @@ pub fn ulcer_index(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     validate_period(period, close.len())?;
 
     let n = close.len();
+    let rolling_max_close = rolling_max(close, period);
+
+    let mut dd_sq = init_result!(n);
+    for i in 0..n {
+        let max_close = rolling_max_close[i];
+        let c = close[i];
+        if max_close.is_nan() || c.is_nan() || max_close <= 0.0 {
+            continue;
+        }
+        let dd = (c - max_close) / max_close * 100.0;
+        dd_sq[i] = dd * dd;
+    }
+
+    let dd_sq_clean: Vec<f64> = dd_sq
+        .iter()
+        .map(|&v| if v.is_finite() { v } else { 0.0 })
+        .collect();
+    let dd_sq_sum = rolling_sum_kahan(&dd_sq_clean, period);
+
+    let mut valid_prefix = vec![0usize; n + 1];
+    for i in 0..n {
+        let valid = if dd_sq[i].is_finite() { 1 } else { 0 };
+        valid_prefix[i + 1] = valid_prefix[i] + valid;
+    }
+
     let mut result = init_result!(n);
-
     for i in (period - 1)..n {
-        let window = &close[i + 1 - period..=i];
-        let max_close = window.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        if max_close.is_nan() || max_close <= 0.0 {
-            continue;
+        let valid_count = valid_prefix[i + 1] - valid_prefix[i + 1 - period];
+        if valid_count == period {
+            result[i] = (dd_sq_sum[i] / period as f64).sqrt();
         }
-
-        let mut sum = 0.0;
-        let mut has_nan = false;
-        for &c in window {
-            if c.is_nan() {
-                has_nan = true;
-                break;
-            }
-            let dd = (c - max_close) / max_close * 100.0;
-            sum += dd * dd;
-        }
-        if has_nan {
-            continue;
-        }
-        result[i] = (sum / period as f64).sqrt();
     }
 
     Ok(result)
@@ -885,10 +892,10 @@ pub fn ulcer_index(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 /// # Algorithm
 /// ```text
 /// Range = high - low
-/// EMA1  = EMA(Range, ema_period)
-/// EMA2  = EMA(EMA1, ema_period)
+/// EMA1  = EMA(Range, fast)
+/// EMA2  = EMA(EMA1, fast)
 /// Ratio = EMA1 / EMA2
-/// Mass Index = Sum(Ratio, period)
+/// Mass Index = Sum(Ratio, slow)
 /// ```
 ///
 /// A "reversal bulge" occurs when Mass Index rises above 27 and then falls below 26.5.
@@ -896,8 +903,8 @@ pub fn ulcer_index(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 /// # Parameters
 /// - `high`: High price series
 /// - `low`: Low price series
-/// - `period`: Sum period (typically 25)
-/// - `ema_period`: EMA period for smoothing (typically 9)
+/// - `fast`: EMA period for smoothing (typically 9)
+/// - `slow`: Sum period (typically 25)
 ///
 /// # Returns
 /// - `Ok(Vec<f64>)`: Mass Index values
@@ -905,7 +912,7 @@ pub fn ulcer_index(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 /// # Errors
 /// - [`HazeError::EmptyInput`]: Any input array is empty
 /// - [`HazeError::LengthMismatch`]: Input arrays have different lengths
-/// - [`HazeError::InvalidPeriod`]: period or ema_period is 0 or > data length
+/// - [`HazeError::InvalidPeriod`]: fast or slow is 0 or > data length
 ///
 /// # Example
 /// ```rust
@@ -914,37 +921,38 @@ pub fn ulcer_index(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 /// let high: Vec<f64> = (100..120).map(|x| x as f64 + 5.0).collect();
 /// let low: Vec<f64> = (100..120).map(|x| x as f64).collect();
 ///
-/// let mi = mass_index(&high, &low, 5, 3).unwrap();
+/// let mi = mass_index(&high, &low, 9, 25).unwrap();
 /// ```
 pub fn mass_index(
     high: &[f64],
     low: &[f64],
-    period: usize,
-    ema_period: usize,
+    fast: usize,
+    slow: usize,
 ) -> HazeResult<Vec<f64>> {
     // Validate inputs
     validate_not_empty(high, "high")?;
     validate_lengths_match(&[(high, "high"), (low, "low")])?;
 
     let n = high.len();
-    validate_period(period, n)?;
+    if fast == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: fast,
+            data_len: n,
+        });
+    }
+    if slow == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: slow,
+            data_len: n,
+        });
+    }
+    validate_period(slow, n)?;
 
-    if ema_period == 0 {
-        return Err(HazeError::InvalidPeriod {
-            period: ema_period,
-            data_len: n,
-        });
-    }
-    if ema_period > n {
-        return Err(HazeError::InvalidPeriod {
-            period: ema_period,
-            data_len: n,
-        });
-    }
+    let (fast, slow) = if slow < fast { (slow, fast) } else { (fast, slow) };
 
     let range: Vec<f64> = (0..n).map(|i| high[i] - low[i]).collect();
-    let ema1 = ema(&range, ema_period.min(n))?;
-    let ema2 = ema(&ema1, ema_period.min(n))?;
+    let ema1 = ema(&range, fast.min(n))?;
+    let ema2 = ema_allow_nan(&ema1, fast.min(n))?;
 
     let ratio: Vec<f64> = ema1
         .iter()
@@ -958,14 +966,24 @@ pub fn mass_index(
         })
         .collect();
 
+    let ratio_clean: Vec<f64> = ratio
+        .iter()
+        .map(|&v| if v.is_finite() { v } else { 0.0 })
+        .collect();
+    let ratio_sum = rolling_sum_kahan(&ratio_clean, slow);
+
+    let mut valid_prefix = vec![0usize; n + 1];
+    for i in 0..n {
+        let valid = if ratio[i].is_finite() { 1 } else { 0 };
+        valid_prefix[i + 1] = valid_prefix[i] + valid;
+    }
+
     let mut result = init_result!(n);
-    for i in (period - 1)..n {
-        let window = &ratio[i + 1 - period..=i];
-        if window.iter().any(|v| v.is_nan()) {
-            continue;
+    for i in (slow - 1)..n {
+        let valid_count = valid_prefix[i + 1] - valid_prefix[i + 1 - slow];
+        if valid_count == slow {
+            result[i] = ratio_sum[i];
         }
-        let sum: f64 = window.iter().sum();
-        result[i] = sum;
     }
 
     Ok(result)
@@ -1302,7 +1320,7 @@ mod tests {
         let high: Vec<f64> = (100..120).map(|x| x as f64 + 5.0).collect();
         let low: Vec<f64> = (100..120).map(|x| x as f64).collect();
 
-        let result = mass_index(&high, &low, 5, 3);
+        let result = mass_index(&high, &low, 3, 5);
         assert!(result.is_ok());
 
         let mi = result.unwrap();
@@ -1314,12 +1332,15 @@ mod tests {
         let high = vec![100.0, 101.0];
         let low = vec![99.0, 100.0];
 
-        let result = mass_index(&high, &low, 1, 0);
+        let result = mass_index(&high, &low, 0, 5);
         assert!(result.is_err());
         match result {
             Err(HazeError::InvalidPeriod { period, .. }) => assert_eq!(period, 0),
             _ => panic!("Expected InvalidPeriod error"),
         }
+
+        let result = mass_index(&high, &low, 3, 0);
+        assert!(result.is_err());
     }
 
     #[test]

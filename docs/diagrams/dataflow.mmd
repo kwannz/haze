@@ -1,0 +1,28 @@
+```mermaid
+flowchart LR
+    INPUT["输入数据<br/>OHLCV Arrays<br/>Vec&lt;f64&gt; close, high, low..."]
+
+    VALIDATE{"输入验证<br/>validate_not_empty()<br/>validate_period()<br/>validate_same_length()"}
+
+    COMPUTE["指标计算<br/>O(n) 单次遍历<br/>Wilder's smoothing<br/>Kahan summation"]
+
+    RESULT["计算结果<br/>Vec&lt;f64&gt;<br/>Warmup期为NaN<br/>有效值从index=period开始"]
+
+    ERROR["错误返回<br/>HazeError::InvalidPeriod<br/>HazeError::EmptyInput<br/>HazeError::LengthMismatch<br/>HazeError::InsufficientData"]
+
+    PYERR["Python异常<br/>自动转换为<br/>ValueError"]
+
+    INPUT --> VALIDATE
+    VALIDATE -->|Valid| COMPUTE
+    VALIDATE -->|Invalid| ERROR
+    COMPUTE --> RESULT
+
+    ERROR -.->|PyO3 转换| PYERR
+
+    style INPUT fill:#e8f5e9,stroke:#2e7d32
+    style VALIDATE fill:#fff9c4,stroke:#f57f17
+    style COMPUTE fill:#e1f5fe,stroke:#01579b
+    style RESULT fill:#f3e5f5,stroke:#4a148c
+    style ERROR fill:#ffebee,stroke:#c62828
+    style PYERR fill:#ffccbc,stroke:#bf360c
+```

@@ -62,8 +62,8 @@ class TestATR:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result = haze.py_atr(empty_array, empty_array, empty_array, period=14)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_atr(empty_array, empty_array, empty_array, period=14)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -78,7 +78,7 @@ class TestATR:
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=21
+            period=18
         )
 
         # 更短周期应有更多有效值
@@ -119,8 +119,8 @@ class TestNATR:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result = haze.py_natr(empty_array, empty_array, empty_array, period=14)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_natr(empty_array, empty_array, empty_array, period=14)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -135,7 +135,7 @@ class TestNATR:
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=20
+            period=18
         )
 
         assert len(result_10) == len(ohlcv_data_extended['close'])
@@ -173,8 +173,8 @@ class TestTrueRange:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result = haze.py_true_range(empty_array, empty_array, empty_array)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_true_range(empty_array, empty_array, empty_array)
 
     def test_different_parameters(self, ohlcv_data):
         """测试基本数据集"""
@@ -229,10 +229,8 @@ class TestBollingerBands:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        upper, middle, lower = haze.py_bollinger_bands(empty_array, period=20, std_multiplier=2.0)
-        assert len(upper) == 0
-        assert len(middle) == 0
-        assert len(lower) == 0
+        with pytest.raises(ValueError):
+            haze.py_bollinger_bands(empty_array, period=20, std_multiplier=2.0)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同参数组合"""
@@ -281,7 +279,7 @@ class TestKeltnerChannel:
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
             period=20,
-            atr_period=10,
+            atr_period=20,
             multiplier=2.0
         )
 
@@ -298,12 +296,8 @@ class TestKeltnerChannel:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        upper, middle, lower = haze.py_keltner_channel(
-            empty_array, empty_array, empty_array, 20, 10, 2.0
-        )
-        assert len(upper) == 0
-        assert len(middle) == 0
-        assert len(lower) == 0
+        with pytest.raises(ValueError):
+            haze.py_keltner_channel(empty_array, empty_array, empty_array, 20, 20, 2.0)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同参数组合"""
@@ -313,7 +307,7 @@ class TestKeltnerChannel:
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
             period=20,
-            atr_period=10,
+            atr_period=20,
             multiplier=1.0
         )
 
@@ -323,7 +317,7 @@ class TestKeltnerChannel:
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
             period=20,
-            atr_period=10,
+            atr_period=20,
             multiplier=3.0
         )
 
@@ -367,10 +361,8 @@ class TestDonchianChannel:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        upper, middle, lower = haze.py_donchian_channel(empty_array, empty_array, period=20)
-        assert len(upper) == 0
-        assert len(middle) == 0
-        assert len(lower) == 0
+        with pytest.raises(ValueError):
+            haze.py_donchian_channel(empty_array, empty_array, period=20)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同周期参数"""
@@ -414,8 +406,8 @@ class TestChandelierExit:
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=22,
-            atr_period=22,
+            period=18,
+            atr_period=18,
             multiplier=3.0
         )
 
@@ -432,11 +424,8 @@ class TestChandelierExit:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        long_exit, short_exit = haze.py_chandelier_exit(
-            empty_array, empty_array, empty_array, 22, 22, 3.0
-        )
-        assert len(long_exit) == 0
-        assert len(short_exit) == 0
+        with pytest.raises(ValueError):
+            haze.py_chandelier_exit(empty_array, empty_array, empty_array, 20, 20, 3.0)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同参数组合"""
@@ -445,8 +434,8 @@ class TestChandelierExit:
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=22,
-            atr_period=22,
+            period=18,
+            atr_period=18,
             multiplier=4.0
         )
 
@@ -455,8 +444,8 @@ class TestChandelierExit:
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
             ohlcv_data_extended['close'],
-            period=22,
-            atr_period=22,
+            period=18,
+            atr_period=18,
             multiplier=2.0
         )
 
@@ -494,8 +483,8 @@ class TestHistoricalVolatility:
     def test_edge_cases(self, empty_array, constant_values):
         """测试边界条件"""
         # 空数组
-        result = haze.py_historical_volatility(empty_array, period=20)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_historical_volatility(empty_array, period=20)
 
         # 常数序列（零波动）
         result = haze.py_historical_volatility(constant_values, period=5)
@@ -510,7 +499,7 @@ class TestHistoricalVolatility:
 
         result_30 = haze.py_historical_volatility(
             ohlcv_data_extended['close'],
-            period=30
+            period=18
         )
 
         # 更短周期有更多有效值
@@ -549,8 +538,8 @@ class TestUlcerIndex:
     def test_edge_cases(self, empty_array, monotonic_increasing):
         """测试边界条件"""
         # 空数组
-        result = haze.py_ulcer_index(empty_array, period=14)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_ulcer_index(empty_array, period=14)
 
         # 单调递增（无回撤）
         result = haze.py_ulcer_index(monotonic_increasing, period=5)
@@ -565,7 +554,7 @@ class TestUlcerIndex:
 
         result_21 = haze.py_ulcer_index(
             ohlcv_data_extended['close'],
-            period=21
+            period=18
         )
 
         # 更短周期有更多有效值
@@ -591,8 +580,8 @@ class TestMassIndex:
         result = haze.py_mass_index(
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
-            period=25,
-            ema_period=9
+            fast=9,
+            slow=18
         )
 
         # 验证输出长度
@@ -605,8 +594,8 @@ class TestMassIndex:
     def test_edge_cases(self, empty_array):
         """测试边界条件"""
         # 空数组
-        result = haze.py_mass_index(empty_array, empty_array, period=25, ema_period=9)
-        assert len(result) == 0
+        with pytest.raises(ValueError):
+            haze.py_mass_index(empty_array, empty_array, fast=9, slow=18)
 
     def test_different_parameters(self, ohlcv_data_extended):
         """测试不同参数组合"""
@@ -614,16 +603,16 @@ class TestMassIndex:
         result_short = haze.py_mass_index(
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
-            period=15,
-            ema_period=9
+            fast=9,
+            slow=15
         )
 
         # 标准周期
         result_standard = haze.py_mass_index(
             ohlcv_data_extended['high'],
             ohlcv_data_extended['low'],
-            period=25,
-            ema_period=9
+            fast=9,
+            slow=18
         )
 
         assert len(result_short) == len(ohlcv_data_extended['close'])

@@ -2,8 +2,6 @@
 include README.md
 include LICENSE
 include CHANGELOG.md
-include CONTRIBUTING.md
-include IMPLEMENTED_INDICATORS.md
 include pyproject.toml
 
 # Include Rust source code

@@ -41,9 +41,6 @@ class TestDataFrameAccessorContract:
         ta = _get_df_accessor(df)
 
         with pytest.raises(TypeError):
-            ta.stochastic(smooth_k=3)
-
-        with pytest.raises(TypeError):
             ta.kdj(j_period=3)
 
     def test_missing_column_raises_typed_error(self):
@@ -70,7 +67,7 @@ class TestDataFrameAccessorContract:
         _assert_series(d, df.index)
         _assert_series(j, df.index)
 
-        tsi, signal = ta.tsi(fast=13, slow=25, signal=13)
+        tsi, signal = ta.tsi(fast=7, slow=15, signal=7)
         _assert_series(tsi, df.index)
         _assert_series(signal, df.index)
 

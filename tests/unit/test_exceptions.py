@@ -24,6 +24,7 @@ from haze_library.exceptions import (
     ComputationError,
     validate_period,
     validate_data_length,
+    require_columns,
 )
 
 
@@ -131,3 +132,19 @@ class TestValidationFunctions:
         """Test that insufficient data raises."""
         with pytest.raises(InsufficientDataError):
             validate_data_length(50, 100, "RSI")
+
+
+class TestAdditionalExceptionCoverage:
+    def test_invalid_parameter_error_message(self):
+        err = InvalidParameterError("period", -1, indicator="SMA")
+        assert "period" in str(err)
+        assert "SMA" in str(err)
+
+    def test_computation_error_message(self):
+        err = ComputationError("RSI", "overflow")
+        assert "RSI" in str(err)
+        assert "overflow" in str(err)
+
+    def test_require_columns(self):
+        with pytest.raises(ColumnNotFoundError):
+            require_columns(["open", "high"], ["close"], indicator="SMA")

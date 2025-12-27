@@ -48,6 +48,16 @@ Haze-Library integrates seamlessly with pandas:
 
    print(df)
 
+For repeated computations on the same OHLCV data, you can build a cached Rust
+frame once and reuse it:
+
+.. code-block:: python
+
+   frame = df.haze.frame()
+   sma_20 = frame.sma(20)
+   rsi_14 = frame.rsi(14)
+   upper, middle, lower = frame.bollinger_bands(20, 2.0)
+
 Common Indicators
 -----------------
 

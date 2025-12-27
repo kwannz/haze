@@ -28,9 +28,6 @@ class TestNumpyCompatContract:
         close = np.array(ohlcv_data_extended["close"], dtype=np.float64)
 
         with pytest.raises(TypeError):
-            _ = haze_library.np_ta.stochastic(high, low, close, smooth_k=3)
-
-        with pytest.raises(TypeError):
             _ = haze_library.np_ta.kdj(high, low, close, j_period=3)
 
     def test_multi_output_indicators(self, ohlcv_data_extended):
@@ -54,7 +51,7 @@ class TestNumpyCompatContract:
         _assert_array(d, n)
         _assert_array(j, n)
 
-        tsi, signal = haze_library.np_ta.tsi(close, fast=13, slow=25, signal=13)
+        tsi, signal = haze_library.np_ta.tsi(close, fast=7, slow=15, signal=7)
         _assert_array(tsi, n)
         _assert_array(signal, n)
 

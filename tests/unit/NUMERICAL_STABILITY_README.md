@@ -39,12 +39,12 @@ Tests error accumulation over many iterations.
 
 ### 4. NaN and Infinity Handling
 
-Tests robustness with invalid inputs.
+Tests fail-fast behavior for invalid inputs.
 
-**Challenge**: NaN can propagate through calculations, invalidating entire results.
+**Challenge**: NaN can silently propagate through calculations if not rejected.
 
 **Tests**:
-- `test_nan_propagation`: Handles NaN input gracefully
+- `test_nan_propagation`: Rejects NaN input with ValueError
 - `test_division_by_zero_safety`: Bollinger Bands with zero variance
 - `test_zero_and_negative_prices`: Invalid price values
 
@@ -75,7 +75,7 @@ Tests boundary conditions for indicator parameters.
 **Tests**:
 - `test_period_one`: SMA(1) should equal input
 - `test_period_equals_length`: SMA(n) with n data points
-- `test_very_large_period`: Period > data length should return all NaN
+- `test_very_large_period`: Period > data length should raise ValueError
 
 ### 8. Memory Efficiency (`TestMemoryEfficiency`)
 
@@ -115,9 +115,10 @@ pytest tests/unit/test_numerical_stability.py::TestNumericalStability::test_larg
 
 All tests should **PASS** with these characteristics:
 
-1. **No Crashes**: All tests complete without exceptions
+1. **No Crashes**: Valid inputs complete without exceptions
 2. **Finite Results**: No NaN or Inf in valid calculation regions
-3. **Bounded Error**: Results match reference implementations within tolerance
+3. **Fail-Fast**: Invalid inputs raise ValueError
+4. **Bounded Error**: Results match reference implementations within tolerance
 4. **Consistent Behavior**: Results are reproducible across runs
 
 ## Failure Investigation
@@ -136,7 +137,7 @@ These tests run automatically on every commit via GitHub Actions:
 - **Workflow**: `.github/workflows/precision_tests.yml`
 - **Schedule**: On push, pull request, and daily at 2 AM UTC
 - **Platforms**: Ubuntu and macOS
-- **Python Versions**: 3.10, 3.11, 3.12
+- **Python Versions**: 3.14
 
 ## Benchmarks
 

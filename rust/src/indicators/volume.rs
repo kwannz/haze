@@ -59,11 +59,16 @@
 
 #![allow(clippy::needless_range_loop)]
 
-use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_period};
+use crate::errors::validation::{
+    validate_lengths_match, validate_min_length, validate_not_empty, validate_not_empty_allow_nan,
+    validate_period, validate_range,
+};
 use crate::errors::HazeResult;
 use crate::init_result;
+use crate::utils::float_compare::approx_eq;
+use crate::utils::ma::{ema_allow_nan, sma_allow_nan};
 use crate::utils::math::{is_not_zero, is_zero};
-use crate::utils::{sma, vwap as vwap_util};
+use crate::utils::{rolling_sum_kahan, sma, vwap as vwap_util};
 
 /// OBV - On-Balance Volume（能量潮）
 ///
@@ -257,25 +262,20 @@ pub fn mfi(
         prev_tp = tp;
     }
 
+    let pos_sum = rolling_sum_kahan(&positive_mf, period);
+    let neg_sum = rolling_sum_kahan(&negative_mf, period);
+
     let mut result = init_result!(n);
-    let mut pos_sum: f64 = positive_mf[..period].iter().sum();
-    let mut neg_sum: f64 = negative_mf[..period].iter().sum();
-
-    result[period - 1] = if is_zero(neg_sum) {
-        100.0
-    } else {
-        let money_ratio = pos_sum / neg_sum;
-        100.0 - (100.0 / (1.0 + money_ratio))
-    };
-
-    for i in period..n {
-        pos_sum += positive_mf[i] - positive_mf[i - period];
-        neg_sum += negative_mf[i] - negative_mf[i - period];
-
-        result[i] = if is_zero(neg_sum) {
+    for i in (period - 1)..n {
+        let pos = pos_sum[i];
+        let neg = neg_sum[i];
+        if pos.is_nan() || neg.is_nan() {
+            continue;
+        }
+        result[i] = if is_zero(neg) {
             100.0
         } else {
-            let money_ratio = pos_sum / neg_sum;
+            let money_ratio = pos / neg;
             100.0 - (100.0 / (1.0 + money_ratio))
         };
     }
@@ -336,24 +336,17 @@ pub fn cmf(
     // Money Flow Volume
     let mf_volume: Vec<f64> = (0..n).map(|i| mf_multiplier[i] * volume[i]).collect();
 
+    let mfv_sum = rolling_sum_kahan(&mf_volume, period);
+    let vol_sum = rolling_sum_kahan(volume, period);
+
     let mut result = init_result!(n);
-    let mut mfv_sum: f64 = mf_volume[..period].iter().sum();
-    let mut vol_sum: f64 = volume[..period].iter().sum();
-
-    result[period - 1] = if is_zero(vol_sum) {
-        0.0
-    } else {
-        mfv_sum / vol_sum
-    };
-
-    for i in period..n {
-        mfv_sum += mf_volume[i] - mf_volume[i - period];
-        vol_sum += volume[i] - volume[i - period];
-        result[i] = if is_zero(vol_sum) {
-            0.0
-        } else {
-            mfv_sum / vol_sum
-        };
+    for i in (period - 1)..n {
+        let mfv = mfv_sum[i];
+        let vol = vol_sum[i];
+        if mfv.is_nan() || vol.is_nan() {
+            continue;
+        }
+        result[i] = if is_zero(vol) { 0.0 } else { mfv / vol };
     }
 
     Ok(result)
@@ -379,6 +372,7 @@ pub fn cmf(
 /// # 错误
 /// - `EmptyInput`: 输入为空
 /// - `LengthMismatch`: 数组长度不匹配
+/// - `ParameterOutOfRange`: num_bins 为 0
 pub fn volume_profile(
     high: &[f64],
     low: &[f64],
@@ -393,10 +387,7 @@ pub fn volume_profile(
         (close, "close"),
         (volume, "volume"),
     ])?;
-
-    if num_bins == 0 {
-        return Ok((vec![], vec![], f64::NAN));
-    }
+    validate_range("num_bins", num_bins as f64, 1.0, f64::INFINITY)?;
 
     let n = high.len();
 
@@ -422,14 +413,19 @@ pub fn volume_profile(
     // 分配成交量到各个区间
     for i in 0..n {
         let typical_price = (high[i] + low[i] + close[i]) / 3.0;
-        let bin_index = ((typical_price - min_price) / bin_size).floor() as usize;
-        let bin_index = bin_index.min(num_bins - 1);
+        // 安全计算 bin_index：先 clamp 到 [0, num_bins-1]，再转换为 usize
+        let raw_index = ((typical_price - min_price) / bin_size).floor();
+        let bin_index = raw_index.clamp(0.0, (num_bins - 1) as f64) as usize;
         bins[bin_index] += volume[i];
     }
 
     // 找到 POC（最大成交量的价格水平）
+    // 使用 approx_eq 进行浮点数比较，避免精度问题导致找不到匹配
     let max_volume = bins.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-    let poc_index = bins.iter().position(|&v| v == max_volume).unwrap_or(0);
+    let poc_index = bins
+        .iter()
+        .position(|&v| approx_eq(v, max_volume, None))
+        .unwrap_or(0);
     let poc_price = price_levels[poc_index];
 
     Ok((price_levels, bins, poc_price))
@@ -510,14 +506,13 @@ pub fn accumulation_distribution(
 /// # 错误
 /// - `EmptyInput`: 输入为空
 /// - `LengthMismatch`: 数组长度不匹配
+/// - `InsufficientData`: 数据长度小于 2
 pub fn price_volume_trend(close: &[f64], volume: &[f64]) -> HazeResult<Vec<f64>> {
     validate_not_empty(close, "close")?;
     validate_lengths_match(&[(close, "close"), (volume, "volume")])?;
 
     let n = close.len();
-    if n < 2 {
-        return Ok(init_result!(n));
-    }
+    validate_min_length(close, 2)?;
 
     let mut pvt = init_result!(n);
     pvt[0] = 0.0;
@@ -554,14 +549,13 @@ pub fn price_volume_trend(close: &[f64], volume: &[f64]) -> HazeResult<Vec<f64>>
 /// # 错误
 /// - `EmptyInput`: 输入为空
 /// - `LengthMismatch`: 数组长度不匹配
+/// - `InsufficientData`: 数据长度小于 2
 pub fn negative_volume_index(close: &[f64], volume: &[f64]) -> HazeResult<Vec<f64>> {
     validate_not_empty(close, "close")?;
     validate_lengths_match(&[(close, "close"), (volume, "volume")])?;
 
     let n = close.len();
-    if n < 2 {
-        return Ok(init_result!(n));
-    }
+    validate_min_length(close, 2)?;
 
     let mut nvi = init_result!(n);
     nvi[0] = 1000.0; // 起始值
@@ -599,14 +593,13 @@ pub fn negative_volume_index(close: &[f64], volume: &[f64]) -> HazeResult<Vec<f6
 /// # 错误
 /// - `EmptyInput`: 输入为空
 /// - `LengthMismatch`: 数组长度不匹配
+/// - `InsufficientData`: 数据长度小于 2
 pub fn positive_volume_index(close: &[f64], volume: &[f64]) -> HazeResult<Vec<f64>> {
     validate_not_empty(close, "close")?;
     validate_lengths_match(&[(close, "close"), (volume, "volume")])?;
 
     let n = close.len();
-    if n < 2 {
-        return Ok(init_result!(n));
-    }
+    validate_min_length(close, 2)?;
 
     let mut pvi = init_result!(n);
     pvi[0] = 1000.0; // 起始值
@@ -647,6 +640,7 @@ pub fn positive_volume_index(close: &[f64], volume: &[f64]) -> HazeResult<Vec<f6
 /// - `EmptyInput`: 输入为空
 /// - `LengthMismatch`: 数组长度不匹配
 /// - `InvalidPeriod`: 周期参数无效
+/// - `InsufficientData`: 数据长度小于 2
 pub fn ease_of_movement(
     high: &[f64],
     low: &[f64],
@@ -657,10 +651,7 @@ pub fn ease_of_movement(
     validate_lengths_match(&[(high, "high"), (low, "low"), (volume, "volume")])?;
     let n = high.len();
     validate_period(period, n)?;
-
-    if n < 2 {
-        return Ok(init_result!(n));
-    }
+    validate_min_length(high, 2)?;
 
     let mut emv = init_result!(n);
     emv[0] = 0.0;
@@ -679,7 +670,7 @@ pub fn ease_of_movement(
     }
 
     // SMA 平滑
-    sma(&emv, period)
+    sma_allow_nan(&emv, period)
 }
 
 /// ADOSC (Chaikin A/D Oscillator) 蔡金A/D振荡器
@@ -727,9 +718,9 @@ pub fn chaikin_ad_oscillator(
     // 1. 计算 AD 线
     let ad_line = accumulation_distribution(high, low, close, volume)?;
 
-    // 2. 计算快慢 EMA
-    let ad_ema_fast = crate::utils::ema(&ad_line, fast_period)?;
-    let ad_ema_slow = crate::utils::ema(&ad_line, slow_period)?;
+    // 2. 计算快慢 EMA（TA-Lib 对齐：使用首个值作为种子）
+    let ad_ema_fast = ema_seed(&ad_line, fast_period)?;
+    let ad_ema_slow = ema_seed(&ad_line, slow_period)?;
 
     // 3. 计算差值
     let result = ad_ema_fast
@@ -747,9 +738,35 @@ pub fn chaikin_ad_oscillator(
     Ok(result)
 }
 
+fn ema_seed(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
+    validate_not_empty_allow_nan(values, "values")?;
+    validate_period(period, values.len())?;
+
+    let n = values.len();
+    let mut result = vec![f64::NAN; n];
+    let alpha = 2.0 / (period as f64 + 1.0);
+
+    let mut prev = values[0];
+    result[0] = prev;
+
+    for i in 1..n {
+        let v = values[i];
+        if v.is_nan() || prev.is_nan() {
+            prev = v;
+            result[i] = v;
+            continue;
+        }
+        prev = alpha * v + (1.0 - alpha) * prev;
+        result[i] = prev;
+    }
+
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::errors::HazeError;
 
     #[test]
     fn test_obv() {
@@ -850,17 +867,19 @@ mod tests {
         let close = vec![101.0, 103.0];
         let volume = vec![1000.0, 1100.0];
 
-        let (price_levels, bins, poc) = volume_profile(&high, &low, &close, &volume, 0).unwrap();
-
-        assert!(price_levels.is_empty());
-        assert!(bins.is_empty());
-        assert!(poc.is_nan());
+        let result = volume_profile(&high, &low, &close, &volume, 0);
+        assert!(result.is_err());
+        match result {
+            Err(HazeError::ParameterOutOfRange { name, .. }) => assert_eq!(name, "num_bins"),
+            _ => panic!("Expected ParameterOutOfRange for num_bins"),
+        }
     }
 }
 
 #[cfg(test)]
 mod volume_extended_tests {
     use super::*;
+    use crate::errors::HazeError;
 
     #[test]
     fn test_ad_basic() {
@@ -892,6 +911,21 @@ mod volume_extended_tests {
     }
 
     #[test]
+    fn test_pvt_insufficient_data() {
+        let close = vec![100.0];
+        let volume = vec![1000.0];
+
+        let result = price_volume_trend(&close, &volume);
+        match result {
+            Err(HazeError::InsufficientData { required, actual }) => {
+                assert_eq!(required, 2);
+                assert_eq!(actual, 1);
+            }
+            _ => panic!("Expected InsufficientData for PVT"),
+        }
+    }
+
+    #[test]
     fn test_nvi_pvi() {
         let close = vec![100.0, 102.0, 101.0, 103.0];
         let volume = vec![1000.0, 900.0, 1100.0, 1000.0];
@@ -906,6 +940,30 @@ mod volume_extended_tests {
     }
 
     #[test]
+    fn test_nvi_pvi_insufficient_data() {
+        let close = vec![100.0];
+        let volume = vec![1000.0];
+
+        let nvi_result = negative_volume_index(&close, &volume);
+        match nvi_result {
+            Err(HazeError::InsufficientData { required, actual }) => {
+                assert_eq!(required, 2);
+                assert_eq!(actual, 1);
+            }
+            _ => panic!("Expected InsufficientData for NVI"),
+        }
+
+        let pvi_result = positive_volume_index(&close, &volume);
+        match pvi_result {
+            Err(HazeError::InsufficientData { required, actual }) => {
+                assert_eq!(required, 2);
+                assert_eq!(actual, 1);
+            }
+            _ => panic!("Expected InsufficientData for PVI"),
+        }
+    }
+
+    #[test]
     fn test_eom_basic() {
         let high = vec![110.0; 20];
         let low = vec![100.0; 20];
@@ -917,6 +975,22 @@ mod volume_extended_tests {
         let valid_idx = 15;
         assert!(!eom[valid_idx].is_nan());
         assert!(eom[valid_idx].abs() < 10.0);
+    }
+
+    #[test]
+    fn test_eom_insufficient_data() {
+        let high = vec![110.0];
+        let low = vec![100.0];
+        let volume = vec![1000.0];
+
+        let result = ease_of_movement(&high, &low, &volume, 1);
+        match result {
+            Err(HazeError::InsufficientData { required, actual }) => {
+                assert_eq!(required, 2);
+                assert_eq!(actual, 1);
+            }
+            _ => panic!("Expected InsufficientData for EOM"),
+        }
     }
 
     #[test]

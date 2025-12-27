@@ -15,12 +15,13 @@
 // - 子指标错误使用 ? 传播
 
 use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_period};
-use crate::errors::HazeResult;
+use crate::errors::{HazeError, HazeResult};
 use crate::indicators::{atr, rsi, supertrend};
 use crate::ml::models::ModelType;
 use crate::ml::trainer::{
     online_predict_atr2, online_predict_momentum, online_predict_supertrend, TrainConfig,
 };
+use crate::utils::ma::{ema_allow_nan, sma_allow_nan, wma_allow_nan};
 use crate::utils::math::is_not_zero;
 use crate::utils::{ema, sma, wma};
 use std::cmp::Ordering;
@@ -80,8 +81,27 @@ pub fn ai_supertrend_ml(
     validate_not_empty(close, "close")?;
     validate_lengths_match(&[(high, "high"), (low, "low"), (close, "close")])?;
     validate_period(st_length, close.len())?;
+    validate_period(lookback, close.len())?;
+    if train_window == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: train_window,
+            data_len: close.len(),
+        });
+    }
 
     let len = close.len();
+    let required = train_window
+        .checked_add(lookback)
+        .ok_or_else(|| HazeError::InvalidValue {
+            index: 0,
+            message: "train_window + lookback overflow".to_string(),
+        })?;
+    if len < required {
+        return Err(HazeError::InsufficientData {
+            required,
+            actual: len,
+        });
+    }
 
     // 1. 计算传统 SuperTrend
     let (st_values, st_direction, _, _) = supertrend(high, low, close, st_length, st_multiplier)?;
@@ -90,14 +110,22 @@ pub fn ai_supertrend_ml(
     let atr_values = atr(high, low, close, st_length)?;
 
     // 3. ML 预测趋势偏移
+    let model_type = match model_type {
+        "linreg" => ModelType::LinearRegression,
+        "ridge" => ModelType::Ridge,
+        other => {
+            return Err(HazeError::InvalidValue {
+                index: 0,
+                message: format!("unknown model_type: {other}"),
+            })
+        }
+    };
+
     let config = TrainConfig {
         train_window,
         lookback,
         rolling: true,
-        model_type: match model_type {
-            "ridge" => ModelType::Ridge,
-            _ => ModelType::LinearRegression,
-        },
+        model_type,
         ridge_alpha: 1.0,
         use_polynomial: false,
     };
@@ -190,8 +218,26 @@ pub fn atr2_signals_ml(
     ])?;
     validate_period(rsi_period, close.len())?;
     validate_period(atr_period, close.len())?;
+    if momentum_window == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: momentum_window,
+            data_len: close.len(),
+        });
+    }
 
     let len = close.len();
+    let required = 200usize
+        .checked_add(momentum_window)
+        .ok_or_else(|| HazeError::InvalidValue {
+            index: 0,
+            message: "train_window + momentum_window overflow".to_string(),
+        })?;
+    if len < required {
+        return Err(HazeError::InsufficientData {
+            required,
+            actual: len,
+        });
+    }
 
     // 1. 计算基础指标
     let rsi_values = rsi(close, rsi_period)?;
@@ -304,8 +350,27 @@ pub fn ai_momentum_index_ml(
     validate_not_empty(close, "close")?;
     validate_period(rsi_period, close.len())?;
     validate_period(smooth_period, close.len())?;
+    validate_period(lookback, close.len())?;
+    if train_window == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period: train_window,
+            data_len: close.len(),
+        });
+    }
 
     let len = close.len();
+    let required = train_window
+        .checked_add(lookback)
+        .ok_or_else(|| HazeError::InvalidValue {
+            index: 0,
+            message: "train_window + lookback overflow".to_string(),
+        })?;
+    if len < required {
+        return Err(HazeError::InsufficientData {
+            required,
+            actual: len,
+        });
+    }
 
     // 1. 计算 RSI
     let rsi_values = rsi(close, rsi_period)?;
@@ -323,7 +388,7 @@ pub fn ai_momentum_index_ml(
     let predicted_momentum = online_predict_momentum(&rsi_values, &config);
 
     // 3. 计算动量移动平均
-    let momentum_ma = ema(&predicted_momentum, smooth_period)?;
+    let momentum_ma = ema_allow_nan(&predicted_momentum, smooth_period)?;
 
     // 4. 生成信号
     let mut zero_cross_buy = vec![0.0; len];
@@ -768,8 +833,23 @@ pub fn ai_supertrend(
     validate_period(st_length, close.len())?;
     validate_period(price_trend, close.len())?;
     validate_period(predict_trend, close.len())?;
+    validate_period(k, close.len())?;
+    validate_period(n, close.len())?;
 
     let len = close.len();
+    let required = n
+        .checked_add(k)
+        .and_then(|sum| sum.checked_add(1))
+        .ok_or_else(|| HazeError::InvalidValue {
+            index: 0,
+            message: "n + k overflow".to_string(),
+        })?;
+    if len < required {
+        return Err(HazeError::InsufficientData {
+            required,
+            actual: len,
+        });
+    }
 
     // 1. 计算传统 SuperTrend
     let (st_values, st_direction, _basic_upper, _basic_lower) =
@@ -779,15 +859,11 @@ pub fn ai_supertrend(
     let price_wma = wma(close, price_trend)?;
 
     // 3. 计算 SuperTrend 加权移动平均
-    let st_wma = wma(&st_values, predict_trend)?;
+    let st_wma = wma_allow_nan(&st_values, predict_trend)?;
 
     // 4. KNN 预测优化
     let optimized_st = st_values;
     let mut optimized_dir = st_direction.clone();
-    if len == 0 || k == 0 {
-        return Ok((optimized_st, optimized_dir));
-    }
-
     let mut distances: Vec<(usize, f64)> = Vec::new();
     if len > n + k {
         for i in n..len {
@@ -883,10 +959,24 @@ pub fn ai_momentum_index(
 ) -> HazeResult<(Vec<f64>, Vec<f64>)> {
     // 输入验证
     validate_not_empty(close, "close")?;
+    validate_period(k, close.len())?;
     validate_period(trend_length, close.len())?;
     validate_period(smooth, close.len())?;
 
     let len = close.len();
+    let required = k
+        .checked_add(trend_length)
+        .and_then(|sum| sum.checked_add(1))
+        .ok_or_else(|| HazeError::InvalidValue {
+            index: 0,
+            message: "k + trend_length overflow".to_string(),
+        })?;
+    if len < required {
+        return Err(HazeError::InsufficientData {
+            required,
+            actual: len,
+        });
+    }
 
     // 1. 计算 RSI
     let rsi = crate::indicators::rsi(close, trend_length)?;
@@ -896,7 +986,7 @@ pub fn ai_momentum_index(
 
     // 3. KNN 预测
     let mut distances: Vec<(usize, f64)> = Vec::new();
-    if len > k + trend_length && k > 0 {
+    if len > k + trend_length {
         for i in (k + trend_length)..len {
             let current_rsi = if !rsi[i].is_nan() { rsi[i] } else { 50.0 };
             let current_price = close[i];
@@ -957,7 +1047,7 @@ pub fn ai_momentum_index(
     }
 
     // 4. 计算预测值的移动平均
-    let prediction_ma = sma(&prediction, smooth)?;
+    let prediction_ma = sma_allow_nan(&prediction, smooth)?;
 
     Ok((prediction, prediction_ma))
 }
@@ -1147,9 +1237,11 @@ mod tests {
 
     #[test]
     fn test_ai_momentum_index() {
+        // Need sufficient data: momentum_period + roc_period + smoothing_period - 2 = 10 + 14 + 3 - 2 = 25
         let close = vec![
-            100.0, 102.0, 101.0, 103.0, 105.0, 104.0, 106.0, 108.0, 107.0, 109.0, 110.0, 112.0,
-            111.0, 113.0, 115.0, 114.0, 116.0, 118.0, 117.0, 119.0,
+            100.0, 102.0, 101.0, 103.0, 105.0, 104.0, 106.0, 108.0, 107.0, 109.0,
+            110.0, 112.0, 111.0, 113.0, 115.0, 114.0, 116.0, 118.0, 117.0, 119.0,
+            120.0, 121.0, 122.0, 123.0, 124.0, 125.0, 126.0, 127.0, 128.0, 129.0,
         ];
 
         let (pred, pred_ma) = ai_momentum_index(&close, 10, 14, 3).unwrap();

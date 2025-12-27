@@ -40,8 +40,9 @@ class ExecutionEngine:
         req: CreateOrderRequest,
         *,
         dry_run: bool = False,
-        reason: str | None = None,
+        reason: str | None = None,  # Reserved for audit logging
     ) -> tuple[Order, NotionalCheck | None]:
+        _ = reason  # Placeholder for future audit logging
         self.permissions.require(Scope.TRADE)
         self._require_live(dry_run=dry_run)
 
@@ -78,8 +79,9 @@ class ExecutionEngine:
         req: CancelOrderRequest,
         *,
         dry_run: bool = False,
-        reason: str | None = None,
+        reason: str | None = None,  # Reserved for audit logging
     ) -> Order:
+        _ = reason  # Placeholder for future audit logging
         self.permissions.require(Scope.CANCEL)
         self._require_live(dry_run=dry_run)
 
@@ -98,8 +100,9 @@ class ExecutionEngine:
         req: AmendOrderRequest,
         *,
         dry_run: bool = False,
-        reason: str | None = None,
+        reason: str | None = None,  # Reserved for audit logging
     ) -> Order:
+        _ = reason  # Placeholder for future audit logging
         self.permissions.require(Scope.AMEND)
         self._require_live(dry_run=dry_run)
 
