@@ -1,10 +1,10 @@
 [build-system]
-requires = ["maturin>=1.0,<2.0"]
+requires = ["maturin>=1.10.2,<2.0"]
 build-backend = "maturin"
 
 [project]
 name = "haze-library"
-version = "1.0.0"
+version = "1.0.2"
 description = "High-performance quantitative trading indicators library with Rust backend"
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -17,7 +17,7 @@ maintainers = [
     {name = "Haze Team", email = "team@haze-library.com"},
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Financial and Insurance Industry",
     "License :: Free For Educational Use",
     "Programming Language :: Python :: 3",
@@ -28,8 +28,8 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Information Analysis",
 ]
 dependencies = [
-    "numpy>=1.24.0,<2.4",
-    "pandas>=2.0.0",
+    "numpy>=2.4.0",
+    "pandas>=2.3.3",
 ]
 
 [project.optional-dependencies]

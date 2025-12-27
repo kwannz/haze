@@ -425,13 +425,7 @@ fn test_pivots_extra() {
     let low = vec![90.0, 91.0, 92.0];
     let close = vec![105.0, 106.0, 107.0];
 
-    for method in [
-        "standard",
-        "fibonacci",
-        "woodie",
-        "camarilla",
-        "demark",
-    ] {
+    for method in ["standard", "fibonacci", "woodie", "camarilla", "demark"] {
         let pivots = calc_pivot_series(&open, &high, &low, &close, method).unwrap();
         assert_eq!(pivots.len(), open.len());
     }
@@ -803,7 +797,9 @@ fn test_sfg_ai_supertrend_short_len() {
     assert!(result.is_err());
 
     // Test with sufficient data: use smaller period or more data
-    let close = vec![10.0, 10.5, 10.2, 10.8, 10.6, 10.9, 11.0, 10.7, 10.4, 10.8, 11.2, 11.5];
+    let close = vec![
+        10.0, 10.5, 10.2, 10.8, 10.6, 10.9, 11.0, 10.7, 10.4, 10.8, 11.2, 11.5,
+    ];
     let high: Vec<f64> = close.iter().map(|v| v + 0.5).collect();
     let low: Vec<f64> = close.iter().map(|v| v - 0.5).collect();
 
@@ -2887,20 +2883,14 @@ fn test_indicators_with_nan_input() {
 
     // stdev 应该正确传播 NaN
     let stdev_result = stdev(&values_with_nan, 2);
-    assert!(stdev_result[1].is_nan(), "stdev should propagate NaN");
+    assert!(stdev_result[1].is_nan());
 
     // rolling_max/min 应该在窗口包含 NaN 时返回 NaN
     let max_result = rolling_max(&values_with_nan, 3);
-    assert!(
-        max_result[2].is_nan(),
-        "rolling_max should return NaN when window contains NaN"
-    );
+    assert!(max_result[2].is_nan());
 
     let min_result = rolling_min(&values_with_nan, 3);
-    assert!(
-        min_result[2].is_nan(),
-        "rolling_min should return NaN when window contains NaN"
-    );
+    assert!(min_result[2].is_nan());
 }
 
 /// 测试指标函数对 Infinity 输入的处理
@@ -2919,10 +2909,7 @@ fn test_indicators_with_infinity_input() {
     // stdev 对 Infinity 的处理
     let stdev_result = stdev(&values_with_inf, 2);
     // Infinity - 有限值 = Infinity，所以方差是 Infinity
-    assert!(
-        stdev_result[1].is_infinite() || stdev_result[1].is_nan(),
-        "stdev should handle Infinity"
-    );
+    assert!(stdev_result[1].is_infinite() || stdev_result[1].is_nan());
 
     // 包含负无穷的输入
     let values_with_neg_inf = vec![100.0, f64::NEG_INFINITY, 102.0, 103.0, 104.0];
@@ -2936,29 +2923,20 @@ fn test_rsi_boundary_cases() {
     let all_up = vec![100.0, 101.0, 102.0, 103.0, 104.0, 105.0];
     let rsi_up = indicators::rsi(&all_up, 3).unwrap();
     let valid_rsi: Vec<_> = rsi_up.iter().filter(|v| !v.is_nan()).collect();
-    assert!(
-        valid_rsi.iter().all(|&&v| v >= 99.0),
-        "RSI should be 100 for all-up series"
-    );
+    assert!(valid_rsi.iter().all(|&&v| v >= 99.0));
 
     // 全下跌：RSI 应为 0
     let all_down = vec![105.0, 104.0, 103.0, 102.0, 101.0, 100.0];
     let rsi_down = indicators::rsi(&all_down, 3).unwrap();
     let valid_rsi_down: Vec<_> = rsi_down.iter().filter(|v| !v.is_nan()).collect();
-    assert!(
-        valid_rsi_down.iter().all(|&&v| v <= 1.0),
-        "RSI should be 0 for all-down series"
-    );
+    assert!(valid_rsi_down.iter().all(|&&v| v <= 1.0));
 
     // 横盘：RSI 应为 0 (无涨无跌)
     let flat = vec![100.0, 100.0, 100.0, 100.0, 100.0, 100.0];
     let rsi_flat = indicators::rsi(&flat, 3).unwrap();
     let valid_rsi_flat: Vec<_> = rsi_flat.iter().filter(|v| !v.is_nan()).collect();
     // 当 gain=0 且 loss=0 时，RSI 定义为 0
-    assert!(
-        valid_rsi_flat.iter().all(|&&v| v == 0.0 || v == 50.0),
-        "RSI should be 0 or 50 for flat series"
-    );
+    assert!(valid_rsi_flat.iter().all(|&&v| v == 0.0 || v == 50.0));
 }
 
 /// 测试 ATR 边界情况
@@ -2970,7 +2948,7 @@ fn test_atr_boundary_cases() {
     let close = vec![100.0, 101.0, 102.0, 103.0, 104.0];
 
     let atr_1 = indicators::atr(&high, &low, &close, 1);
-    assert!(atr_1.is_ok(), "ATR with period=1 should work");
+    assert!(atr_1.is_ok());
     let atr_values = atr_1.unwrap();
     // period=1 时 ATR 就是当前 True Range
     assert!(atr_values.iter().skip(1).all(|v| !v.is_nan()));
@@ -2983,13 +2961,10 @@ fn test_atr_boundary_cases() {
     assert!(atr_flat.is_ok());
     let atr_flat_values = atr_flat.unwrap();
     // 零波动性时 ATR 应为 0
-    assert!(
-        atr_flat_values
-            .iter()
-            .skip(3)
-            .all(|&v| v.abs() < 1e-10 || v.is_nan()),
-        "ATR should be 0 for flat prices"
-    );
+    assert!(atr_flat_values
+        .iter()
+        .skip(3)
+        .all(|&v| v.abs() < 1e-10 || v.is_nan()));
 }
 
 /// 测试 Bollinger Bands 边界情况
@@ -2998,7 +2973,7 @@ fn test_bollinger_bands_boundary_cases() {
     // period = 2（最小有效周期）
     let close = vec![100.0, 101.0, 102.0, 103.0, 104.0];
     let bb_2 = indicators::bollinger_bands(&close, 2, 2.0);
-    assert!(bb_2.is_ok(), "Bollinger Bands with period=2 should work");
+    assert!(bb_2.is_ok());
 
     // 常数序列（标准差为 0）
     let flat = vec![100.0; 10];
@@ -3008,14 +2983,8 @@ fn test_bollinger_bands_boundary_cases() {
     // 标准差为 0 时，上下轨应等于中轨
     for i in 3..10 {
         if !middle[i].is_nan() {
-            assert!(
-                (upper[i] - middle[i]).abs() < 1e-10,
-                "Upper band should equal middle for flat series"
-            );
-            assert!(
-                (lower[i] - middle[i]).abs() < 1e-10,
-                "Lower band should equal middle for flat series"
-            );
+            assert!((upper[i] - middle[i]).abs() < 1e-10);
+            assert!((lower[i] - middle[i]).abs() < 1e-10);
         }
     }
 }
@@ -3031,24 +3000,15 @@ fn test_macd_boundary_cases() {
 
     // MACD 应为 0（快慢 EMA 相等）
     let valid_macd: Vec<_> = macd_line.iter().filter(|v| !v.is_nan()).collect();
-    assert!(
-        valid_macd.iter().all(|&&v| v.abs() < 1e-10),
-        "MACD should be 0 for flat series"
-    );
+    assert!(valid_macd.iter().all(|&&v| v.abs() < 1e-10));
 
     // 信号线也应为 0
     let valid_signal: Vec<_> = signal.iter().filter(|v| !v.is_nan()).collect();
-    assert!(
-        valid_signal.iter().all(|&&v| v.abs() < 1e-10),
-        "Signal should be 0 for flat series"
-    );
+    assert!(valid_signal.iter().all(|&&v| v.abs() < 1e-10));
 
     // 柱状图也应为 0
     let valid_hist: Vec<_> = hist.iter().filter(|v| !v.is_nan()).collect();
-    assert!(
-        valid_hist.iter().all(|&&v| v.abs() < 1e-10),
-        "Histogram should be 0 for flat series"
-    );
+    assert!(valid_hist.iter().all(|&&v| v.abs() < 1e-10));
 }
 
 /// 测试 period = 1 的各种指标行为
@@ -3062,55 +3022,37 @@ fn test_period_one_behavior() {
     // SMA(1) 应该等于原值
     let sma_1 = sma(&values, 1).unwrap();
     for i in 0..values.len() {
-        assert!(
-            (sma_1[i] - values[i]).abs() < 1e-10,
-            "SMA(1) should equal input"
-        );
+        assert!((sma_1[i] - values[i]).abs() < 1e-10);
     }
 
     // EMA(1) 应该等于原值
     let ema_1 = ema(&values, 1).unwrap();
     for i in 0..values.len() {
-        assert!(
-            (ema_1[i] - values[i]).abs() < 1e-10,
-            "EMA(1) should equal input"
-        );
+        assert!((ema_1[i] - values[i]).abs() < 1e-10);
     }
 
     // WMA(1) 应该等于原值
     let wma_1 = wma(&values, 1).unwrap();
     for i in 0..values.len() {
-        assert!(
-            (wma_1[i] - values[i]).abs() < 1e-10,
-            "WMA(1) should equal input"
-        );
+        assert!((wma_1[i] - values[i]).abs() < 1e-10);
     }
 
     // rolling_sum(1) 应该等于原值
     let sum_1 = rolling_sum(&values, 1);
     for i in 0..values.len() {
-        assert!(
-            (sum_1[i] - values[i]).abs() < 1e-10,
-            "rolling_sum(1) should equal input"
-        );
+        assert!((sum_1[i] - values[i]).abs() < 1e-10);
     }
 
     // rolling_max(1) 应该等于原值
     let max_1 = rolling_max(&values, 1);
     for i in 0..values.len() {
-        assert!(
-            (max_1[i] - values[i]).abs() < 1e-10,
-            "rolling_max(1) should equal input"
-        );
+        assert!((max_1[i] - values[i]).abs() < 1e-10);
     }
 
     // rolling_min(1) 应该等于原值
     let min_1 = rolling_min(&values, 1);
     for i in 0..values.len() {
-        assert!(
-            (min_1[i] - values[i]).abs() < 1e-10,
-            "rolling_min(1) should equal input"
-        );
+        assert!((min_1[i] - values[i]).abs() < 1e-10);
     }
 }
 
@@ -3143,12 +3085,7 @@ fn test_period_equals_length() {
     assert!(stdev_n[..n - 1].iter().all(|v| v.is_nan()));
     // stdev of [1,2,3,4,5] with sample formula
     let expected_stdev = (2.5_f64).sqrt(); // sqrt(10/4) = sqrt(2.5)
-    assert!(
-        (stdev_n[n - 1] - expected_stdev).abs() < 0.01,
-        "Expected stdev {} but got {}",
-        expected_stdev,
-        stdev_n[n - 1]
-    );
+    assert!((stdev_n[n - 1] - expected_stdev).abs() < 0.01);
 }
 
 /// 测试 period > n 的行为（应返回 InvalidPeriod 错误）
@@ -3207,12 +3144,7 @@ fn test_talib_reference_rsi() {
     // 注：由于初始化方法可能不同，允许一定误差
     let expected_rsi_at_14 = 70.46; // TA-Lib 在第 14 个点的值
     if !rsi[14].is_nan() {
-        assert!(
-            (rsi[14] - expected_rsi_at_14).abs() < 1.0,
-            "RSI at index 14: expected ~{}, got {}",
-            expected_rsi_at_14,
-            rsi[14]
-        );
+        assert!((rsi[14] - expected_rsi_at_14).abs() < 1.0);
     }
 }
 
@@ -3264,20 +3196,14 @@ fn talib_reference_ohlc() -> TalibReferenceOhlc {
 const TALIB_TOLERANCE: f64 = 0.01; // 允许 0.01 的绝对误差
 const TALIB_REL_TOLERANCE: f64 = 0.001; // 允许 0.1% 的相对误差
 
-fn assert_talib_close(actual: f64, expected: f64, name: &str, index: usize) {
+fn assert_talib_close(actual: f64, expected: f64, _name: &str, _index: usize) {
     if expected.abs() > 1.0 {
         // 对较大值使用相对误差
         let rel_error = (actual - expected).abs() / expected.abs();
-        assert!(
-            rel_error < TALIB_REL_TOLERANCE,
-            "{name} at index {index}: expected {expected}, got {actual}, rel_error {rel_error}"
-        );
+        assert!(rel_error < TALIB_REL_TOLERANCE);
     } else {
         // 对较小值使用绝对误差
-        assert!(
-            (actual - expected).abs() < TALIB_TOLERANCE,
-            "{name} at index {index}: expected {expected}, got {actual}"
-        );
+        assert!((actual - expected).abs() < TALIB_TOLERANCE);
     }
 }
 
@@ -3389,24 +3315,12 @@ fn test_talib_reference_macd() {
     let lookback = 33;
 
     // 验证 warmup 期为 NaN
-    assert!(
-        macd_line[lookback - 1].is_nan(),
-        "MACD before lookback should be NaN"
-    );
+    assert!(macd_line[lookback - 1].is_nan());
 
     // 验证 lookback 后有有效值
-    assert!(
-        !macd_line[lookback].is_nan(),
-        "MACD at lookback should be valid"
-    );
-    assert!(
-        !signal[lookback].is_nan(),
-        "Signal at lookback should be valid"
-    );
-    assert!(
-        !histogram[lookback].is_nan(),
-        "Histogram at lookback should be valid"
-    );
+    assert!(!macd_line[lookback].is_nan());
+    assert!(!signal[lookback].is_nan());
+    assert!(!histogram[lookback].is_nan());
 
     // 验证 Histogram = MACD Line - Signal（核心关系）
     for i in lookback..close.len() {
@@ -3416,18 +3330,8 @@ fn test_talib_reference_macd() {
 
     // 验证 MACD 值在合理范围内（不应该太大）
     for i in lookback..close.len() {
-        assert!(
-            macd_line[i].abs() < 5.0,
-            "MACD Line at {} out of range: {}",
-            i,
-            macd_line[i]
-        );
-        assert!(
-            signal[i].abs() < 5.0,
-            "Signal at {} out of range: {}",
-            i,
-            signal[i]
-        );
+        assert!(macd_line[i].abs() < 5.0);
+        assert!(signal[i].abs() < 5.0);
     }
 }
 
@@ -3445,20 +3349,12 @@ fn test_talib_reference_stochastic() {
     let valid_idx = 15; // 14 + 3 - 2 = 15
     if !k[valid_idx].is_nan() {
         // %K 应该在 0-100 范围内
-        assert!(
-            k[valid_idx] >= 0.0 && k[valid_idx] <= 100.0,
-            "Stochastic K should be 0-100, got {}",
-            k[valid_idx]
-        );
+        assert!(k[valid_idx] >= 0.0 && k[valid_idx] <= 100.0);
     }
 
     // %D = SMA(3) of %K
     if !d[valid_idx + 2].is_nan() {
-        assert!(
-            d[valid_idx + 2] >= 0.0 && d[valid_idx + 2] <= 100.0,
-            "Stochastic D should be 0-100, got {}",
-            d[valid_idx + 2]
-        );
+        assert!(d[valid_idx + 2] >= 0.0 && d[valid_idx + 2] <= 100.0);
     }
 }
 
@@ -3525,27 +3421,15 @@ fn test_talib_reference_adx() {
 
     if !adx_14[valid_idx].is_nan() {
         // ADX 应该在 0-100 范围内
-        assert!(
-            adx_14[valid_idx] >= 0.0 && adx_14[valid_idx] <= 100.0,
-            "ADX should be 0-100, got {}",
-            adx_14[valid_idx]
-        );
+        assert!(adx_14[valid_idx] >= 0.0 && adx_14[valid_idx] <= 100.0);
     }
 
     // +DI 和 -DI 也应该在 0-100 范围内
     if !plus_di[valid_idx].is_nan() {
-        assert!(
-            plus_di[valid_idx] >= 0.0 && plus_di[valid_idx] <= 100.0,
-            "+DI should be 0-100, got {}",
-            plus_di[valid_idx]
-        );
+        assert!(plus_di[valid_idx] >= 0.0 && plus_di[valid_idx] <= 100.0);
     }
     if !minus_di[valid_idx].is_nan() {
-        assert!(
-            minus_di[valid_idx] >= 0.0 && minus_di[valid_idx] <= 100.0,
-            "-DI should be 0-100, got {}",
-            minus_di[valid_idx]
-        );
+        assert!(minus_di[valid_idx] >= 0.0 && minus_di[valid_idx] <= 100.0);
     }
 }
 
@@ -3580,12 +3464,9 @@ fn test_talib_reference_mfi() {
     let mfi_14 = indicators::volume::mfi(&high, &low, &close, &volume, 14).unwrap();
 
     // MFI 应该在 0-100 范围内
-    for (i, &mfi) in mfi_14.iter().enumerate().skip(14) {
+    for &mfi in mfi_14.iter().skip(14) {
         if !mfi.is_nan() {
-            assert!(
-                (0.0..=100.0).contains(&mfi),
-                "MFI at index {i}: should be 0-100, got {mfi}"
-            );
+            assert!((0.0..=100.0).contains(&mfi));
         }
     }
 }
@@ -3598,7 +3479,7 @@ fn test_talib_reference_true_range() {
     let tr = indicators::volatility::true_range(&high, &low, &close, 1).unwrap();
 
     // TR[0] is NaN (no previous close available with drift=1)
-    assert!(tr[0].is_nan(), "TR[0] should be NaN due to warmup");
+    assert!(tr[0].is_nan());
 
     // TR[i] = max(H-L, |H-C[i-1]|, |L-C[i-1]|) for i >= 1
     for i in 1..close.len() {

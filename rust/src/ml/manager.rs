@@ -149,8 +149,8 @@ impl SFGModelManager {
             let file =
                 File::create(&path).map_err(|e| format!("Failed to create weights file: {e}"))?;
 
-            let writer = BufWriter::new(file);
-            bincode::serialize_into(writer, &weights)
+            let mut writer = BufWriter::new(file);
+            bincode::encode_into_std_write(&weights, &mut writer, bincode::config::standard())
                 .map_err(|e| format!("Failed to serialize weights: {e}"))?;
         }
 
@@ -174,8 +174,9 @@ impl SFGModelManager {
             let file = File::open(&weights_path)
                 .map_err(|e| format!("Failed to open weights file: {e}"))?;
 
-            let reader = BufReader::new(file);
-            let weights: SerializableWeights = bincode::deserialize_from(reader)
+            let mut reader = BufReader::new(file);
+            let weights: SerializableWeights =
+                bincode::decode_from_std_read(&mut reader, bincode::config::standard())
                 .map_err(|e| format!("Failed to deserialize weights: {e}"))?;
 
             model.set_serializable_weights(weights);
@@ -243,7 +244,7 @@ pub fn create_metadata(
 ) -> ModelMetadata {
     ModelMetadata {
         name: name.to_string(),
-        version: "1.0.0".to_string(),
+        version: "1.0.1".to_string(),
         created_at: current_timestamp(),
         training_samples,
         features_dim,

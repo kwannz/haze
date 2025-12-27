@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2025-12-28
+
+### Changed / 变更
+- Updated Rust dependency pins to latest compatible patch versions (linfa 0.8.1, thiserror 2.0.17,
+  ndarray 0.16.1, criterion 0.8.1, bincode 2.0.1).
+- Raised maturin minimum version to 1.10.2 for Python builds.
+
+### Fixed / 修复
+- Mass Index doc example now uses sufficient input length to avoid `InsufficientData` errors.
+
 ## [1.0.0] - 2025-12-28
 
 ### Highlights / 亮点 🎉
@@ -52,6 +62,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `asin`, `acos`, `div`, length-matched vector ops).
 - AI indicators (`adaptive_rsi`, `ensemble_signal`, `ml_supertrend`) are exported at the
   top-level and enforce strict parameter/length validation (fail-fast).
+- Streaming incremental indicators now raise on non-finite inputs instead of
+  propagating NaN, aligning streaming APIs with fail-fast behavior.
+- Python runtime deps now require `numpy>=2.4.0` and `pandas>=2.3.3` to match
+  Python 3.14 support.
 - Fibonacci, Harmonics, Ichimoku, Pivot, and SFG signal utilities now fail fast on
   invalid inputs; Python bindings updated accordingly.
 - Python API changes:
@@ -80,6 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - AI indicators now require `base_period` within `[min_period, max_period]`, and
   `min_period`, `max_period`, `volatility_window`, and `period` must be `< data length`.
   `ml_supertrend` now errors if `confirmation_bars` exceeds data length.
+- Streaming updates now raise `ValueError` on NaN/Inf inputs; remove any caller-side
+  reliance on NaN propagation for `IncrementalSMA` and `IncrementalAdaptiveRSI`.
 
 ## [0.1.3] - 2025-12-26
 

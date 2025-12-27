@@ -7,6 +7,7 @@
 // 遵循 SOLID 原则: 每个模型单一职责,接口统一
 // Ridge 回归使用手动 L2 正则化实现
 
+use bincode::{Decode, Encode};
 use linfa::prelude::*;
 use linfa_linear::{FittedLinearRegression, LinearRegression};
 use ndarray::{Array1, Array2};
@@ -34,7 +35,7 @@ pub trait Predictor: Send + Sync {
 // ============================================================
 
 /// 可序列化的模型权重
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Encode, Decode, Serialize, Deserialize)]
 pub struct SerializableWeights {
     /// 权重向量
     pub weights: Vec<f64>,

@@ -52,7 +52,9 @@
 
 #![allow(clippy::needless_range_loop)]
 
-use crate::errors::validation::{validate_lengths_match, validate_not_empty, validate_period};
+use crate::errors::validation::{
+    validate_lengths_match, validate_min_length, validate_not_empty, validate_period,
+};
 use crate::errors::{HazeError, HazeResult};
 use crate::init_result;
 use crate::utils::ma::ema_allow_nan;
@@ -912,23 +914,19 @@ pub fn ulcer_index(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 /// # Errors
 /// - [`HazeError::EmptyInput`]: Any input array is empty
 /// - [`HazeError::LengthMismatch`]: Input arrays have different lengths
-/// - [`HazeError::InvalidPeriod`]: fast or slow is 0 or > data length
+/// - [`HazeError::InvalidPeriod`]: fast or slow is 0
+/// - [`HazeError::InsufficientData`]: data length is insufficient for fast/slow
 ///
 /// # Example
 /// ```rust
 /// use haze_library::indicators::volatility::mass_index;
 ///
-/// let high: Vec<f64> = (100..120).map(|x| x as f64 + 5.0).collect();
-/// let low: Vec<f64> = (100..120).map(|x| x as f64).collect();
+/// let high: Vec<f64> = (100..160).map(|x| x as f64 + 5.0).collect();
+/// let low: Vec<f64> = (100..160).map(|x| x as f64).collect();
 ///
 /// let mi = mass_index(&high, &low, 9, 25).unwrap();
 /// ```
-pub fn mass_index(
-    high: &[f64],
-    low: &[f64],
-    fast: usize,
-    slow: usize,
-) -> HazeResult<Vec<f64>> {
+pub fn mass_index(high: &[f64], low: &[f64], fast: usize, slow: usize) -> HazeResult<Vec<f64>> {
     // Validate inputs
     validate_not_empty(high, "high")?;
     validate_lengths_match(&[(high, "high"), (low, "low")])?;
@@ -946,13 +944,17 @@ pub fn mass_index(
             data_len: n,
         });
     }
-    validate_period(slow, n)?;
-
-    let (fast, slow) = if slow < fast { (slow, fast) } else { (fast, slow) };
+    let (fast, slow) = if slow < fast {
+        (slow, fast)
+    } else {
+        (fast, slow)
+    };
+    let required = 2 * slow - fast;
+    validate_min_length(high, required)?;
 
     let range: Vec<f64> = (0..n).map(|i| high[i] - low[i]).collect();
-    let ema1 = ema(&range, fast.min(n))?;
-    let ema2 = ema_allow_nan(&ema1, fast.min(n))?;
+    let ema1 = ema(&range, fast)?;
+    let ema2 = ema_allow_nan(&ema1, fast)?;
 
     let ratio: Vec<f64> = ema1
         .iter()
