@@ -76,7 +76,7 @@
 //! # Cross-References
 //! - [`crate::utils::math`] - Extended math utilities with Kahan summation
 //! - [`crate::indicators`] - Technical indicators using these comparisons
-//! - [`crate::ml`] - Machine learning modules requiring precise comparisons
+//! - `crate::ml` - Machine learning modules requiring precise comparisons
 
 /// Default epsilon for f64 comparisons (1e-10)
 ///

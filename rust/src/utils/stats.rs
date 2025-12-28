@@ -726,7 +726,7 @@ fn rolling_percentile_dual_heap(values: &[f64], period: usize, percentile: f64) 
 /// - `period`: 周期
 ///
 /// # 返回
-/// - ROC[i] = (values[i] / values[i-period] - 1) * 100
+/// - ROC`[i]` = (values`[i]` / values[i-period] - 1) * 100
 pub fn roc(values: &[f64], period: usize) -> Vec<f64> {
     if period == 0 || period >= values.len() {
         return vec![f64::NAN; values.len()];
@@ -750,7 +750,7 @@ pub fn roc(values: &[f64], period: usize) -> Vec<f64> {
 /// - `period`: 周期
 ///
 /// # 返回
-/// - MOM[i] = values[i] - values[i-period]
+/// - MOM`[i]` = values`[i]` - values[i-period]
 pub fn momentum(values: &[f64], period: usize) -> Vec<f64> {
     if period == 0 || period >= values.len() {
         return vec![f64::NAN; values.len()];

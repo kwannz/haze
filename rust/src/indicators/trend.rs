@@ -548,7 +548,7 @@ pub fn aroon(
 /// PSAR - Parabolic SAR（抛物线止损转向）
 ///
 /// 算法：
-/// - SAR[i] = SAR[i-1] + AF * (EP - SAR[i-1])
+/// - SAR`[i]` = SAR`[i-1]` + AF * (EP - SAR`[i-1]`)
 /// - EP = 极值点（上升趋势中的最高价，下降趋势中的最低价）
 /// - AF = 加速因子，初始 0.02，每次新极值增加 0.02，最大 0.2
 ///
@@ -682,9 +682,9 @@ pub fn psar(
 /// 返回：`Ok((VI+, VI-))`
 ///
 /// # 算法
-/// 1. VM+ = |High[i] - Low[i-1]|
-/// 2. VM- = |Low[i] - High[i-1]|
-/// 3. TR = Max(High[i] - Low[i], |High[i] - Close[i-1]|, |Low[i] - Close[i-1]|)
+/// 1. VM+ = |High`[i]` - Low`[i-1]`|
+/// 2. VM- = |Low`[i]` - High`[i-1]`|
+/// 3. TR = Max(High`[i]` - Low`[i]`, |High`[i]` - Close`[i-1]`|, |Low`[i]` - Close`[i-1]`|)
 /// 4. VI+ = Sum(VM+, period) / Sum(TR, period)
 /// 5. VI- = Sum(VM-, period) / Sum(TR, period)
 ///
@@ -882,7 +882,7 @@ pub fn qstick(open: &[f64], close: &[f64], period: usize) -> HazeResult<Vec<f64>
 /// 返回：`Ok(VHF 值)`
 ///
 /// # 算法
-/// VHF = |最高收盘价 - 最低收盘价| / Sum(|Close[i] - Close[i-1]|, period)
+/// VHF = |最高收盘价 - 最低收盘价| / Sum(|Close`[i]` - Close`[i-1]`|, period)
 ///
 /// # 解释
 /// - VHF 高值：趋势市场
@@ -938,7 +938,7 @@ pub fn vhf(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 
 /// TRIX - Triple Exponential Average（三重指数平滑变化率）
 ///
-/// 算法：TRIX = (EMA3[i] - EMA3[i-1]) / EMA3[i-1] * 100
+/// 算法：TRIX = (EMA3`[i]` - EMA3`[i-1]`) / EMA3`[i-1]` * 100
 ///
 /// # 错误
 /// - `HazeError::EmptyInput` - 输入为空

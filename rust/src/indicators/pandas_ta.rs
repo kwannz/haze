@@ -251,7 +251,7 @@ pub fn squeeze(
 ///
 /// 算法：平滑版 RSI + 动态波动带
 /// 1. RSI_EMA = EMA(RSI(close, rsi_period), smooth)
-/// 2. RSI_DIFF = ABS(RSI_EMA - RSI_EMA[1])
+/// 2. RSI_DIFF = ABS(RSI_EMA - RSI_EMA`[1]`)
 /// 3. TR = EMA(RSI_DIFF, smooth)
 /// 4. Fast_Line = RSI_EMA
 /// 5. Slow_Line = Fast_Line ± (TR * multiplier)
@@ -361,8 +361,8 @@ pub fn cti(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 ///
 /// 算法：考夫曼效率比（Kaufman's Efficiency Ratio）
 /// ER = |price_change| / sum(|price_diff|)
-/// 其中 price_change = close[i] - close[i-period]
-///      price_diff = close[j] - close[j-1]
+/// 其中 price_change = close`[i]` - close[i-period]
+///      price_diff = close`[j]` - close`[j-1]`
 ///
 /// # 参数
 /// - `close`: 收盘价序列
@@ -475,8 +475,8 @@ pub fn psl(close: &[f64], period: usize) -> HazeResult<Vec<f64>> {
 /// RVI - Relative Vigor Index（相对活力指数）
 ///
 /// 算法：
-/// 1. Numerator = (close - open) + 2*(close[1] - open[1]) + 2*(close[2] - open[2]) + (close[3] - open[3])
-/// 2. Denominator = (high - low) + 2*(high[1] - low[1]) + 2*(high[2] - low[2]) + (high[3] - low[3])
+/// 1. Numerator = (close - open) + 2*(close`[1]` - open`[1]`) + 2*(close`[2]` - open`[2]`) + (close`[3]` - open`[3]`)
+/// 2. Denominator = (high - low) + 2*(high`[1]` - low`[1]`) + 2*(high`[2]` - low`[2]`) + (high`[3]` - low`[3]`)
 /// 3. RVI = SMA(Numerator, period) / SMA(Denominator, period)
 /// 4. Signal = SMA(RVI, signal_period)
 ///
@@ -666,7 +666,7 @@ fn shift_forward(values: &[f64], offset: usize) -> Vec<f64> {
 
 /// EFI - Elder's Force Index（艾尔德力度指数）
 ///
-/// 算法：Force = (Close - Close[1]) × Volume
+/// 算法：Force = (Close - Close`[1]`) × Volume
 ///      EFI = EMA(Force, period)
 ///
 /// # 参数
@@ -845,7 +845,7 @@ fn stochastic_raw(values: &[f64], period: usize) -> Vec<f64> {
 /// TDFI - Trend Direction Force Index（趋势方向力度指数）
 ///
 /// 算法：
-/// 1. TDF = abs(close - close[period])
+/// 1. TDF = abs(close - close`[period]`)
 /// 2. TDFI = EMA(TDF, smooth)
 ///
 /// # 参数
@@ -1241,7 +1241,7 @@ pub fn alma(values: &[f64], period: usize, offset: f64, sigma: f64) -> HazeResul
 /// alpha = 2 / (period + 1)
 /// volatility_ratio = abs(STDEV(close, period) / close)
 /// adaptive_alpha = alpha * volatility_ratio
-/// VIDYA[i] = close[i] * adaptive_alpha + VIDYA[i-1] * (1 - adaptive_alpha)
+/// VIDYA`[i]` = close`[i]` * adaptive_alpha + VIDYA`[i-1]` * (1 - adaptive_alpha)
 ///
 /// # 参数
 /// - `close`: 收盘价序列

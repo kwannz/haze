@@ -501,7 +501,7 @@ pub fn accumulation_distribution(
 /// - `HazeResult<Vec<f64>>`: PVT 线（累积值）
 ///
 /// # 算法
-/// PVT[i] = PVT[i-1] + Volume[i] * (Close[i] - Close[i-1]) / Close[i-1]
+/// PVT`[i]` = PVT`[i-1]` + Volume`[i]` * (Close`[i]` - Close`[i-1]`) / Close`[i-1]`
 ///
 /// # 错误
 /// - `EmptyInput`: 输入为空
@@ -541,10 +541,10 @@ pub fn price_volume_trend(close: &[f64], volume: &[f64]) -> HazeResult<Vec<f64>>
 /// - `HazeResult<Vec<f64>>`: NVI 线（起始值 1000）
 ///
 /// # 算法
-/// 如果 Volume[i] < Volume[i-1]:
-///     NVI[i] = NVI[i-1] + NVI[i-1] * (Close[i] - Close[i-1]) / Close[i-1]
+/// 如果 Volume`[i]` < Volume`[i-1]`:
+///     NVI`[i]` = NVI`[i-1]` + NVI`[i-1]` * (Close`[i]` - Close`[i-1]`) / Close`[i-1]`
 /// 否则:
-///     NVI[i] = NVI[i-1]
+///     NVI`[i]` = NVI`[i-1]`
 ///
 /// # 错误
 /// - `EmptyInput`: 输入为空
@@ -585,10 +585,10 @@ pub fn negative_volume_index(close: &[f64], volume: &[f64]) -> HazeResult<Vec<f6
 /// - `HazeResult<Vec<f64>>`: PVI 线（起始值 1000）
 ///
 /// # 算法
-/// 如果 Volume[i] > Volume[i-1]:
-///     PVI[i] = PVI[i-1] + PVI[i-1] * (Close[i] - Close[i-1]) / Close[i-1]
+/// 如果 Volume`[i]` > Volume`[i-1]`:
+///     PVI`[i]` = PVI`[i-1]` + PVI`[i-1]` * (Close`[i]` - Close`[i-1]`) / Close`[i-1]`
 /// 否则:
-///     PVI[i] = PVI[i-1]
+///     PVI`[i]` = PVI`[i-1]`
 ///
 /// # 错误
 /// - `EmptyInput`: 输入为空
@@ -631,8 +631,8 @@ pub fn positive_volume_index(close: &[f64], volume: &[f64]) -> HazeResult<Vec<f6
 /// - `HazeResult<Vec<f64>>`: EOM 线
 ///
 /// # 算法
-/// 1. Distance Moved = (High[i] + Low[i])/2 - (High[i-1] + Low[i-1])/2
-/// 2. Box Ratio = Volume[i] / (High[i] - Low[i])
+/// 1. Distance Moved = (High`[i]` + Low`[i]`)/2 - (High`[i-1]` + Low`[i-1]`)/2
+/// 2. Box Ratio = Volume`[i]` / (High`[i]` - Low`[i]`)
 /// 3. EMV = Distance Moved / Box Ratio
 /// 4. EOM = SMA(EMV, period)
 ///

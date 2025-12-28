@@ -307,7 +307,7 @@ impl MultiIndicatorResult {
 
 // ==================== 辅助函数 ====================
 
-/// 将 Vec<Candle> 转换为分离的 OHLCV 向量
+/// 将 `Vec<Candle>` 转换为分离的 OHLCV 向量
 pub fn candles_to_vectors(
     candles: &[Candle],
 ) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {

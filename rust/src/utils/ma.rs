@@ -13,9 +13,9 @@
 //! - [`dema`] - Double Exponential Moving Average (reduced lag)
 //! - [`tema`] - Triple Exponential Moving Average (further lag reduction)
 //! - [`kama`] - Kaufman Adaptive Moving Average (volatility-adjusted)
-//! - [`zlema`] - Zero-Lag Exponential Moving Average (lag compensation)
+//! - `zlema` - Zero-Lag Exponential Moving Average (lag compensation)
 //! - [`hma`] - Hull Moving Average (smoothness with reduced lag)
-//! - [`vwma`] - Volume Weighted Moving Average
+//! - `vwma` - Volume Weighted Moving Average
 //! - [`vwap`] - Volume Weighted Average Price
 //!
 //! # Usage Patterns
@@ -152,8 +152,8 @@ pub(crate) fn sma_allow_nan(values: &[f64], period: usize) -> HazeResult<Vec<f64
 ///
 /// 算法：
 /// - alpha = 2 / (period + 1)
-/// - EMA[0] = SMA(period)  // 初始值使用 SMA
-/// - EMA[i] = alpha * value[i] + (1 - alpha) * EMA[i-1]
+/// - EMA`[0]` = SMA(period)  // 初始值使用 SMA
+/// - EMA`[i]` = alpha * value`[i]` + (1 - alpha) * EMA`[i-1]`
 ///
 /// # 参数
 /// - `values`: 输入序列
@@ -222,7 +222,7 @@ pub(crate) fn ema_allow_nan(values: &[f64], period: usize) -> HazeResult<Vec<f64
 
 /// RMA - Wilder's Moving Average（威尔德移动平均）
 ///
-/// 算法：RMA[i] = (RMA[i-1] * (period - 1) + value[i]) / period
+/// 算法：RMA`[i]` = (RMA`[i-1]` * (period - 1) + value`[i]`) / period
 /// 等价于 EMA with alpha = 1 / period
 ///
 /// 用于：ATR、RSI 等指标
@@ -257,8 +257,8 @@ pub(crate) fn rma_allow_nan(values: &[f64], period: usize) -> HazeResult<Vec<f64
 ///
 /// 使用 O(n) 增量算法实现。
 ///
-/// 算法：WMA = sum(value[i] * weight[i]) / sum(weight)
-/// 其中 weight[i] = i + 1（线性递增权重）
+/// 算法：WMA = sum(value`[i]` * weight`[i]`) / sum(weight)
+/// 其中 weight`[i]` = i + 1（线性递增权重）
 ///
 /// # 增量更新原理
 /// 当窗口从 [v0, v1, ..., v_{n-1}] 滑动到 [v1, v2, ..., v_n] 时：
@@ -752,7 +752,7 @@ mod tests {
 ///
 /// # 算法
 /// 1. Lag = (period - 1) / 2
-/// 2. EMA_Data = 2 * values - values[lag_ago]
+/// 2. EMA_Data = 2 * values - values`[lag_ago]`
 /// 3. ZLMA = EMA(EMA_Data, period)
 ///
 /// # 错误
@@ -838,11 +838,11 @@ pub fn t3(values: &[f64], period: usize, v_factor: f64) -> HazeResult<Vec<f64>> 
 /// 返回：KAMA 序列
 ///
 /// # 算法
-/// 1. Change = |Price[i] - Price[i-period]|
-/// 2. Volatility = Sum(|Price[i] - Price[i-1]|, period)
+/// 1. Change = |Price`[i]` - Price[i-period]|
+/// 2. Volatility = Sum(|Price`[i]` - Price`[i-1]`|, period)
 /// 3. ER (Efficiency Ratio) = Change / Volatility
 /// 4. SC (Smoothing Constant) = [ER * (Fast_SC - Slow_SC) + Slow_SC]^2
-/// 5. KAMA[i] = KAMA[i-1] + SC * (Price[i] - KAMA[i-1])
+/// 5. KAMA`[i]` = KAMA`[i-1]` + SC * (Price`[i]` - KAMA`[i-1]`)
 ///
 /// # 错误
 /// - 如果输入为空，返回 `HazeError::EmptyInput`

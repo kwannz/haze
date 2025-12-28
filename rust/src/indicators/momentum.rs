@@ -778,7 +778,7 @@ pub fn awesome_oscillator(
 /// 1. 归一化价格：value = (close - lowest) / (highest - lowest) * 2 - 1
 /// 2. 限制范围：value = max(-0.999, min(0.999, value))
 /// 3. Fisher = 0.5 * ln((1 + value) / (1 - value))
-/// 4. Trigger = Fisher[i-1]
+/// 4. Trigger = Fisher`[i-1]`
 ///
 /// # 参数
 /// - `high`: 最高价序列
@@ -904,7 +904,7 @@ pub fn kdj(
 /// - `HazeError::InsufficientData`: 如果数据不足
 ///
 /// # 算法
-/// 1. Momentum = Close[i] - Close[i-1]
+/// 1. Momentum = Close`[i]` - Close`[i-1]`
 /// 2. Double_Smoothed_Momentum = EMA(EMA(Momentum, long), short)
 /// 3. Double_Smoothed_Abs_Momentum = EMA(EMA(|Momentum|, long), short)
 /// 4. TSI = 100 * Double_Smoothed_Momentum / Double_Smoothed_Abs_Momentum

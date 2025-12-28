@@ -33,7 +33,7 @@
 //! # Usage Pattern
 //! All indicators follow a consistent API pattern:
 //! - Input: Price arrays (close, high, low, open, volume as needed)
-//! - Output: Vec<f64> with NaN for warmup periods
+//! - Output: `Vec<f64>` with NaN for warmup periods
 //! - Period parameter controls lookback window
 //!
 //! # Examples

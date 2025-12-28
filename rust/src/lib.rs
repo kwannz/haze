@@ -1044,7 +1044,7 @@ fn py_historical_volatility(close: Vec<f64>, period: Option<usize>) -> PyResult<
 /// Examples
 /// --------
 /// >>> ui = py_ulcer_index([50.0, 49.5, 48.0, 49.0, 51.0], period=14)
-/// >>> ui[13]  # First valid value
+/// >>> ui`[13]`  # First valid value
 /// 2.45
 fn py_ulcer_index(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
     let len = close.len();
@@ -1084,7 +1084,7 @@ fn py_ulcer_index(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> 
 /// Examples
 /// --------
 /// >>> mi = py_mass_index([10.5, 10.8, 11.0], [10.0, 10.3, 10.5], fast=9, slow=25)
-/// >>> mi[33]  # First valid value after warmup
+/// >>> mi`[33]`  # First valid value after warmup
 /// 26.8
 fn py_mass_index(high: Vec<f64>, low: Vec<f64>, fast: usize, slow: usize) -> PyResult<Vec<f64>> {
     let len = high.len();
@@ -1120,7 +1120,7 @@ fn py_mass_index(high: Vec<f64>, low: Vec<f64>, fast: usize, slow: usize) -> PyR
 /// Examples
 /// --------
 /// >>> rsi = py_rsi([44.0, 44.25, 44.375, ...], period=14)
-/// >>> rsi[14]  # First valid value
+/// >>> rsi`[14]`  # First valid value
 /// 52.3
 fn py_rsi(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
     let len = close.len();
@@ -1678,7 +1678,7 @@ fn py_parabolic_sar(
 /// Examples
 /// --------
 /// >>> trix = py_trix([44.0, 44.5, 45.0, 44.8, 45.5], period=15)
-/// >>> trix[45]  # First valid value after triple EMA warmup
+/// >>> trix`[45]`  # First valid value after triple EMA warmup
 /// 0.12
 fn py_trix(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
     let len = close.len();
@@ -1713,7 +1713,7 @@ fn py_trix(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
 /// Examples
 /// --------
 /// >>> dpo = py_dpo([44.0, 44.5, 45.0, 44.8, 45.5], period=20)
-/// >>> dpo[20]  # First valid value
+/// >>> dpo`[20]`  # First valid value
 /// 0.35
 fn py_dpo(close: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
     let len = close.len();
@@ -1820,7 +1820,7 @@ fn py_vwap(
 /// Examples
 /// --------
 /// >>> fi = py_force_index([44.0, 44.5, 45.0], [1000, 1200, 1500], period=13)
-/// >>> fi[13]  # First valid value
+/// >>> fi`[13]`  # First valid value
 /// 625.5
 fn py_force_index(close: Vec<f64>, volume: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
     let len = close.len();
@@ -1857,7 +1857,7 @@ fn py_force_index(close: Vec<f64>, volume: Vec<f64>, period: Option<usize>) -> P
 /// Examples
 /// --------
 /// >>> vo = py_volume_oscillator([1000, 1200, 1500, 1300], short_period=5, long_period=10)
-/// >>> vo[9]  # First valid value
+/// >>> vo`[9]`  # First valid value
 /// 12.5
 fn py_volume_oscillator(
     volume: Vec<f64>,
@@ -2747,7 +2747,7 @@ fn py_ultimate_oscillator(
 ///
 /// Returns
 /// -------
-/// list of float - Momentum values (price[i] - price[i-period])
+/// list of float - Momentum values (price`[i]` - price[i-period])
 fn py_mom(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
     let period = period.unwrap_or(10);
     let len = validate_single!(&values, "values");
@@ -2761,7 +2761,7 @@ fn py_mom(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
 /// Calculate Rate of Change (ROC)
 ///
 /// Percentage change over a lookback period.
-/// ROC = ((price - price[n]) / price[n]) * 100
+/// ROC = ((price - price`[n]`) / price`[n]`) * 100
 ///
 /// Parameters
 /// ----------
@@ -3024,7 +3024,7 @@ fn py_frama(values: Vec<f64>, period: Option<usize>) -> PyResult<Vec<f64>> {
 /// Examples
 /// --------
 /// >>> doji = py_doji([10.0, 10.5], [10.8, 11.0], [9.8, 10.0], [10.05, 10.48])
-/// >>> doji[0]  # First candle is doji
+/// >>> doji`[0]`  # First candle is doji
 /// 100.0
 fn py_doji(
     open: Vec<f64>,
@@ -3733,7 +3733,7 @@ fn py_spinning_top(
 /// Examples
 /// --------
 /// >>> dd = py_dragonfly_doji([10.5], [10.6], [9.8], [10.55])
-/// >>> dd[0]  # Dragonfly doji detected
+/// >>> dd`[0]`  # Dragonfly doji detected
 /// 100.0
 fn py_dragonfly_doji(
     open: Vec<f64>,
@@ -3787,7 +3787,7 @@ fn py_dragonfly_doji(
 /// Examples
 /// --------
 /// >>> gd = py_gravestone_doji([10.0], [10.8], [9.95], [10.05])
-/// >>> gd[0]  # Gravestone doji detected
+/// >>> gd`[0]`  # Gravestone doji detected
 /// 100.0
 fn py_gravestone_doji(
     open: Vec<f64>,
@@ -3841,7 +3841,7 @@ fn py_gravestone_doji(
 /// Examples
 /// --------
 /// >>> lld = py_long_legged_doji([10.3], [11.0], [9.5], [10.35])
-/// >>> lld[0]  # Long-legged doji detected
+/// >>> lld`[0]`  # Long-legged doji detected
 /// 100.0
 fn py_long_legged_doji(
     open: Vec<f64>,
@@ -3892,7 +3892,7 @@ fn py_long_legged_doji(
 /// Examples
 /// --------
 /// >>> tt = py_tweezers_top([10.0, 10.5], [11.0, 11.02], [10.8, 10.3])
-/// >>> tt[1]  # Tweezers top detected on second candle
+/// >>> tt`[1]`  # Tweezers top detected on second candle
 /// 100.0
 fn py_tweezers_top(
     open: Vec<f64>,
@@ -3941,7 +3941,7 @@ fn py_tweezers_top(
 /// Examples
 /// --------
 /// >>> tb = py_tweezers_bottom([10.5, 10.0], [9.0, 8.98], [10.2, 10.7])
-/// >>> tb[1]  # Tweezers bottom detected on second candle
+/// >>> tb`[1]`  # Tweezers bottom detected on second candle
 /// 100.0
 fn py_tweezers_bottom(
     open: Vec<f64>,
@@ -4019,7 +4019,7 @@ fn py_falling_three_methods(
 /// Examples
 /// --------
 /// >>> hc = py_harami_cross([11.0, 10.5], [11.2, 10.6], [10.5, 10.4], [10.6, 10.52])
-/// >>> hc[1]  # Bullish harami cross detected
+/// >>> hc`[1]`  # Bullish harami cross detected
 /// 100.0
 fn py_harami_cross(
     open: Vec<f64>,
@@ -4073,7 +4073,7 @@ fn py_harami_cross(
 /// Examples
 /// --------
 /// >>> mds = py_morning_doji_star([11.0, 10.0, 10.1], [11.0, 10.1, 11.2], [10.0, 9.8, 10.0], [10.0, 9.95, 11.0])
-/// >>> mds[2]  # Morning doji star detected
+/// >>> mds`[2]`  # Morning doji star detected
 /// 100.0
 fn py_morning_doji_star(
     open: Vec<f64>,
@@ -4127,7 +4127,7 @@ fn py_morning_doji_star(
 /// Examples
 /// --------
 /// >>> eds = py_evening_doji_star([10.0, 11.0, 10.9], [10.0, 11.1, 11.0], [10.0, 10.8, 9.8], [11.0, 11.05, 10.0])
-/// >>> eds[2]  # Evening doji star detected
+/// >>> eds`[2]`  # Evening doji star detected
 /// -100.0
 fn py_evening_doji_star(
     open: Vec<f64>,
@@ -4203,7 +4203,7 @@ fn py_three_outside(
 /// Examples
 /// --------
 /// >>> ab = py_abandoned_baby([11.0, 9.5, 9.6], [11.0, 9.6, 10.5], [10.0, 9.4, 9.5], [10.0, 9.5, 10.5])
-/// >>> ab[2]  # Bullish abandoned baby detected
+/// >>> ab`[2]`  # Bullish abandoned baby detected
 /// 100.0
 fn py_abandoned_baby(
     open: Vec<f64>,
@@ -4268,7 +4268,7 @@ fn py_kicking(
 /// Examples
 /// --------
 /// >>> ll = py_long_line([10.0, 10.1], [10.5, 11.5], [9.8, 10.0], [10.2, 11.4], lookback=10)
-/// >>> ll[1]  # Long bullish line detected
+/// >>> ll`[1]`  # Long bullish line detected
 /// 100.0
 fn py_long_line(
     open: Vec<f64>,
@@ -4322,7 +4322,7 @@ fn py_long_line(
 /// Examples
 /// --------
 /// >>> sl = py_short_line([10.0, 10.2], [10.3, 10.5], [9.9, 10.1], [10.1, 10.25], lookback=10)
-/// >>> sl[1]  # Short line detected
+/// >>> sl`[1]`  # Short line detected
 /// 100.0
 fn py_short_line(
     open: Vec<f64>,
@@ -4376,7 +4376,7 @@ fn py_short_line(
 /// Examples
 /// --------
 /// >>> ds = py_doji_star([11.0, 10.0], [11.0, 10.1], [10.0, 9.8], [10.0, 9.95])
-/// >>> ds[1]  # Bullish doji star detected
+/// >>> ds`[1]`  # Bullish doji star detected
 /// 100.0
 fn py_doji_star(
     open: Vec<f64>,
@@ -4443,7 +4443,7 @@ fn py_identical_three_crows(
 /// Examples
 /// --------
 /// >>> ss = py_stick_sandwich([11.0, 10.0, 10.5], [11.0, 10.8, 11.0], [10.0, 10.0, 10.0], [10.0, 10.5, 10.02])
-/// >>> ss[2]  # Stick sandwich detected
+/// >>> ss`[2]`  # Stick sandwich detected
 /// 100.0
 fn py_stick_sandwich(
     open: Vec<f64>,
@@ -4497,7 +4497,7 @@ fn py_stick_sandwich(
 /// Examples
 /// --------
 /// >>> ts = py_tristar([10.0, 9.5, 10.0], [10.2, 9.6, 10.2], [9.8, 9.3, 9.8], [10.05, 9.52, 10.03])
-/// >>> ts[2]  # Bullish tristar detected
+/// >>> ts`[2]`  # Bullish tristar detected
 /// 100.0
 fn py_tristar(
     open: Vec<f64>,
@@ -4592,7 +4592,7 @@ fn py_homing_pigeon(
 /// Examples
 /// --------
 /// >>> ml = py_matching_low([10.5, 10.2], [10.5, 10.2], [9.0, 8.98], [9.0, 9.02])
-/// >>> ml[1]  # Matching low detected
+/// >>> ml`[1]`  # Matching low detected
 /// 100.0
 fn py_matching_low(
     open: Vec<f64>,
@@ -4646,7 +4646,7 @@ fn py_matching_low(
 /// Examples
 /// --------
 /// >>> sl = py_separating_lines([10.0, 10.02], [10.5, 11.0], [9.5, 10.0], [9.8, 10.8])
-/// >>> sl[1]  # Bullish separating lines detected
+/// >>> sl`[1]`  # Bullish separating lines detected
 /// 100.0
 fn py_separating_lines(
     open: Vec<f64>,
@@ -4711,7 +4711,7 @@ fn py_thrusting(
 /// Examples
 /// --------
 /// >>> inn = py_inneck([11.0, 9.5], [11.0, 10.0], [9.0, 9.5], [9.0, 9.05])
-/// >>> inn[1]  # In-neck pattern detected
+/// >>> inn`[1]`  # In-neck pattern detected
 /// -100.0
 fn py_inneck(
     open: Vec<f64>,
@@ -4765,7 +4765,7 @@ fn py_inneck(
 /// Examples
 /// --------
 /// >>> onn = py_onneck([11.0, 9.5], [11.0, 10.2], [9.0, 9.5], [9.0, 9.02])
-/// >>> onn[1]  # On-neck pattern detected
+/// >>> onn`[1]`  # On-neck pattern detected
 /// -100.0
 fn py_onneck(
     open: Vec<f64>,
@@ -4866,7 +4866,7 @@ fn py_concealing_baby_swallow(
 /// Examples
 /// --------
 /// >>> ca = py_counterattack([11.0, 9.5], [11.0, 10.5], [10.0, 9.5], [10.0, 10.02])
-/// >>> ca[1]  # Bullish counterattack detected
+/// >>> ca`[1]`  # Bullish counterattack detected
 /// 100.0
 fn py_counterattack(
     open: Vec<f64>,
@@ -4920,7 +4920,7 @@ fn py_counterattack(
 /// Examples
 /// --------
 /// >>> hw = py_highwave([10.3], [11.5], [9.0], [10.5])
-/// >>> hw[0]  # High wave detected
+/// >>> hw`[0]`  # High wave detected
 /// 100.0
 fn py_highwave(
     open: Vec<f64>,
@@ -5018,7 +5018,7 @@ fn py_mat_hold(
 /// Examples
 /// --------
 /// >>> rm = py_rickshaw_man([10.5], [11.5], [9.5], [10.55])
-/// >>> rm[0]  # Rickshaw man detected
+/// >>> rm`[0]`  # Rickshaw man detected
 /// 100.0
 fn py_rickshaw_man(
     open: Vec<f64>,

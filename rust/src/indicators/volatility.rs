@@ -212,7 +212,7 @@ pub fn true_range(high: &[f64], low: &[f64], close: &[f64], drift: usize) -> Haz
 ///
 /// # Implementation Notes
 /// This implementation follows TA-Lib conventions:
-/// - TR[0] is ignored in ATR calculation
+/// - TR`[0]` is ignored in ATR calculation
 /// - Initial ATR uses simple average of TR[1..=period]
 /// - Subsequent values use Wilder's smoothing (RMA)
 ///
