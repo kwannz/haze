@@ -62,6 +62,10 @@ class TestDataFrameAccessorContract:
         _assert_series(k, df.index)
         _assert_series(d, df.index)
 
+        k, d = ta.stochrsi(period=14, stoch_period=10, k_period=3, d_period=3)
+        _assert_series(k, df.index)
+        _assert_series(d, df.index)
+
         k, d, j = ta.kdj(k_period=9, d_period=3)
         _assert_series(k, df.index)
         _assert_series(d, df.index)
