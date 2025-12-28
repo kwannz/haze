@@ -155,16 +155,18 @@ class IncrementalRSI:
         self._lock = threading.Lock()
         self.count = 0
         self._current = _NAN
+        self._is_ready = False
 
     def reset(self) -> None:
         with self._lock:
             self._inner.reset()
             self.count = 0
             self._current = _NAN
+            self._is_ready = False
 
     @property
     def is_ready(self) -> bool:
-        return self.count >= self.period
+        return self._is_ready
 
     @property
     def current(self) -> float:
@@ -175,7 +177,12 @@ class IncrementalRSI:
         with self._lock:
             result = self._inner.update(v)
             self.count += 1
-            self._current = result if result is not None else _NAN
+            if result is not None:
+                self._current = result
+                self._is_ready = True
+            else:
+                self._current = _NAN
+                self._is_ready = False
             return self._current
 
     def status(self) -> dict[str, Any]:
@@ -203,16 +210,18 @@ class IncrementalMACD:
         self._lock = threading.Lock()
         self.count = 0
         self._current = (_NAN, _NAN, _NAN)
+        self._is_ready = False
 
     @property
     def is_ready(self) -> bool:
-        return self.count >= self.slow
+        return self._is_ready
 
     def reset(self) -> None:
         with self._lock:
             self._inner.reset()
             self.count = 0
             self._current = (_NAN, _NAN, _NAN)
+            self._is_ready = False
 
     def update(self, value: float) -> tuple[float, float, float]:
         v = float(value)
@@ -221,8 +230,10 @@ class IncrementalMACD:
             self.count += 1
             if result is not None:
                 self._current = result
+                self._is_ready = True
             else:
                 self._current = (_NAN, _NAN, _NAN)
+                self._is_ready = False
             return self._current
 
     def status(self) -> dict[str, Any]:
@@ -510,6 +521,7 @@ class IncrementalEnsembleSignal:
         for name, weight in self.weights.items():
             if not math.isfinite(weight):
                 raise ValueError(f"weights contains non-finite value for {name}: {weight}")
+        self._weight_map: dict[str, float] | None = None
         self._is_ready = False
         self.count = 0
 
@@ -540,9 +552,10 @@ class IncrementalEnsembleSignal:
                     "supertrend": result.trend_contrib,
                 }
 
-                weight_map = None
-                if self.weights:
+                weight_map = self._weight_map
+                if weight_map is None and self.weights:
                     weight_map = _normalize_weights(self.weights, _ENSEMBLE_COMPONENTS)
+                    self._weight_map = weight_map
 
                 # Apply custom weights if provided
                 if weight_map is not None:

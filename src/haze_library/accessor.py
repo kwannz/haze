@@ -487,11 +487,19 @@ class TechnicalAnalysisAccessor:
             k, d = _lib.py_stochastic(high, low, close, k_period, smooth_k, d_period)
             return _to_series(k, self.index), _to_series(d, self.index)
 
-    def stochrsi(self, period: int = 14, k_period: int = 3, d_period: int = 3,
-                 column: str = 'close') -> tuple[pd.Series, pd.Series]:
+    def stochrsi(
+        self,
+        period: int = 14,
+        stoch_period: int | None = None,
+        k_period: int = 3,
+        d_period: int = 3,
+        column: str = 'close',
+    ) -> tuple[pd.Series, pd.Series]:
         """Stochastic RSI. Returns (%K, %D)."""
         data = _to_list(self._get_column(column))
-        k, d = _lib.py_stochrsi(data, period, period, k_period, d_period)
+        if stoch_period is None:
+            stoch_period = period
+        k, d = _lib.py_stochrsi(data, period, stoch_period, k_period, d_period)
         return _to_series(k, self.index), _to_series(d, self.index)
 
     def cci(self, period: int = 20) -> pd.Series:

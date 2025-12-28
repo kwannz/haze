@@ -21,6 +21,8 @@ Usage:
 from __future__ import annotations
 
 from collections import deque
+from typing import Tuple
+
 import numpy as np
 # Import Rust extension
 try:
@@ -212,10 +214,17 @@ def stochastic(high: ArrayLike, low: ArrayLike, close: ArrayLike,
     return _to_array(k), _to_array(d)
 
 
-def stochrsi(data: ArrayLike, period: int = 14, k_period: int = 3,
-             d_period: int = 3) -> Tuple[np.ndarray, np.ndarray]:
+def stochrsi(
+    data: ArrayLike,
+    period: int = 14,
+    stoch_period: int | None = None,
+    k_period: int = 3,
+    d_period: int = 3,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Stochastic RSI. Returns (%K, %D)."""
-    k, d = _lib.py_stochrsi(_to_list_fast(data), period, period, k_period, d_period)
+    if stoch_period is None:
+        stoch_period = period
+    k, d = _lib.py_stochrsi(_to_list_fast(data), period, stoch_period, k_period, d_period)
     return _to_array(k), _to_array(d)
 
 

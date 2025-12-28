@@ -46,6 +46,12 @@ class TestNumpyCompatContract:
         _assert_array(k, n)
         _assert_array(d, n)
 
+        k, d = haze_library.np_ta.stochrsi(
+            close, period=14, stoch_period=10, k_period=3, d_period=3
+        )
+        _assert_array(k, n)
+        _assert_array(d, n)
+
         k, d, j = haze_library.np_ta.kdj(high, low, close, k_period=9, d_period=3)
         _assert_array(k, n)
         _assert_array(d, n)

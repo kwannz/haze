@@ -155,6 +155,15 @@ class TestIncrementalRSI:
         valid_results = [r for r in results if not math.isnan(r)]
         assert all(0 <= r <= 100 for r in valid_results)
 
+    def test_is_ready(self):
+        """RSI should only be ready after period + 1 updates."""
+        rsi = IncrementalRSI(period=3)
+        for value in (100.0, 101.0, 102.0):
+            rsi.update(value)
+            assert not rsi.is_ready
+        rsi.update(103.0)
+        assert rsi.is_ready
+
     def test_rsi_range(self, sample_prices):
         """Test RSI stays in [0, 100] range."""
         rsi = IncrementalRSI(period=7)
@@ -183,6 +192,17 @@ class TestIncrementalMACD:
         assert not math.isnan(hist)
         # Histogram = MACD line - Signal line
         assert abs(hist - (line - signal)) < 0.0001
+
+    def test_is_ready(self):
+        """MACD should only be ready after slow + signal - 1 updates."""
+        macd = IncrementalMACD(fast=3, slow=5, signal=2)
+
+        for value in (100.0, 101.0, 102.0, 103.0, 104.0):
+            macd.update(value)
+        assert not macd.is_ready
+
+        macd.update(105.0)
+        assert macd.is_ready
 
 
 # ==================== ATR Tests ====================

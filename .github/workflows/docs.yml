@@ -67,7 +67,8 @@ jobs:
       - name: Check for broken documentation links
         working-directory: ./rust
         run: |
-          cargo deadlinks --check-http --dir target/doc
+          # Skip external HTTP links to avoid failures from third-party docs
+          cargo deadlinks --dir target/doc
 
       - name: Generate documentation coverage report
         working-directory: ./rust
