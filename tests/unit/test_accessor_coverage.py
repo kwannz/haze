@@ -190,6 +190,8 @@ def test_series_accessor_methods() -> None:
 def test_register_pandas_accessors_idempotent() -> None:
     original_df = acc_mod.pd.api.extensions.register_dataframe_accessor
     original_series = acc_mod.pd.api.extensions.register_series_accessor
+    original_df_class = acc_mod.pd.DataFrame
+    original_series_class = acc_mod.pd.Series
 
     def raise_value_error(_name):
         def _decorator(_cls):
@@ -199,11 +201,15 @@ def test_register_pandas_accessors_idempotent() -> None:
 
     acc_mod.pd.api.extensions.register_dataframe_accessor = raise_value_error
     acc_mod.pd.api.extensions.register_series_accessor = raise_value_error
+    acc_mod.pd.DataFrame = type("DummyDataFrame", (), {})
+    acc_mod.pd.Series = type("DummySeries", (), {})
     try:
         acc_mod._register_pandas_accessors()
     finally:
         acc_mod.pd.api.extensions.register_dataframe_accessor = original_df
         acc_mod.pd.api.extensions.register_series_accessor = original_series
+        acc_mod.pd.DataFrame = original_df_class
+        acc_mod.pd.Series = original_series_class
 
 
 def test_accessor_import_fallback(monkeypatch: pytest.MonkeyPatch) -> None:

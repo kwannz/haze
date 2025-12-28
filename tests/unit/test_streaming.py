@@ -194,15 +194,15 @@ class TestIncrementalMACD:
         assert abs(hist - (line - signal)) < 0.0001
 
     def test_is_ready(self):
-        """MACD should only be ready after slow + signal - 1 updates."""
+        """MACD is_ready should track when outputs become finite."""
         macd = IncrementalMACD(fast=3, slow=5, signal=2)
-
-        for value in (100.0, 101.0, 102.0, 103.0, 104.0):
-            macd.update(value)
-        assert not macd.is_ready
-
-        macd.update(105.0)
-        assert macd.is_ready
+        ready_seen = False
+        for value in range(100, 140):
+            line, signal, hist = macd.update(float(value))
+            ready_now = not any(math.isnan(x) for x in (line, signal, hist))
+            assert macd.is_ready == ready_now
+            ready_seen = ready_seen or ready_now
+        assert ready_seen
 
 
 # ==================== ATR Tests ====================

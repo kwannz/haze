@@ -54,15 +54,20 @@ jobs:
 
       - name: Install dependencies
         run: |
+          python -m venv .venv
+          source .venv/bin/activate
           pip install --upgrade pip
           pip install maturin pytest pytest-cov numpy pandas
 
       - name: Build Rust extension
         working-directory: ./rust
-        run: maturin develop --release --features python
+        run: |
+          source ../.venv/bin/activate
+          maturin develop --release --features python
 
       - name: Run numerical stability tests
         run: |
+          source .venv/bin/activate
           pytest tests/unit/test_numerical_stability.py -v \
             --cov=haze_library \
             --cov-report=xml \
@@ -79,6 +84,7 @@ jobs:
       - name: Generate precision report
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.14'
         run: |
+          source .venv/bin/activate
           python -c "
           import numpy as np
           import haze_library as haze

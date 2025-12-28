@@ -12,7 +12,11 @@ from __future__ import annotations
 import pytest
 
 from haze_library.execution.engine import ExecutionEngine
-from haze_library.execution.errors import ExecutionPermissionError, ExecutionRiskError
+from haze_library.execution.errors import (
+    ExecutionPermissionError,
+    ExecutionProviderError,
+    ExecutionRiskError,
+)
 from haze_library.execution.models import (
     AmendOrderRequest,
     CancelOrderRequest,
@@ -143,3 +147,44 @@ class TestEngineAmendFallback:
         assert amended.id != created.id
         old = provider.fetch_order(created.id, symbol="BTC/USDT")
         assert old.status.value == "canceled"
+
+    def test_amend_fallback_create_failure(self) -> None:
+        class FailingCreateProvider(InMemoryExecutionProvider):
+            @property
+            def supports_amend(self) -> bool:  # type: ignore[override]
+                return False
+
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.fail_next_create = False
+
+            def create_order(self, req: CreateOrderRequest):  # type: ignore[override]
+                if self.fail_next_create:
+                    raise RuntimeError("boom")
+                return super().create_order(req)
+
+        provider = FailingCreateProvider(reference_prices={"BTC/USDT": 10.0})
+        perms = ExecutionPermissions.from_scopes(
+            [Scope.READ, Scope.TRADE, Scope.CANCEL, Scope.AMEND],
+            live_trading=True,
+            allowed_symbols={"BTC/USDT"},
+        )
+        engine = ExecutionEngine(provider=provider, permissions=perms)
+
+        created, _ = engine.place_order(
+            CreateOrderRequest(
+                symbol="BTC/USDT",
+                side=OrderSide.BUY,
+                order_type=OrderType.LIMIT,
+                amount=1.0,
+                price=10.0,
+            ),
+            dry_run=False,
+        )
+
+        provider.fail_next_create = True
+        with pytest.raises(ExecutionProviderError, match="CRITICAL: Order"):
+            engine.amend_order(
+                AmendOrderRequest(order_id=created.id, symbol="BTC/USDT", price=12.0),
+                dry_run=False,
+            )
