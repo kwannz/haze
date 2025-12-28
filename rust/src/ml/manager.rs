@@ -177,7 +177,7 @@ impl SFGModelManager {
             let mut reader = BufReader::new(file);
             let weights: SerializableWeights =
                 bincode::decode_from_std_read(&mut reader, bincode::config::standard())
-                .map_err(|e| format!("Failed to deserialize weights: {e}"))?;
+                    .map_err(|e| format!("Failed to deserialize weights: {e}"))?;
 
             model.set_serializable_weights(weights);
         }
