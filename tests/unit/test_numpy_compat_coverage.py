@@ -14,6 +14,24 @@ def _arrays(n: int = 300) -> dict[str, np.ndarray]:
     low = close - 1.0
     open_ = close + 0.5
     volume = np.linspace(1000.0, 1200.0, n, dtype=np.float64)
+
+    # RSI-like indicator for divergence detection (range 0-100)
+    indicator = 30.0 + 40.0 * np.sin(np.linspace(0, 4 * np.pi, n))
+
+    # Binary signals for combine_signals (0.0 or 1.0)
+    buy1 = np.zeros(n, dtype=np.float64)
+    buy1[::20] = 1.0  # Buy signal every 20 bars
+    sell1 = np.zeros(n, dtype=np.float64)
+    sell1[10::20] = 1.0  # Sell signal offset by 10
+
+    buy2 = np.zeros(n, dtype=np.float64)
+    buy2[5::25] = 1.0  # Different pattern
+    sell2 = np.zeros(n, dtype=np.float64)
+    sell2[15::25] = 1.0
+
+    # ATR values for calculate_stops (volatility measure)
+    atr_values = np.full(n, 2.0, dtype=np.float64)  # Constant ATR for simplicity
+
     return {
         "data": close,
         "close": close,
@@ -23,6 +41,16 @@ def _arrays(n: int = 300) -> dict[str, np.ndarray]:
         "volume": volume,
         "series1": close,
         "series2": open_,
+        # SFG function parameters
+        "price": close,  # For detect_divergence
+        "indicator": indicator,  # For detect_divergence
+        "buy1": buy1,  # For combine_signals
+        "sell1": sell1,
+        "buy2": buy2,
+        "sell2": sell2,
+        "atr_values": atr_values,  # For calculate_stops
+        "buy_signals": buy1,  # For calculate_stops
+        "sell_signals": sell1,
     }
 
 

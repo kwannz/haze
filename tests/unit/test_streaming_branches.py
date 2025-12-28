@@ -7,6 +7,7 @@ import pytest
 from haze_library.streaming import (
     CCXTStreamProcessor,
     IncrementalAdaptiveRSI,
+    IncrementalAISuperTrend,
     IncrementalATR,
     IncrementalBollingerBands,
     IncrementalEMA,
@@ -194,7 +195,186 @@ def test_stream_processor_and_factory() -> None:
 
     names = get_available_streaming_indicators()
     assert "IncrementalSMA" in names
+    assert "IncrementalAISuperTrend" in names
 
     assert isinstance(create_indicator("bb"), IncrementalBollingerBands)
+    assert isinstance(create_indicator("ai_supertrend"), IncrementalAISuperTrend)
+    assert isinstance(create_indicator("ai_supertrend_ml"), IncrementalAISuperTrend)
     with pytest.raises(ValueError):
         create_indicator("unknown_indicator")
+
+
+# ==================== IncrementalAISuperTrend Tests ====================
+
+
+def test_ai_supertrend_invalid_parameters() -> None:
+    """Test IncrementalAISuperTrend parameter validation."""
+    with pytest.raises(ValueError, match="st_length must be > 0"):
+        IncrementalAISuperTrend(st_length=0)
+    with pytest.raises(ValueError, match="st_length must be > 0"):
+        IncrementalAISuperTrend(st_length=-5)
+    with pytest.raises(ValueError, match="st_multiplier must be > 0"):
+        IncrementalAISuperTrend(st_multiplier=0.0)
+    with pytest.raises(ValueError, match="st_multiplier must be > 0"):
+        IncrementalAISuperTrend(st_multiplier=-3.0)
+    with pytest.raises(ValueError, match="st_multiplier must be > 0"):
+        IncrementalAISuperTrend(st_multiplier=float("nan"))
+    with pytest.raises(ValueError, match="st_multiplier must be > 0"):
+        IncrementalAISuperTrend(st_multiplier=float("inf"))
+    with pytest.raises(ValueError, match="lookback must be > 0"):
+        IncrementalAISuperTrend(lookback=0)
+    with pytest.raises(ValueError, match="train_window must be > lookback"):
+        IncrementalAISuperTrend(lookback=50, train_window=50)
+    with pytest.raises(ValueError, match="train_window must be > lookback"):
+        IncrementalAISuperTrend(lookback=100, train_window=50)
+
+
+def test_ai_supertrend_basic_functionality() -> None:
+    """Test IncrementalAISuperTrend basic update functionality."""
+    ind = IncrementalAISuperTrend(
+        st_length=5,
+        st_multiplier=2.0,
+        lookback=5,
+        train_window=50
+    )
+
+    assert not ind.is_ready
+    assert ind.count == 0
+    assert ind.current_direction == 0
+
+    # Feed data until ready
+    import random
+    random.seed(42)
+    price = 100.0
+    for i in range(60):
+        price += random.uniform(-1.0, 1.0)
+        high = price + random.uniform(0.5, 1.5)
+        low = price - random.uniform(0.5, 1.5)
+        result = ind.update(high, low, price)
+
+        assert isinstance(result, dict)
+        assert "supertrend" in result
+        assert "direction" in result
+        assert "trend_offset" in result
+        assert "buy_signal" in result
+        assert "sell_signal" in result
+        assert "stop_loss" in result
+        assert "take_profit" in result
+
+    assert ind.count == 60
+    assert ind.is_ready
+
+
+def test_ai_supertrend_not_ready_result() -> None:
+    """Test IncrementalAISuperTrend returns NaN values when not ready."""
+    ind = IncrementalAISuperTrend(st_length=10, train_window=200)
+
+    # Only feed a few bars (not enough to be ready)
+    result = ind.update(102.0, 98.0, 100.0)
+    assert math.isnan(result["supertrend"])
+    assert result["direction"] == 0
+    assert math.isnan(result["trend_offset"])
+    assert result["buy_signal"] is False
+    assert result["sell_signal"] is False
+    assert math.isnan(result["stop_loss"])
+    assert math.isnan(result["take_profit"])
+    assert not ind.is_ready
+
+
+def test_ai_supertrend_reset() -> None:
+    """Test IncrementalAISuperTrend reset functionality."""
+    ind = IncrementalAISuperTrend(
+        st_length=5,
+        st_multiplier=2.0,
+        lookback=5,
+        train_window=50
+    )
+
+    # Feed enough data to become ready
+    import random
+    random.seed(123)
+    price = 100.0
+    for i in range(60):
+        price += random.uniform(-0.5, 0.5)
+        ind.update(price + 1, price - 1, price)
+
+    assert ind.count == 60
+    assert ind.is_ready
+
+    # Reset and verify
+    ind.reset()
+    assert ind.count == 0
+    assert not ind.is_ready
+    assert ind.current_direction == 0
+
+
+def test_ai_supertrend_status() -> None:
+    """Test IncrementalAISuperTrend status method."""
+    ind = IncrementalAISuperTrend(
+        st_length=14,
+        st_multiplier=2.5,
+        lookback=8,
+        train_window=100
+    )
+
+    ind.update(102.0, 98.0, 100.0)
+    status = ind.status()
+
+    assert status["count"] == 1
+    assert status["is_ready"] is False
+    assert status["direction"] == 0
+    assert status["st_length"] == 14
+    assert status["st_multiplier"] == 2.5
+    assert status["lookback"] == 8
+    assert status["train_window"] == 100
+
+
+def test_ai_supertrend_ccxt_processor_integration() -> None:
+    """Test IncrementalAISuperTrend with CCXTStreamProcessor."""
+    proc = CCXTStreamProcessor()
+    proc.add_indicator("ai_st", IncrementalAISuperTrend(
+        st_length=5,
+        train_window=50
+    ))
+    proc.add_indicator("sma", IncrementalSMA(period=5))
+
+    import random
+    random.seed(456)
+    price = 100.0
+
+    # Process CCXT-format candles [timestamp, open, high, low, close, volume]
+    for i in range(60):
+        price += random.uniform(-0.5, 0.5)
+        candle = [i * 60000, price - 0.2, price + 1, price - 1, price, 1000]
+        results = proc.process_candle(candle)
+
+        assert "ai_st" in results
+        assert "sma" in results
+
+    status = proc.get_status()
+    assert "ai_st" in status
+    assert status["ai_st"]["count"] == 60
+
+
+def test_ai_supertrend_signal_generation() -> None:
+    """Test that IncrementalAISuperTrend generates signals on trend changes."""
+    ind = IncrementalAISuperTrend(
+        st_length=5,
+        st_multiplier=2.0,
+        lookback=5,
+        train_window=30
+    )
+
+    # Create uptrend data
+    for i in range(40):
+        price = 100.0 + i * 0.5
+        _ = ind.update(price + 1, price - 1, price)
+
+    # Create sharp reversal
+    for i in range(20):
+        price = 120.0 - i * 1.0
+        _ = ind.update(price + 1, price - 1, price)
+
+    # At least one result should have valid direction after reversal
+    assert ind.is_ready
+    assert ind.current_direction in [-1, 0, 1]

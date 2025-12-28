@@ -1403,6 +1403,282 @@ impl OnlineMLSuperTrend {
     }
 }
 
+// ==================== OnlineAISuperTrendML ====================
+
+/// AI SuperTrend ML 增量计算器
+///
+/// 使用滑动窗口进行线性回归预测趋势偏移，提供 ML 增强的 SuperTrend 信号。
+///
+/// # 设计说明
+/// - 组合使用 OnlineSuperTrend 和 OnlineATR 作为基础指标
+/// - 维护 train_window 大小的滑动窗口用于 ML 训练
+/// - 每次更新时使用简单线性回归预测趋势偏移
+/// - 时间复杂度: O(train_window) per update
+///
+/// # Example
+/// ```rust,ignore
+/// use haze_library::utils::streaming::OnlineAISuperTrendML;
+///
+/// let mut ai_st = OnlineAISuperTrendML::new(10, 3.0, 10, 200).unwrap();
+/// for (h, l, c) in bars {
+///     if let Some(result) = ai_st.update(h, l, c).unwrap() {
+///         if result.buy_signal { println!("BUY at {}", c); }
+///     }
+/// }
+/// ```
+#[derive(Debug, Clone)]
+pub struct OnlineAISuperTrendML {
+    // 基础指标
+    base_supertrend: OnlineSuperTrend,
+    atr: OnlineATR,
+
+    // ML 训练数据缓冲
+    close_buffer: VecDeque<f64>,
+    atr_buffer: VecDeque<f64>,
+    direction_buffer: VecDeque<i8>,
+
+    // 配置参数
+    st_length: usize,
+    st_multiplier: f64,
+    train_window: usize,
+    lookback: usize,
+
+    // 信号状态
+    prev_direction: i8,
+    prev_close: f64,
+    update_count: usize,
+}
+
+/// AI SuperTrend ML 结果
+#[derive(Debug, Clone, Copy)]
+pub struct AISuperTrendMLResult {
+    /// SuperTrend 值
+    pub supertrend: f64,
+    /// 趋势方向: -1=看跌, 0=中性, 1=看涨
+    pub direction: i8,
+    /// ML 预测的趋势偏移量
+    pub trend_offset: f64,
+    /// 买入信号 (趋势从下跌转为上涨)
+    pub buy_signal: bool,
+    /// 卖出信号 (趋势从上涨转为下跌)
+    pub sell_signal: bool,
+    /// 动态止损价位 (基于 ATR)
+    pub stop_loss: f64,
+    /// 动态止盈价位 (基于 ATR)
+    pub take_profit: f64,
+}
+
+impl OnlineAISuperTrendML {
+    /// 创建新的 AI SuperTrend ML 计算器
+    ///
+    /// # Arguments
+    /// * `st_length` - SuperTrend ATR 周期 (默认 10)
+    /// * `st_multiplier` - ATR 乘数 (默认 3.0)
+    /// * `lookback` - ML 特征回溯期 (默认 10)
+    /// * `train_window` - ML 训练窗口大小 (默认 200)
+    pub fn new(
+        st_length: usize,
+        st_multiplier: f64,
+        lookback: usize,
+        train_window: usize,
+    ) -> HazeResult<Self> {
+        if st_length == 0 {
+            return Err(HazeError::InvalidPeriod {
+                period: st_length,
+                data_len: 0,
+            });
+        }
+        if train_window == 0 || train_window < lookback + 10 {
+            return Err(HazeError::InvalidPeriod {
+                period: train_window,
+                data_len: 0,
+            });
+        }
+        if lookback == 0 {
+            return Err(HazeError::InvalidPeriod {
+                period: lookback,
+                data_len: 0,
+            });
+        }
+        if !st_multiplier.is_finite() || st_multiplier <= 0.0 {
+            return Err(HazeError::ParameterOutOfRange {
+                name: "st_multiplier",
+                value: st_multiplier,
+                min: 0.0,
+                max: f64::INFINITY,
+            });
+        }
+
+        Ok(Self {
+            base_supertrend: OnlineSuperTrend::new(st_length, st_multiplier)?,
+            atr: OnlineATR::new(st_length)?,
+            close_buffer: VecDeque::with_capacity(train_window),
+            atr_buffer: VecDeque::with_capacity(train_window),
+            direction_buffer: VecDeque::with_capacity(train_window),
+            st_length,
+            st_multiplier,
+            train_window,
+            lookback,
+            prev_direction: 0,
+            prev_close: f64::NAN,
+            update_count: 0,
+        })
+    }
+
+    /// 使用默认参数创建
+    pub fn default_params() -> HazeResult<Self> {
+        Self::new(10, 3.0, 10, 200)
+    }
+
+    /// 更新计算器并返回结果
+    ///
+    /// # Returns
+    /// - `None` 如果数据量不足 (预热期)
+    /// - `Some(AISuperTrendMLResult)` 包含完整的信号和止损止盈
+    pub fn update(
+        &mut self,
+        high: f64,
+        low: f64,
+        close: f64,
+    ) -> HazeResult<Option<AISuperTrendMLResult>> {
+        if !high.is_finite() || !low.is_finite() || !close.is_finite() {
+            return Err(HazeError::InvalidValue {
+                index: 0,
+                message: "OHLC values must be finite".to_string(),
+            });
+        }
+
+        self.update_count += 1;
+
+        // 更新基础 SuperTrend
+        let (st_value, direction) = match self.base_supertrend.update(high, low, close)? {
+            Some(v) => v,
+            None => return Ok(None),
+        };
+
+        // 更新 ATR
+        let atr_value = match self.atr.update(high, low, close)? {
+            Some(v) => v,
+            None => return Ok(None),
+        };
+
+        // 维护滑动窗口
+        self.close_buffer.push_back(close);
+        self.atr_buffer.push_back(atr_value);
+        self.direction_buffer.push_back(direction);
+
+        if self.close_buffer.len() > self.train_window {
+            self.close_buffer.pop_front();
+            self.atr_buffer.pop_front();
+            self.direction_buffer.pop_front();
+        }
+
+        // 检查是否有足够数据进行 ML 预测
+        let is_ready = self.close_buffer.len() >= self.lookback + 10;
+
+        // 计算 ML 趋势偏移 (使用简单线性回归)
+        let trend_offset = if is_ready {
+            self.compute_trend_offset()
+        } else {
+            0.0
+        };
+
+        // 检测信号变化
+        let buy_signal = self.prev_direction <= 0 && direction > 0;
+        let sell_signal = self.prev_direction >= 0 && direction < 0;
+
+        // 计算动态止损止盈 (基于 ATR)
+        let atr_mult = 2.0;
+        let (stop_loss, take_profit) = if direction > 0 {
+            // 多头: 止损在下方，止盈在上方
+            (
+                close - atr_value * atr_mult,
+                close + atr_value * atr_mult * 1.5,
+            )
+        } else if direction < 0 {
+            // 空头: 止损在上方，止盈在下方
+            (
+                close + atr_value * atr_mult,
+                close - atr_value * atr_mult * 1.5,
+            )
+        } else {
+            (f64::NAN, f64::NAN)
+        };
+
+        // 更新状态
+        self.prev_direction = direction;
+        self.prev_close = close;
+
+        Ok(Some(AISuperTrendMLResult {
+            supertrend: st_value,
+            direction,
+            trend_offset,
+            buy_signal,
+            sell_signal,
+            stop_loss,
+            take_profit,
+        }))
+    }
+
+    /// 使用简单线性回归计算趋势偏移
+    fn compute_trend_offset(&self) -> f64 {
+        let n = self.close_buffer.len();
+        if n < self.lookback + 2 {
+            return 0.0;
+        }
+
+        // 使用最近 lookback 个价格变化作为特征
+        let closes: Vec<f64> = self.close_buffer.iter().copied().collect();
+        let recent = &closes[n - self.lookback..];
+
+        // 计算简单的线性回归斜率作为趋势偏移
+        let x_mean = (self.lookback as f64 - 1.0) / 2.0;
+        let y_mean: f64 = kahan_sum_iter(recent.iter().copied()) / self.lookback as f64;
+
+        let mut numerator = 0.0;
+        let mut denominator = 0.0;
+
+        for (i, &y) in recent.iter().enumerate() {
+            let x = i as f64;
+            numerator += (x - x_mean) * (y - y_mean);
+            denominator += (x - x_mean).powi(2);
+        }
+
+        if is_zero(denominator) {
+            0.0
+        } else {
+            numerator / denominator
+        }
+    }
+
+    /// 重置计算器状态
+    pub fn reset(&mut self) {
+        self.base_supertrend.reset();
+        self.atr.reset();
+        self.close_buffer.clear();
+        self.atr_buffer.clear();
+        self.direction_buffer.clear();
+        self.prev_direction = 0;
+        self.prev_close = f64::NAN;
+        self.update_count = 0;
+    }
+
+    /// 检查是否已准备好 (有足够的预热数据)
+    pub fn is_ready(&self) -> bool {
+        self.close_buffer.len() >= self.lookback + 10
+    }
+
+    /// 当前趋势方向
+    pub fn direction(&self) -> i8 {
+        self.prev_direction
+    }
+
+    /// 更新计数
+    pub fn update_count(&self) -> usize {
+        self.update_count
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

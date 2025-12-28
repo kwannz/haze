@@ -8,9 +8,9 @@ use pyo3::prelude::*;
 
 #[cfg(feature = "python")]
 use crate::utils::streaming::{
-    EnsembleResult, MLSuperTrendResult, OnlineATR, OnlineAdaptiveRSI, OnlineBollingerBands,
-    OnlineEMA, OnlineEnsembleSignal, OnlineMACD, OnlineMLSuperTrend, OnlineRSI, OnlineSMA,
-    OnlineStochastic, OnlineSuperTrend,
+    AISuperTrendMLResult, EnsembleResult, MLSuperTrendResult, OnlineAISuperTrendML, OnlineATR,
+    OnlineAdaptiveRSI, OnlineBollingerBands, OnlineEMA, OnlineEnsembleSignal, OnlineMACD,
+    OnlineMLSuperTrend, OnlineRSI, OnlineSMA, OnlineStochastic, OnlineSuperTrend,
 };
 
 // ==================== OnlineSMA Python Wrapper ====================
@@ -497,6 +497,100 @@ impl PyOnlineMLSuperTrend {
     }
 }
 
+// ==================== OnlineAISuperTrendML Python Wrapper ====================
+
+/// Python 结果包装类
+#[cfg(feature = "python")]
+#[pyclass(name = "AISuperTrendMLResult")]
+#[derive(Debug, Clone)]
+pub struct PyAISuperTrendMLResult {
+    #[pyo3(get)]
+    pub supertrend: f64,
+    #[pyo3(get)]
+    pub direction: i8,
+    #[pyo3(get)]
+    pub trend_offset: f64,
+    #[pyo3(get)]
+    pub buy_signal: bool,
+    #[pyo3(get)]
+    pub sell_signal: bool,
+    #[pyo3(get)]
+    pub stop_loss: f64,
+    #[pyo3(get)]
+    pub take_profit: f64,
+}
+
+#[cfg(feature = "python")]
+impl From<AISuperTrendMLResult> for PyAISuperTrendMLResult {
+    fn from(r: AISuperTrendMLResult) -> Self {
+        Self {
+            supertrend: r.supertrend,
+            direction: r.direction,
+            trend_offset: r.trend_offset,
+            buy_signal: r.buy_signal,
+            sell_signal: r.sell_signal,
+            stop_loss: r.stop_loss,
+            take_profit: r.take_profit,
+        }
+    }
+}
+
+#[cfg(feature = "python")]
+#[pyclass(name = "OnlineAISuperTrendML")]
+pub struct PyOnlineAISuperTrendML {
+    inner: OnlineAISuperTrendML,
+}
+
+#[cfg(feature = "python")]
+#[pymethods]
+impl PyOnlineAISuperTrendML {
+    #[new]
+    #[pyo3(signature = (st_length=10, st_multiplier=3.0, lookback=10, train_window=200))]
+    pub fn new(
+        st_length: usize,
+        st_multiplier: f64,
+        lookback: usize,
+        train_window: usize,
+    ) -> PyResult<Self> {
+        Ok(Self {
+            inner: OnlineAISuperTrendML::new(st_length, st_multiplier, lookback, train_window)?,
+        })
+    }
+
+    #[staticmethod]
+    pub fn with_defaults() -> PyResult<Self> {
+        Ok(Self {
+            inner: OnlineAISuperTrendML::default_params()?,
+        })
+    }
+
+    /// 更新并返回结果，预热期返回 None
+    pub fn update(
+        &mut self,
+        high: f64,
+        low: f64,
+        close: f64,
+    ) -> PyResult<Option<PyAISuperTrendMLResult>> {
+        Ok(self.inner.update(high, low, close)?.map(Into::into))
+    }
+
+    pub fn reset(&mut self) {
+        self.inner.reset();
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.inner.is_ready()
+    }
+
+    pub fn direction(&self) -> i8 {
+        self.inner.direction()
+    }
+
+    pub fn update_count(&self) -> usize {
+        self.inner.update_count()
+    }
+}
+
 // ==================== Module Registration ====================
 
 #[cfg(feature = "python")]
@@ -517,6 +611,10 @@ pub fn register_streaming_classes(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyEnsembleResult>()?;
     m.add_class::<PyOnlineMLSuperTrend>()?;
     m.add_class::<PyMLSuperTrendResult>()?;
+
+    // AI SuperTrend ML (SFG)
+    m.add_class::<PyOnlineAISuperTrendML>()?;
+    m.add_class::<PyAISuperTrendMLResult>()?;
 
     Ok(())
 }

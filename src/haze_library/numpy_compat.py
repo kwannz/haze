@@ -671,6 +671,534 @@ def percent_rank(data: ArrayLike, period: int = 20) -> np.ndarray:
     return _to_array(_lib.py_percent_rank(_to_list_fast(data), period))
 
 
+# ==================== SFG Indicators (ML-Enhanced) ====================
+
+def ai_supertrend_ml(
+    high: ArrayLike,
+    low: ArrayLike,
+    close: ArrayLike,
+    st_length: int = 10,
+    st_multiplier: float = 3.0,
+    model_type: str = "linreg",
+    lookback: int = 10,
+    train_window: int = 200,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    AI SuperTrend ML - ML 增强的 SuperTrend 指标。
+
+    使用线性回归或岭回归预测趋势偏移，提供更准确的趋势跟踪。
+
+    Args:
+        high: 最高价序列
+        low: 最低价序列
+        close: 收盘价序列
+        st_length: SuperTrend ATR 周期 (默认 10)
+        st_multiplier: ATR 乘数 (默认 3.0)
+        model_type: ML 模型类型 "linreg" 或 "ridge" (默认 "linreg")
+        lookback: ML 特征回溯期 (默认 10)
+        train_window: ML 训练窗口大小 (默认 200)
+
+    Returns:
+        Tuple of 6 arrays:
+        - supertrend: SuperTrend 值
+        - direction: 趋势方向 (1.0=看涨, -1.0=看跌)
+        - buy_signals: 买入信号 (1.0=信号, 0.0=无)
+        - sell_signals: 卖出信号 (1.0=信号, 0.0=无)
+        - stop_loss: 动态止损价位
+        - take_profit: 动态止盈价位
+    """
+    supertrend, direction, buy, sell, sl, tp = _lib.py_ai_supertrend_ml(
+        _to_list_fast(high),
+        _to_list_fast(low),
+        _to_list_fast(close),
+        st_length,
+        st_multiplier,
+        model_type,
+        lookback,
+        train_window,
+    )
+    return (
+        _to_array(supertrend),
+        _to_array(direction),
+        _to_array(buy),
+        _to_array(sell),
+        _to_array(sl),
+        _to_array(tp),
+    )
+
+
+def atr2_signals_ml(
+    high: ArrayLike,
+    low: ArrayLike,
+    close: ArrayLike,
+    volume: ArrayLike,
+    rsi_period: int = 14,
+    atr_period: int = 14,
+    ridge_alpha: float = 1.0,
+    momentum_window: int = 10,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    ATR2 Signals ML - 基于 ATR 和动量的 ML 增强信号。
+
+    使用岭回归动态调整 RSI 阈值，提供自适应的买卖信号。
+
+    Args:
+        high: 最高价序列
+        low: 最低价序列
+        close: 收盘价序列
+        volume: 成交量序列
+        rsi_period: RSI 计算周期 (默认 14)
+        atr_period: ATR 计算周期 (默认 14)
+        ridge_alpha: 岭回归正则化参数 (默认 1.0)
+        momentum_window: 动量计算窗口 (默认 10)
+
+    Returns:
+        Tuple of 6 arrays:
+        - rsi: RSI 值
+        - buy_signals: 买入信号 (1.0=信号, 0.0=无)
+        - sell_signals: 卖出信号 (1.0=信号, 0.0=无)
+        - signal_strength: 信号强度 (0.0-1.0)
+        - stop_loss: 动态止损价位
+        - take_profit: 动态止盈价位
+    """
+    rsi, buy, sell, strength, sl, tp = _lib.py_atr2_signals_ml(
+        _to_list_fast(high),
+        _to_list_fast(low),
+        _to_list_fast(close),
+        _to_list_fast(volume),
+        rsi_period,
+        atr_period,
+        ridge_alpha,
+        momentum_window,
+    )
+    return (
+        _to_array(rsi),
+        _to_array(buy),
+        _to_array(sell),
+        _to_array(strength),
+        _to_array(sl),
+        _to_array(tp),
+    )
+
+
+def ai_momentum_index_ml(
+    close: ArrayLike,
+    rsi_period: int = 14,
+    smooth_period: int = 3,
+    use_polynomial: bool = False,
+    lookback: int = 5,
+    train_window: int = 200,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    AI Momentum Index ML - ML 增强的动量指标。
+
+    使用机器学习预测动量方向，提供超买超卖和零线穿越信号。
+
+    Args:
+        close: 收盘价序列
+        rsi_period: RSI 计算周期 (默认 14)
+        smooth_period: 平滑周期 (默认 3)
+        use_polynomial: 是否使用多项式特征 (默认 False)
+        lookback: ML 特征回溯期 (默认 5)
+        train_window: ML 训练窗口大小 (默认 200)
+
+    Returns:
+        Tuple of 6 arrays:
+        - rsi: RSI 值
+        - predicted_momentum: 预测动量值
+        - zero_cross_buy: 零线向上穿越信号 (买入)
+        - zero_cross_sell: 零线向下穿越信号 (卖出)
+        - overbought: 超买信号
+        - oversold: 超卖信号
+    """
+    rsi, momentum, buy, sell, overbought, oversold = _lib.py_ai_momentum_index_ml(
+        _to_list_fast(close),
+        rsi_period,
+        smooth_period,
+        use_polynomial,
+        lookback,
+        train_window,
+    )
+    return (
+        _to_array(rsi),
+        _to_array(momentum),
+        _to_array(buy),
+        _to_array(sell),
+        _to_array(overbought),
+        _to_array(oversold),
+    )
+
+
+def general_parameters_signals(
+    high: ArrayLike,
+    low: ArrayLike,
+    close: ArrayLike,
+    ema_fast: int = 20,
+    ema_slow: int = 50,
+    atr_period: int = 14,
+    grid_multiplier: float = 1.0,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    General Parameters Signals - EMA 通道 + 网格入场信号。
+
+    基于 EMA 通道和 ATR 生成网格交易信号。
+
+    Args:
+        high: 最高价序列
+        low: 最低价序列
+        close: 收盘价序列
+        ema_fast: 快速 EMA 周期 (默认 20)
+        ema_slow: 慢速 EMA 周期 (默认 50)
+        atr_period: ATR 计算周期 (默认 14)
+        grid_multiplier: 网格间距乘数 (默认 1.0)
+
+    Returns:
+        Tuple of 4 arrays:
+        - buy_signals: 买入信号 (1.0=信号, 0.0=无)
+        - sell_signals: 卖出信号 (1.0=信号, 0.0=无)
+        - stop_loss: 动态止损价位
+        - take_profit: 动态止盈价位
+    """
+    buy, sell, sl, tp = _lib.py_general_parameters_signals(
+        _to_list_fast(high),
+        _to_list_fast(low),
+        _to_list_fast(close),
+        ema_fast,
+        ema_slow,
+        atr_period,
+        grid_multiplier,
+    )
+    return _to_array(buy), _to_array(sell), _to_array(sl), _to_array(tp)
+
+
+def ai_supertrend(
+    high: ArrayLike,
+    low: ArrayLike,
+    close: ArrayLike,
+    k: int = 5,
+    n: int = 100,
+    price_trend: int = 10,
+    predict_trend: int = 10,
+    st_length: int = 10,
+    st_multiplier: float = 3.0,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    AI SuperTrend - KNN 增强的 SuperTrend 指标（非 ML 版本）。
+
+    Args:
+        high: 最高价序列
+        low: 最低价序列
+        close: 收盘价序列
+        k: KNN 近邻数 (默认 5)
+        n: 训练样本数 (默认 100)
+        price_trend: 价格趋势周期 (默认 10)
+        predict_trend: 预测趋势周期 (默认 10)
+        st_length: SuperTrend ATR 周期 (默认 10)
+        st_multiplier: ATR 乘数 (默认 3.0)
+
+    Returns:
+        Tuple of 2 arrays: (supertrend, direction)
+    """
+    supertrend, direction = _lib.py_ai_supertrend(
+        _to_list_fast(high),
+        _to_list_fast(low),
+        _to_list_fast(close),
+        k, n, price_trend, predict_trend, st_length, st_multiplier,
+    )
+    return _to_array(supertrend), _to_array(direction)
+
+
+def ai_momentum_index(
+    close: ArrayLike,
+    k: int = 5,
+    trend_length: int = 10,
+    smooth: int = 3,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    AI Momentum Index - KNN 增强的动量指标（非 ML 版本）。
+
+    Args:
+        close: 收盘价序列
+        k: KNN 近邻数 (默认 5)
+        trend_length: 趋势长度 (默认 10)
+        smooth: 平滑周期 (默认 3)
+
+    Returns:
+        Tuple of 2 arrays: (momentum, smoothed_momentum)
+    """
+    momentum, smoothed = _lib.py_ai_momentum_index(
+        _to_list_fast(close), k, trend_length, smooth,
+    )
+    return _to_array(momentum), _to_array(smoothed)
+
+
+def atr2_signals(
+    high: ArrayLike,
+    low: ArrayLike,
+    close: ArrayLike,
+    volume: ArrayLike,
+    trend_length: int = 14,
+    confirmation_threshold: float = 0.5,
+    momentum_window: int = 10,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    ATR2 Signals - ATR 和动量信号生成器（非 ML 版本）。
+
+    Args:
+        high: 最高价序列
+        low: 最低价序列
+        close: 收盘价序列
+        volume: 成交量序列
+        trend_length: 趋势周期 (默认 14)
+        confirmation_threshold: 确认阈值 (默认 0.5)
+        momentum_window: 动量窗口 (默认 10)
+
+    Returns:
+        Tuple of 3 arrays: (buy_signals, sell_signals, signal_strength)
+    """
+    buy, sell, strength = _lib.py_atr2_signals(
+        _to_list_fast(high),
+        _to_list_fast(low),
+        _to_list_fast(close),
+        _to_list_fast(volume),
+        trend_length, confirmation_threshold, momentum_window,
+    )
+    return _to_array(buy), _to_array(sell), _to_array(strength)
+
+
+def pivot_buy_sell(
+    high: ArrayLike,
+    low: ArrayLike,
+    close: ArrayLike,
+    lookback: int = 5,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Pivot Buy/Sell - 枢轴点买卖信号。
+
+    Args:
+        high: 最高价序列
+        low: 最低价序列
+        close: 收盘价序列
+        lookback: 回溯周期 (默认 5)
+
+    Returns:
+        Tuple of 7 arrays: (pivot, r1, r2, s1, s2, buy_signals, sell_signals)
+    """
+    pivot, r1, r2, s1, s2, buy, sell = _lib.py_pivot_buy_sell(
+        _to_list_fast(high),
+        _to_list_fast(low),
+        _to_list_fast(close),
+        lookback,
+    )
+    return (
+        _to_array(pivot), _to_array(r1), _to_array(r2),
+        _to_array(s1), _to_array(s2),
+        _to_array(buy), _to_array(sell),
+    )
+
+
+def detect_divergence(
+    price: ArrayLike,
+    indicator: ArrayLike,
+    lookback: int = 5,
+    threshold: float = 0.01,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    背离检测 - 检测价格与指标之间的背离。
+
+    Args:
+        price: 价格序列
+        indicator: 指标序列 (如 RSI, MACD)
+        lookback: 回溯周期 (默认 5)
+        threshold: 背离阈值 (默认 0.01)
+
+    Returns:
+        Tuple of 2 arrays:
+        - divergence_type: 背离类型 (0=无, 1=常规看涨, 2=常规看跌, 3=隐藏看涨, 4=隐藏看跌)
+        - strength: 背离强度 (0.0-1.0)
+    """
+    div_type, strength = _lib.py_detect_divergence(
+        _to_list_fast(price),
+        _to_list_fast(indicator),
+        lookback, threshold,
+    )
+    return _to_array(div_type), _to_array(strength)
+
+
+def fvg_signals(
+    high: ArrayLike,
+    low: ArrayLike,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    FVG (Fair Value Gap) 信号 - 公平价值缺口检测。
+
+    ICT (Inner Circle Trader) 概念，检测价格中的失衡区域。
+
+    Args:
+        high: 最高价序列
+        low: 最低价序列
+
+    Returns:
+        Tuple of 4 arrays:
+        - bullish_fvg: 看涨 FVG (1.0=存在, 0.0=无)
+        - bearish_fvg: 看跌 FVG (1.0=存在, 0.0=无)
+        - fvg_upper: FVG 上边界
+        - fvg_lower: FVG 下边界
+    """
+    bullish, bearish, upper, lower = _lib.py_fvg_signals(
+        _to_list_fast(high),
+        _to_list_fast(low),
+    )
+    return _to_array(bullish), _to_array(bearish), _to_array(upper), _to_array(lower)
+
+
+def pd_array_signals(
+    high: ArrayLike,
+    low: ArrayLike,
+    close: ArrayLike,
+    swing_lookback: int = 10,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    PD Array Signals - 溢价/折扣区域信号。
+
+    ICT 概念，基于 swing high/low 计算溢价和折扣区域。
+
+    Args:
+        high: 最高价序列
+        low: 最低价序列
+        close: 收盘价序列
+        swing_lookback: Swing 点回溯周期 (默认 10)
+
+    Returns:
+        Tuple of 4 arrays:
+        - premium_zone: 溢价区 (1.0=在区域内, 0.0=无)
+        - discount_zone: 折扣区 (1.0=在区域内, 0.0=无)
+        - equilibrium: 平衡点价格
+        - zone_strength: 区域强度
+    """
+    premium, discount, equilibrium, strength = _lib.py_pd_array_signals(
+        _to_list_fast(high),
+        _to_list_fast(low),
+        _to_list_fast(close),
+        swing_lookback,
+    )
+    return _to_array(premium), _to_array(discount), _to_array(equilibrium), _to_array(strength)
+
+
+def combine_signals(
+    buy1: ArrayLike,
+    sell1: ArrayLike,
+    buy2: ArrayLike,
+    sell2: ArrayLike,
+    weight1: float = 0.5,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """
+    组合信号 - 加权组合两组交易信号。
+
+    Args:
+        buy1: 第一组买入信号
+        sell1: 第一组卖出信号
+        buy2: 第二组买入信号
+        sell2: 第二组卖出信号
+        weight1: 第一组权重 (默认 0.5, 第二组为 1-weight1)
+
+    Returns:
+        Tuple of 3 arrays:
+        - combined_buy: 组合买入信号
+        - combined_sell: 组合卖出信号
+        - signal_strength: 信号强度
+    """
+    buy, sell, strength = _lib.py_combine_signals(
+        _to_list_fast(buy1),
+        _to_list_fast(sell1),
+        _to_list_fast(buy2),
+        _to_list_fast(sell2),
+        weight1,
+    )
+    return _to_array(buy), _to_array(sell), _to_array(strength)
+
+
+def calculate_stops(
+    close: ArrayLike,
+    atr_values: ArrayLike,
+    buy_signals: ArrayLike,
+    sell_signals: ArrayLike,
+    sl_multiplier: float = 1.5,
+    tp_multiplier: float = 2.0,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    计算止损止盈 - 基于 ATR 计算动态止损止盈价位。
+
+    Args:
+        close: 收盘价序列
+        atr_values: ATR 值序列
+        buy_signals: 买入信号序列
+        sell_signals: 卖出信号序列
+        sl_multiplier: 止损 ATR 乘数 (默认 1.5)
+        tp_multiplier: 止盈 ATR 乘数 (默认 2.0)
+
+    Returns:
+        Tuple of 2 arrays:
+        - stop_loss: 止损价位
+        - take_profit: 止盈价位
+    """
+    sl, tp = _lib.py_calculate_stops(
+        _to_list_fast(close),
+        _to_list_fast(atr_values),
+        _to_list_fast(buy_signals),
+        _to_list_fast(sell_signals),
+        sl_multiplier, tp_multiplier,
+    )
+    return _to_array(sl), _to_array(tp)
+
+
+def dynamic_macd(
+    open_: ArrayLike,
+    high: ArrayLike,
+    low: ArrayLike,
+    close: ArrayLike,
+    fast_length: int = 12,
+    slow_length: int = 26,
+    signal_smooth: int = 9,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Dynamic MACD - Heikin-Ashi 增强的 MACD 指标
+
+    使用 HLCC4 (High+Low+Close+Close)/4 作为数据源计算 MACD，
+    并同时输出 Heikin-Ashi 蜡烛图数据用于趋势确认。
+
+    Args:
+        open_: 开盘价序列
+        high: 最高价序列
+        low: 最低价序列
+        close: 收盘价序列
+        fast_length: 快速 EMA 周期（默认 12）
+        slow_length: 慢速 EMA 周期（默认 26）
+        signal_smooth: 信号线平滑周期（默认 9）
+
+    Returns:
+        Tuple of 5 arrays:
+        - macd: MACD 线
+        - signal: 信号线
+        - histogram: MACD 柱状图
+        - ha_open: Heikin-Ashi 开盘价
+        - ha_close: Heikin-Ashi 收盘价
+    """
+    macd, signal, histogram, ha_open, ha_close = _lib.py_dynamic_macd(
+        _to_list_fast(open_),
+        _to_list_fast(high),
+        _to_list_fast(low),
+        _to_list_fast(close),
+        fast_length, slow_length, signal_smooth,
+    )
+    return (
+        _to_array(macd),
+        _to_array(signal),
+        _to_array(histogram),
+        _to_array(ha_open),
+        _to_array(ha_close),
+    )
+
+
 # Export all functions
 __all__ = [
     # Moving Averages
@@ -696,4 +1224,14 @@ __all__ = [
     'morning_star', 'evening_star',
     # Utility
     'crossover', 'crossunder', 'highest', 'lowest', 'percent_rank',
+    # SFG (Signal Force Generator - ML-Enhanced + Market Structure)
+    'ai_supertrend_ml', 'atr2_signals_ml', 'ai_momentum_index_ml',
+    'general_parameters_signals',
+    # SFG Non-ML versions
+    'ai_supertrend', 'ai_momentum_index', 'atr2_signals',
+    # SFG Market Structure (ICT Concepts)
+    'pivot_buy_sell', 'detect_divergence', 'fvg_signals',
+    'pd_array_signals', 'combine_signals', 'calculate_stops',
+    # SFG Enhanced MACD
+    'dynamic_macd',
 ]

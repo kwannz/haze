@@ -28,6 +28,7 @@ from .haze_library import (
     OnlineAdaptiveRSI,
     OnlineEnsembleSignal,
     OnlineMLSuperTrend,
+    OnlineAISuperTrendML,
 )
 
 _NAN = float("nan")
@@ -639,6 +640,124 @@ class IncrementalMLSuperTrend:
             return _NAN, _NAN, _NAN
 
 
+class IncrementalAISuperTrend:
+    """Incremental AI SuperTrend ML calculator.
+
+    ML-enhanced SuperTrend indicator with sliding window linear regression
+    for trend prediction. Provides buy/sell signals, stop-loss, and take-profit
+    levels based on ATR and ML-predicted trend direction.
+
+    Returns a dict with 7 fields:
+    - supertrend: float - SuperTrend line value
+    - direction: int - Trend direction (-1, 0, 1)
+    - trend_offset: float - ML-predicted trend offset
+    - buy_signal: bool - True if buy signal triggered
+    - sell_signal: bool - True if sell signal triggered
+    - stop_loss: float - Suggested stop-loss level
+    - take_profit: float - Suggested take-profit level
+    """
+
+    def __init__(
+        self,
+        *,
+        st_length: int = 10,
+        st_multiplier: float = 3.0,
+        lookback: int = 10,
+        train_window: int = 200,
+    ) -> None:
+        if st_length <= 0:
+            raise ValueError("st_length must be > 0")
+        if not math.isfinite(st_multiplier) or st_multiplier <= 0.0:
+            raise ValueError("st_multiplier must be > 0")
+        if lookback <= 0:
+            raise ValueError("lookback must be > 0")
+        if train_window <= lookback:
+            raise ValueError("train_window must be > lookback")
+
+        self.st_length = int(st_length)
+        self.st_multiplier = float(st_multiplier)
+        self.lookback = int(lookback)
+        self.train_window = int(train_window)
+
+        self._inner = OnlineAISuperTrendML(st_length, st_multiplier, lookback, train_window)
+        self._lock = threading.Lock()
+        self.count = 0
+        self.current_direction = 0
+        self._is_ready = False
+
+    def reset(self) -> None:
+        with self._lock:
+            self._inner.reset()
+            self.count = 0
+            self.current_direction = 0
+            self._is_ready = False
+
+    @property
+    def is_ready(self) -> bool:
+        return self._is_ready
+
+    def update(self, high: float, low: float, close: float) -> dict[str, Any]:
+        """Update with new OHLC bar and return signals.
+
+        Parameters
+        ----------
+        high : float
+            High price of the bar
+        low : float
+            Low price of the bar
+        close : float
+            Close price of the bar
+
+        Returns
+        -------
+        dict
+            Dictionary with keys: supertrend, direction, trend_offset,
+            buy_signal, sell_signal, stop_loss, take_profit
+        """
+        h = float(high)
+        lo = float(low)
+        c = float(close)
+
+        with self._lock:
+            result = self._inner.update(h, lo, c)
+            self.count += 1
+
+            if result is not None:
+                self.current_direction = result.direction
+                self._is_ready = True
+                return {
+                    "supertrend": result.supertrend,
+                    "direction": result.direction,
+                    "trend_offset": result.trend_offset,
+                    "buy_signal": result.buy_signal,
+                    "sell_signal": result.sell_signal,
+                    "stop_loss": result.stop_loss,
+                    "take_profit": result.take_profit,
+                }
+
+            self._is_ready = False
+            return {
+                "supertrend": _NAN,
+                "direction": 0,
+                "trend_offset": _NAN,
+                "buy_signal": False,
+                "sell_signal": False,
+                "stop_loss": _NAN,
+                "take_profit": _NAN,
+            }
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "count": self.count,
+            "is_ready": self.is_ready,
+            "direction": self.current_direction,
+            "st_length": self.st_length,
+            "st_multiplier": self.st_multiplier,
+            "lookback": self.lookback,
+            "train_window": self.train_window,
+        }
+
+
 class CCXTStreamProcessor:
     """Utility class for processing CCXT-style candles with multiple indicators.
 
@@ -686,7 +805,8 @@ class CCXTStreamProcessor:
         with self._lock:
             for name, ind in self._indicators.items():
                 if isinstance(ind, (IncrementalATR, IncrementalSuperTrend, IncrementalStochastic,
-                                   IncrementalEnsembleSignal, IncrementalMLSuperTrend)):
+                                   IncrementalEnsembleSignal, IncrementalMLSuperTrend,
+                                   IncrementalAISuperTrend)):
                     out = ind.update(high, low, close)
                 else:
                     out = ind.update(close)
@@ -709,6 +829,7 @@ def get_available_streaming_indicators() -> list[str]:
         "IncrementalAdaptiveRSI",
         "IncrementalEnsembleSignal",
         "IncrementalMLSuperTrend",
+        "IncrementalAISuperTrend",
     ]
 
 
@@ -749,6 +870,8 @@ def create_indicator(name: str, /, **kwargs: Any) -> Any:
         "adaptive_rsi": IncrementalAdaptiveRSI,
         "ensemble": IncrementalEnsembleSignal,
         "ml_supertrend": IncrementalMLSuperTrend,
+        "ai_supertrend": IncrementalAISuperTrend,
+        "ai_supertrend_ml": IncrementalAISuperTrend,
     }
     cls = aliases.get(key)
     if cls is None:

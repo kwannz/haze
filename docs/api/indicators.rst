@@ -176,3 +176,49 @@ Volume Indicators
 - ``mfi(high, low, close, volume, period)`` - Money Flow Index
 - ``cmf(high, low, close, volume, period)`` - Chaikin Money Flow
 - ``ad(high, low, close, volume)`` - Accumulation/Distribution Line
+
+ML-Enhanced Signal Indicators (SFG)
+-----------------------------------
+
+The SFG (Signal Force Generator) module provides ML-enhanced trading signal indicators.
+See :doc:`pattern/sfg` for detailed documentation.
+
+AI SuperTrend ML
+^^^^^^^^^^^^^^^^
+
+.. function:: haze_library.ai_supertrend_ml(high, low, close, st_length=10, st_multiplier=3.0, model_type="linreg", lookback=10, train_window=200)
+
+   ML-enhanced SuperTrend indicator using linear/ridge regression.
+
+   :returns: Tuple of (supertrend, direction, buy_signals, sell_signals, stop_loss, take_profit)
+   :rtype: tuple[list[float], ...]
+
+ATR2 Signals ML
+^^^^^^^^^^^^^^^
+
+.. function:: haze_library.atr2_signals_ml(high, low, close, volume, rsi_period=14, atr_period=14, ridge_alpha=1.0, momentum_window=10)
+
+   ATR and momentum-based adaptive signal generator.
+
+   :returns: Tuple of (rsi, buy_signals, sell_signals, signal_strength, stop_loss, take_profit)
+   :rtype: tuple[list[float], ...]
+
+AI Momentum Index ML
+^^^^^^^^^^^^^^^^^^^^
+
+.. function:: haze_library.ai_momentum_index_ml(close, rsi_period=14, smooth_period=3, use_polynomial=False, lookback=5, train_window=200)
+
+   ML-enhanced momentum indicator with overbought/oversold detection.
+
+   :returns: Tuple of (rsi, predicted_momentum, zero_cross_buy, zero_cross_sell, overbought, oversold)
+   :rtype: tuple[list[float], ...]
+
+General Parameters Signals
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. function:: haze_library.general_parameters_signals(high, low, close, ema_fast=20, ema_slow=50, atr_period=14, grid_multiplier=1.0)
+
+   EMA channel with grid trading signals.
+
+   :returns: Tuple of (buy_signals, sell_signals, stop_loss, take_profit)
+   :rtype: tuple[list[float], list[float], list[float], list[float]]
