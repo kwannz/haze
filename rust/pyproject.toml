@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "haze-library"
-version = "1.0.5"
+version = "1.0.6"
 description = "High-performance quantitative trading indicators library powered by Rust"
 readme = "../README.md"
 license = { text = "CC-BY-NC-4.0" }
