@@ -138,6 +138,9 @@ jobs:
     name: Rust Precision Benchmarks
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: write  # Required for auto-push to gh-pages
+
     steps:
       - uses: actions/checkout@v4
 
