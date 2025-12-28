@@ -1004,22 +1004,29 @@ def _register_pandas_accessors() -> None:
     `.ta` is commonly used by third-party libraries (e.g. pandas-ta). To avoid
     breaking imports in those environments, we always register `.haze` and only
     register `.ta` when it is available.
+
+    Note: We check __dict__ directly (not hasattr) to avoid triggering accessor
+    property descriptors and to prevent re-registration warnings.
     """
 
     for accessor_name in ("haze", "ta"):
-        try:
-            pd.api.extensions.register_dataframe_accessor(accessor_name)(
-                TechnicalAnalysisAccessor
-            )
-        except ValueError:
-            pass
+        # 跳过已注册的 accessor，避免重复注册警告
+        # 使用 __dict__ 检查而非 hasattr，因为 hasattr 会触发描述符协议
+        if accessor_name not in pd.DataFrame.__dict__:
+            try:
+                pd.api.extensions.register_dataframe_accessor(accessor_name)(
+                    TechnicalAnalysisAccessor
+                )
+            except ValueError:
+                pass
 
-        try:
-            pd.api.extensions.register_series_accessor(accessor_name)(
-                SeriesTechnicalAnalysisAccessor
-            )
-        except ValueError:
-            pass
+        if accessor_name not in pd.Series.__dict__:
+            try:
+                pd.api.extensions.register_series_accessor(accessor_name)(
+                    SeriesTechnicalAnalysisAccessor
+                )
+            except ValueError:
+                pass
 
 
 _register_pandas_accessors()
