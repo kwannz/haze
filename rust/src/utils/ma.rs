@@ -602,7 +602,7 @@ pub fn vwap(typical_prices: &[f64], volumes: &[f64], period: usize) -> HazeResul
 
     for i in period..n {
         // 定期完整重新计算以消除累积浮点误差
-        if (i - period + 1) % RECALC_INTERVAL == 0 {
+        if (i - period + 1).is_multiple_of(RECALC_INTERVAL) {
             pv_sum = 0.0;
             v_sum = 0.0;
             pv_comp = 0.0;
@@ -914,7 +914,7 @@ pub fn frama(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     validate_not_empty(values, "values")?;
 
     let n = values.len();
-    if period < 2 || period % 2 != 0 || period > n {
+    if period < 2 || !period.is_multiple_of(2) || period > n {
         return Err(HazeError::InvalidPeriod {
             period,
             data_len: n,

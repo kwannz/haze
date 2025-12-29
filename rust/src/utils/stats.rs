@@ -133,7 +133,7 @@ fn stdev_welford(values: &[f64], period: usize, population: bool) -> Vec<f64> {
     // 滑动窗口：增量更新
     for i in period..n {
         // 每 RECALC_INTERVAL 次重新计算以重置累积误差
-        if (i - period + 1) % RECALC_INTERVAL == 0 {
+        if (i - period + 1).is_multiple_of(RECALC_INTERVAL) {
             // 完整重新计算
             mean = 0.0;
             m2 = 0.0;
@@ -233,7 +233,7 @@ pub fn mean_and_stdev_population(values: &[f64], period: usize) -> (Vec<f64>, Ve
 
     // 滑动窗口：增量更新
     for i in period..n {
-        if (i - period + 1) % RECALC_INTERVAL == 0 {
+        if (i - period + 1).is_multiple_of(RECALC_INTERVAL) {
             // 完整重新计算以重置累积误差
             mean = 0.0;
             m2 = 0.0;
@@ -432,7 +432,7 @@ pub fn rolling_sum_kahan(values: &[f64], period: usize) -> Vec<f64> {
 
     for i in period..values.len() {
         // 每隔 RECALC_INTERVAL 次进行完整 Kahan 重新计算以重置累积误差
-        if (i - period + 1) % RECALC_INTERVAL == 0 {
+        if (i - period + 1).is_multiple_of(RECALC_INTERVAL) {
             sum = kahan_sum(&values[i + 1 - period..=i]);
             compensation = 0.0;
             result[i] = sum;
@@ -1959,7 +1959,7 @@ pub fn var_precise(values: &[f64], period: usize) -> Vec<f64> {
     }
 
     for i in period..n {
-        if (i - period + 1) % RECALC_INTERVAL == 0 {
+        if (i - period + 1).is_multiple_of(RECALC_INTERVAL) {
             mean = 0.0;
             m2 = 0.0;
             nan_count = 0;

@@ -173,12 +173,12 @@ pub fn trima(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     validate_not_empty(values, "values")?;
     validate_period(period, values.len())?;
 
-    let n1 = if period % 2 == 0 {
+    let n1 = if period.is_multiple_of(2) {
         period / 2
     } else {
         period.div_ceil(2)
     };
-    let n2 = if period % 2 == 0 { n1 + 1 } else { n1 };
+    let n2 = if period.is_multiple_of(2) { n1 + 1 } else { n1 };
 
     let first_sma = sma(values, n1)?;
     sma_allow_nan(&first_sma, n2)
