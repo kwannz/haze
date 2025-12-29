@@ -239,9 +239,7 @@ def main() -> int:
             targets: dict[str, list[str]] = {
                 "linux-x86_64": ["manylinux", "x86_64"],
                 "linux-aarch64": ["manylinux", "aarch64"],
-                "macos-x86_64": ["macosx", "x86_64"],
                 "macos-arm64": ["macosx", "arm64"],
-                "windows-amd64": ["win_amd64"],
             }
 
             for py_ver, cp_tag in python_tags.items():
