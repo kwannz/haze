@@ -63,10 +63,7 @@ jobs:
 
       - name: Run clippy
         if: matrix.rust == 'stable'
-        # Note: Using -W instead of -D until CI/local clippy version difference is resolved
-        # Local clippy 0.1.88 passes, but GitHub Actions stable may differ
-        run: cargo clippy --all-targets -- -W clippy::all
-        continue-on-error: true  # TODO: Fix clippy warnings and re-enable strict mode
+        run: cargo clippy --all-targets -- -D clippy::all
 
       - name: Run tests
         run: cargo test --verbose

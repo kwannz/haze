@@ -1,6 +1,6 @@
 [package]
 name = "haze-library"
-version = "1.1.0"
+version = "1.1.1"
 edition = "2021"
 description = "Rust backend for Haze quantitative trading indicators library"
 license = "CC-BY-NC-4.0"

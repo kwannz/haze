@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2025-12-30
+
+### Fixed / 修复
+- **Clippy 警告清理**: 修复所有 87 个 clippy 警告
+  - 更新 benchmark 代码使用 `std::hint::black_box` 替代 deprecated `criterion::black_box`
+  - CI/CD 启用严格模式 (`-D clippy::all`)
+  - 0 警告，100% 代码质量
+
+### Changed / 变更
+- CI/CD 配置：移除 `continue-on-error` flag，clippy 失败将阻止构建
+
 ## [1.1.0] - 2025-12-30
 
 ### Added / 新增
