@@ -92,7 +92,7 @@ fn rolling_sum_kahan(values: &[f64], period: usize) -> Vec<f64> {
     let mut compensation = 0.0;
 
     for i in period..values.len() {
-        if (i - period + 1) % RECALC_INTERVAL == 0 {
+        if (i - period + 1).is_multiple_of(RECALC_INTERVAL) {
             sum = kahan_sum(&values[i + 1 - period..=i]);
             compensation = 0.0;
             result[i] = sum;
