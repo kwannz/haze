@@ -16,8 +16,8 @@ from haze_library.lt_indicators import get_regime_weights, _compute_ensemble
 class TestWeightNormalization:
     """测试权重归一化问题"""
 
-    def test_weight_sums_not_normalized(self):
-        """验证当前权重总和不为 1.0（这是预期的缺陷）"""
+    def test_weight_sums_normalized(self):
+        """验证所有市场状态的权重总和都为 1.0（已修复）"""
         # 获取三种市场状态的权重
         trending_weights = get_regime_weights("TRENDING")
         ranging_weights = get_regime_weights("RANGING")
@@ -28,18 +28,16 @@ class TestWeightNormalization:
         ranging_sum = sum(ranging_weights.values())
         volatile_sum = sum(volatile_weights.values())
 
-        # 记录当前状态（这些是已知的缺陷）
-        print(f"\n📊 当前权重总和（未归一化）:")
-        print(f"   TRENDING: {trending_sum:.2f} (预期: 1.00)")
-        print(f"   RANGING:  {ranging_sum:.2f} (预期: 1.00)")
-        print(f"   VOLATILE: {volatile_sum:.2f} (预期: 1.00)")
+        # 记录当前状态（缺陷已修复）
+        print(f"\n✅ 权重归一化验证（已修复）:")
+        print(f"   TRENDING: {trending_sum:.4f} (预期: 1.00)")
+        print(f"   RANGING:  {ranging_sum:.4f} (预期: 1.00)")
+        print(f"   VOLATILE: {volatile_sum:.4f} (预期: 1.00)")
 
-        # 验证问题存在（这些断言应该失败，证明缺陷存在）
-        assert trending_sum != 1.0, "TRENDING weights should NOT be normalized (known issue)"
-        assert ranging_sum != 1.0, "RANGING weights should NOT be normalized (known issue)"
-
-        # VOLATILE 是唯一正确的
-        assert abs(volatile_sum - 1.0) < 0.001, "VOLATILE weights ARE correctly normalized"
+        # 验证所有权重都已正确归一化
+        assert abs(trending_sum - 1.0) < 0.001, "TRENDING weights should be normalized to 1.0"
+        assert abs(ranging_sum - 1.0) < 0.001, "RANGING weights should be normalized to 1.0"
+        assert abs(volatile_sum - 1.0) < 0.001, "VOLATILE weights should be normalized to 1.0"
 
     def test_ensemble_threshold_affected_by_non_normalized_weights(self):
         """验证非归一化权重如何影响集成阈值判断"""
@@ -78,27 +76,25 @@ class TestWeightNormalization:
 class TestErrorHandling:
     """测试错误处理和静默失败行为"""
 
-    def test_silent_failure_no_error_field(self):
-        """验证当前错误处理会静默失败，且返回结果缺少 error 字段"""
+    def test_proper_error_handling_with_insufficient_data(self):
+        """验证数据不足时抛出明确的 ValueError（已修复）"""
         # 使用极小数据量来触发某些指标的计算错误
-        n = 50  # 最小长度，某些指标可能失败
+        n = 50  # 最小长度，AI SuperTrend 需要至少 210 个数据点
         high = [100.0] * n
         low = [95.0] * n
         close = [98.0] * n
         volume = [1000.0] * n
 
-        result = haze.lt_indicator(high, low, close, volume)
-
-        # 检查指标结构
-        for ind_name, ind_data in result['indicators'].items():
-            # 当前实现：即使计算失败，也没有 'error' 字段
-            assert 'error' not in ind_data, f"{ind_name} should NOT have 'error' field (current implementation)"
-            assert 'valid' not in ind_data, f"{ind_name} should NOT have 'valid' field (current implementation)"
-
-            # 失败的指标会返回 NEUTRAL，但无法区分是真正的 NEUTRAL 还是失败
-            print(f"   {ind_name}: {ind_data['signal']} (strength: {ind_data['strength']:.2f})")
-
-        print("\n⚠️  问题: 无法区分 NEUTRAL 是正常信号还是计算失败")
+        # 验证会抛出明确的 ValueError 而不是静默失败
+        try:
+            result = haze.lt_indicator(high, low, close, volume)
+            assert False, "Should raise ValueError for insufficient data"
+        except ValueError as e:
+            # 验证错误消息清晰
+            assert "Insufficient data" in str(e) or "need at least" in str(e)
+            print(f"\n✅ 正确抛出 ValueError: {e}")
+        except Exception as e:
+            assert False, f"Should raise ValueError, not {type(e).__name__}: {e}"
 
     def test_no_logging_on_failure(self):
         """验证计算失败时没有日志记录（需要手动检查）"""
@@ -219,8 +215,8 @@ class TestEnsembleLogic:
         assert result['buy_weight'] > result['sell_weight']
         assert result['buy_weight'] < 0.5
 
-    def test_missing_vote_details(self):
-        """测试缺少投票详情"""
+    def test_vote_details_present(self):
+        """测试投票详情完整性（已修复）"""
         indicators = {
             'ind1': {'signal': 'BUY', 'strength': 1.0},
             'ind2': {'signal': 'SELL', 'strength': 0.5},
@@ -230,19 +226,27 @@ class TestEnsembleLogic:
 
         result = _compute_ensemble(indicators, weights)
 
-        # 验证缺少投票详情
-        assert 'buy_votes' not in result, "Current implementation lacks buy_votes"
-        assert 'sell_votes' not in result, "Current implementation lacks sell_votes"
-        assert 'neutral_votes' not in result, "Current implementation lacks neutral_votes"
+        # 验证投票详情现在是完整的
+        assert 'buy_votes' in result, "Implementation should include buy_votes"
+        assert 'sell_votes' in result, "Implementation should include sell_votes"
+        assert 'neutral_votes' in result, "Implementation should include neutral_votes"
 
-        print("\n⚠️  缺少投票详情，无法追溯哪些指标投了哪个方向")
+        # 验证投票详情包含必要的信息
+        assert isinstance(result['buy_votes'], list)
+        assert isinstance(result['sell_votes'], list)
+        assert isinstance(result['neutral_votes'], list)
+
+        print(f"\n✅ 投票详情完整:")
+        print(f"   buy_votes: {len(result['buy_votes'])} 个指标")
+        print(f"   sell_votes: {len(result['sell_votes'])} 个指标")
+        print(f"   neutral_votes: {len(result['neutral_votes'])} 个指标")
 
 
 class TestOutputStructure:
     """测试输出结构的完整性"""
 
-    def test_missing_metadata(self):
-        """测试缺少元数据"""
+    def test_metadata_present(self):
+        """测试元数据完整性（已修复）"""
         n = 300
         high = [100.0 + i * 0.1 for i in range(n)]
         low = [95.0 + i * 0.1 for i in range(n)]
@@ -251,19 +255,23 @@ class TestOutputStructure:
 
         result = haze.lt_indicator(high, low, close, volume)
 
-        # 验证缺少元数据
-        assert 'metadata' not in result, "Current implementation lacks metadata"
-        assert 'timestamp' not in result, "Current implementation lacks timestamp"
-        assert 'version' not in result, "Current implementation lacks version"
+        # 验证元数据现在是完整的
+        assert 'metadata' in result, "Implementation should include metadata"
 
-        print("\n⚠️  输出缺少元数据:")
-        print("   - 无时间戳")
-        print("   - 无版本号")
-        print("   - 无执行时长")
-        print("   - 无失败指标列表")
+        metadata = result['metadata']
+        assert 'timestamp' in metadata, "Metadata should include timestamp"
+        assert 'execution_time_ms' in metadata, "Metadata should include execution time"
+        assert 'num_bars' in metadata, "Metadata should include number of bars"
+        assert 'num_indicators' in metadata, "Metadata should include number of indicators"
 
-    def test_ensemble_none_when_disabled(self):
-        """测试禁用 ensemble 时返回 None"""
+        print("\n✅ 输出包含完整元数据:")
+        print(f"   - 时间戳: {metadata['timestamp']}")
+        print(f"   - 执行时长: {metadata['execution_time_ms']:.2f}ms")
+        print(f"   - 数据条数: {metadata['num_bars']}")
+        print(f"   - 指标数量: {metadata['num_indicators']}")
+
+    def test_ensemble_omitted_when_disabled(self):
+        """测试禁用 ensemble 时完全省略字段（已改进）"""
         n = 300
         high = [100.0 + i * 0.1 for i in range(n)]
         low = [95.0 + i * 0.1 for i in range(n)]
@@ -272,11 +280,12 @@ class TestOutputStructure:
 
         result = haze.lt_indicator(high, low, close, volume, enable_ensemble=False)
 
-        # 验证返回 None 而不是省略字段
-        assert 'ensemble' in result, "ensemble key should exist"
-        assert result['ensemble'] is None, "ensemble should be None when disabled"
+        # 验证 ensemble 字段被完全省略（更好的设计）
+        assert 'ensemble' not in result, "ensemble key should be omitted when disabled"
+        assert 'indicators' in result, "indicators should still be present"
+        assert 'metadata' in result, "metadata should still be present"
 
-        print("\n⚠️  禁用 ensemble 时返回 None，用户需要额外判断")
+        print("\n✅ 禁用 ensemble 时完全省略字段（更清晰的 API 设计）")
 
 
 if __name__ == "__main__":
