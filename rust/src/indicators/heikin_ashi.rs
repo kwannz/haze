@@ -5,8 +5,8 @@
 // - 更清晰地显示趋势
 // - 减少假信号
 
-use crate::errors::{HazeError, HazeResult};
 use crate::errors::validation::{validate_lengths_match, validate_not_empty};
+use crate::errors::{HazeError, HazeResult};
 
 /// Heikin Ashi 蜡烛图数据
 #[derive(Debug, Clone)]
@@ -21,8 +21,8 @@ pub struct HeikinAshiCandles {
 #[derive(Debug, Clone)]
 pub struct HeikinAshiSignals {
     pub candles: HeikinAshiCandles,
-    pub buy_signals: Vec<f64>,   // 买入信号（1.0 = 强烈买入）
-    pub sell_signals: Vec<f64>,  // 卖出信号（1.0 = 强烈卖出）
+    pub buy_signals: Vec<f64>,    // 买入信号（1.0 = 强烈买入）
+    pub sell_signals: Vec<f64>,   // 卖出信号（1.0 = 强烈卖出）
     pub trend_strength: Vec<f64>, // 趋势强度（0.0-1.0）
 }
 
@@ -139,8 +139,10 @@ pub fn heikin_ashi_signals(
             let is_bearish = candles.ha_close[idx] < candles.ha_open[idx];
 
             // 检查是否有下影线（看涨蜡烛）或上影线（看跌蜡烛）
-            let lower_shadow = candles.ha_open[idx].min(candles.ha_close[idx]) - candles.ha_low[idx];
-            let upper_shadow = candles.ha_high[idx] - candles.ha_open[idx].max(candles.ha_close[idx]);
+            let lower_shadow =
+                candles.ha_open[idx].min(candles.ha_close[idx]) - candles.ha_low[idx];
+            let upper_shadow =
+                candles.ha_high[idx] - candles.ha_open[idx].max(candles.ha_close[idx]);
 
             if is_bullish && lower_shadow < ha_range * 0.1 {
                 bullish_count += 1;
@@ -213,11 +215,7 @@ mod tests {
         let result = heikin_ashi_signals(&open, &high, &low, &close, 3).unwrap();
 
         // 上升趋势应该有买入信号
-        let buy_count: usize = result
-            .buy_signals
-            .iter()
-            .filter(|&&x| x > 0.0)
-            .count();
+        let buy_count: usize = result.buy_signals.iter().filter(|&&x| x > 0.0).count();
 
         assert!(buy_count > 0, "Expected buy signals in uptrend");
     }
@@ -234,11 +232,7 @@ mod tests {
         let result = heikin_ashi_signals(&open, &high, &low, &close, 3).unwrap();
 
         // 下降趋势应该有卖出信号
-        let sell_count: usize = result
-            .sell_signals
-            .iter()
-            .filter(|&&x| x > 0.0)
-            .count();
+        let sell_count: usize = result.sell_signals.iter().filter(|&&x| x > 0.0).count();
 
         assert!(sell_count > 0, "Expected sell signals in downtrend");
     }

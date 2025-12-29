@@ -938,9 +938,7 @@ pub fn volume_profile_with_signals(
             vah[i] = value_area_bins
                 .iter()
                 .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
-            val[i] = value_area_bins
-                .iter()
-                .fold(f64::INFINITY, |a, &b| a.min(b));
+            val[i] = value_area_bins.iter().fold(f64::INFINITY, |a, &b| a.min(b));
         }
 
         // 6. 生成信号

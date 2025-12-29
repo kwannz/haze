@@ -5725,13 +5725,8 @@ fn py_heikin_ashi_signals(
     close: Vec<f64>,
     lookback: Option<usize>,
 ) -> PyResult<Vec3F64> {
-    let result = indicators::heikin_ashi_signals(
-        &open,
-        &high,
-        &low,
-        &close,
-        lookback.unwrap_or(3),
-    )?;
+    let result =
+        indicators::heikin_ashi_signals(&open, &high, &low, &close, lookback.unwrap_or(3))?;
     Ok((
         result.buy_signals,
         result.sell_signals,
