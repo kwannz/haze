@@ -62,3 +62,12 @@ site/
 
 # OS
 Thumbs.db
+
+# AI Tool directories
+.claude/
+.serena/
+
+# Local data and temporary scripts
+data/
+check_lt_realtime.py
+monitor_lt_alerts.py

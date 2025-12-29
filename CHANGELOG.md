@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-12-30
+
+### Added / 新增
+- **LT 组合指标系统**: 10 个 SFG 专业交易信号指标
+  - AI SuperTrend: KNN + SuperTrend 机器学习增强
+  - ATR2 Signals: ATR + MLMI 预测
+  - Pivot Buy/Sell Signals: 枢轴点 + 跟踪止损
+  - AI Momentum Index: KNN + RSI 关系预测
+  - Volume Algorithm Profile: 成交量分布 + POC/VAH/VAL
+  - General Parameters: 动态 EMA 通道
+  - Market Structure & FVG: BOS/CHoCH + Fair Value Gap
+  - PD Array & Breaker Block: Premium/Discount + 突破区块
+  - Linear Regression & Supply Demand: 多时间框架支撑阻力
+  - Dynamic MACD + Heikin Ashi: MACD + 平均 K 线
+
+- **市场状态自适应**: 自动检测 TRENDING/RANGING/VOLATILE 市场状态
+- **加权集成投票**: 根据市场状态动态调整指标权重
+- **Volume Profile 增强**: 新增 `volume_profile_with_signals()` 函数
+  - POC (Point of Control) 计算
+  - VAH/VAL (Value Area High/Low) 识别
+  - 买卖信号生成
+- **Heikin Ashi 指标**: 新增 `heikin_ashi_signals()` 函数
+  - 趋势强度计算
+  - 买卖信号生成
+
+### Fixed / 修复
+- 权重归一化: 确保所有市场状态权重总和为 1.0
+- 边界条件检测: 增强 NaN/Inf/负值检测
+- 输入验证: 添加数据长度和有效性检查
+
+### Documentation / 文档
+- 新增 LT 指标演示示例 (`examples/lt_indicator_demo.py`)
+- 新增市场状态校准文档 (`examples/REGIME_CALIBRATION_RESULTS.md`)
+- 新增 10 个 SFG 指标功能验证测试 (`examples/test_lt_indicators.py`)
+
+### Tests / 测试
+- 新增逻辑闭环测试 (`tests/unit/test_lt_indicators_closure.py`)
+- 896/908 tests passing (98.7%)
+- PDF 规格符合度: 10/10 指标 100% 符合
+
 ## [1.0.1] - 2025-12-28
 
 ### Changed / 变更

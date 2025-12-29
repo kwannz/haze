@@ -63,7 +63,7 @@ use crate::errors::validation::{
     validate_lengths_match, validate_min_length, validate_not_empty, validate_not_empty_allow_nan,
     validate_period, validate_range,
 };
-use crate::errors::HazeResult;
+use crate::errors::{HazeError, HazeResult};
 use crate::init_result;
 use crate::utils::float_compare::approx_eq;
 use crate::utils::ma::{ema_allow_nan, sma_allow_nan};
@@ -761,6 +761,233 @@ fn ema_seed(values: &[f64], period: usize) -> HazeResult<Vec<f64>> {
     }
 
     Ok(result)
+}
+
+// ============================================================================
+// Volume Profile with Signals (Advanced Volume Analysis)
+// ============================================================================
+
+/// Volume Profile 结果（包含信号）
+#[derive(Debug, Clone)]
+pub struct VolumeProfileResult {
+    pub poc: Vec<f64>,             // Point of Control
+    pub vah: Vec<f64>,             // Value Area High
+    pub val: Vec<f64>,             // Value Area Low
+    pub buy_signals: Vec<f64>,     // 买入信号（价格接近VAL）
+    pub sell_signals: Vec<f64>,    // 卖出信号（价格接近VAH）
+    pub signal_strength: Vec<f64>, // 信号强度
+}
+
+/// 价格区间结构
+#[derive(Debug, Clone)]
+struct PriceBin {
+    price_level: f64,
+    volume: f64,
+}
+
+/// 计算 Volume Profile 并生成交易信号
+///
+/// Volume Profile 是一种价格分布分析工具，用于识别支撑/阻力位和市场均衡
+///
+/// # 参数
+/// - `high`: 最高价
+/// - `low`: 最低价
+/// - `close`: 收盘价
+/// - `volume`: 成交量
+/// - `period`: 计算周期（滚动窗口）
+/// - `num_bins`: 价格分组数量（默认20）
+///
+/// # 返回
+/// VolumeProfileResult 包含：
+/// - POC (Point of Control): 成交量最大的价格水平
+/// - VAH (Value Area High): 价值区域上界（包含70%成交量）
+/// - VAL (Value Area Low): 价值区域下界
+/// - buy_signals: 买入信号（价格 <= VAL 时触发）
+/// - sell_signals: 卖出信号（价格 >= VAH 时触发）
+/// - signal_strength: 信号强度（0.0-1.0）
+///
+/// # 算法
+/// ```text
+/// 1. 将价格范围分成 num_bins 个区间
+/// 2. 统计每个价格区间的成交量
+/// 3. POC = 成交量最大的价格区间
+/// 4. 按成交量从大到小累加，直到达到总成交量的70%
+/// 5. VAH = 价值区域的最高价
+/// 6. VAL = 价值区域的最低价
+/// 7. 买入信号：价格 <= VAL（支撑位）
+/// 8. 卖出信号：价格 >= VAH（阻力位）
+/// ```
+pub fn volume_profile_with_signals(
+    high: &[f64],
+    low: &[f64],
+    close: &[f64],
+    volume: &[f64],
+    period: usize,
+    num_bins: usize,
+) -> HazeResult<VolumeProfileResult> {
+    validate_not_empty(close, "close")?;
+    validate_lengths_match(&[
+        (high, "high"),
+        (low, "low"),
+        (close, "close"),
+        (volume, "volume"),
+    ])?;
+
+    if period == 0 {
+        return Err(HazeError::InvalidPeriod {
+            period,
+            data_len: close.len(),
+        });
+    }
+
+    validate_range("num_bins", num_bins as f64, 1.0, f64::INFINITY)?;
+
+    let len = close.len();
+    let mut poc = vec![f64::NAN; len];
+    let mut vah = vec![f64::NAN; len];
+    let mut val = vec![f64::NAN; len];
+    let mut buy_signals = vec![0.0; len];
+    let mut sell_signals = vec![0.0; len];
+    let mut signal_strength = vec![0.0; len];
+
+    // 滚动窗口计算
+    for i in period - 1..len {
+        let window_start = i - period + 1;
+
+        // 1. 计算窗口内的价格范围
+        let min_price = low[window_start..=i]
+            .iter()
+            .fold(f64::INFINITY, |a, &b| a.min(b));
+        let max_price = high[window_start..=i]
+            .iter()
+            .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+
+        if max_price <= min_price || !max_price.is_finite() || !min_price.is_finite() {
+            continue;
+        }
+
+        // 2. 创建价格区间
+        let bin_size = (max_price - min_price) / num_bins as f64;
+        let mut bins: Vec<PriceBin> = (0..num_bins)
+            .map(|idx| PriceBin {
+                price_level: min_price + (idx as f64 + 0.5) * bin_size,
+                volume: 0.0,
+            })
+            .collect();
+
+        // 3. 分配成交量到各个价格区间
+        let mut total_volume = 0.0;
+        for j in window_start..=i {
+            let price = close[j];
+            let vol = volume[j];
+
+            if !price.is_finite() || !vol.is_finite() || vol < 0.0 {
+                continue;
+            }
+
+            // 找到对应的price bin
+            let bin_idx = if price <= min_price {
+                0
+            } else if price >= max_price {
+                num_bins - 1
+            } else {
+                let idx = ((price - min_price) / bin_size) as usize;
+                idx.min(num_bins - 1)
+            };
+
+            bins[bin_idx].volume += vol;
+            total_volume += vol;
+        }
+
+        if total_volume <= 0.0 {
+            continue;
+        }
+
+        // 4. 找到 POC (Point of Control) - 成交量最大的价格
+        let mut max_vol_bin = 0;
+        let mut max_vol = 0.0;
+        for (idx, bin) in bins.iter().enumerate() {
+            if bin.volume > max_vol {
+                max_vol = bin.volume;
+                max_vol_bin = idx;
+            }
+        }
+
+        poc[i] = bins[max_vol_bin].price_level;
+
+        // 5. 计算 Value Area (70% 成交量区域)
+        // 按成交量排序
+        let mut sorted_bins = bins.clone();
+        sorted_bins.sort_by(|a, b| b.volume.partial_cmp(&a.volume).unwrap());
+
+        let target_volume = total_volume * 0.70;
+        let mut cumulative_volume = 0.0;
+        let mut value_area_bins = Vec::new();
+
+        for bin in sorted_bins.iter() {
+            value_area_bins.push(bin.price_level);
+            cumulative_volume += bin.volume;
+
+            if cumulative_volume >= target_volume {
+                break;
+            }
+        }
+
+        // VAH/VAL 是价值区域的上下界
+        if !value_area_bins.is_empty() {
+            vah[i] = value_area_bins
+                .iter()
+                .fold(f64::NEG_INFINITY, |a, &b| a.max(b));
+            val[i] = value_area_bins
+                .iter()
+                .fold(f64::INFINITY, |a, &b| a.min(b));
+        }
+
+        // 6. 生成信号
+        let current_price = close[i];
+
+        if !val[i].is_nan() && current_price <= val[i] {
+            // 价格在VAL附近或以下 -> 买入信号（支撑位）
+            buy_signals[i] = 1.0;
+
+            // 信号强度：距离VAL的程度
+            let dist_below = (val[i] - current_price) / val[i];
+            signal_strength[i] = (dist_below * 5.0 + 0.5).min(1.0);
+        } else if !vah[i].is_nan() && current_price >= vah[i] {
+            // 价格在VAH附近或以上 -> 卖出信号（阻力位）
+            sell_signals[i] = 1.0;
+
+            // 信号强度：距离VAH的程度
+            let dist_above = (current_price - vah[i]) / vah[i];
+            signal_strength[i] = (dist_above * 5.0 + 0.5).min(1.0);
+        } else if !val[i].is_nan() && !vah[i].is_nan() {
+            // 在价值区域内
+            let va_range = vah[i] - val[i];
+            if va_range > 0.0 {
+                let dist_to_val = (current_price - val[i]) / va_range;
+                let dist_to_vah = (vah[i] - current_price) / va_range;
+
+                if dist_to_val < 0.15 {
+                    // 接近VAL
+                    buy_signals[i] = 0.5;
+                    signal_strength[i] = 0.4;
+                } else if dist_to_vah < 0.15 {
+                    // 接近VAH
+                    sell_signals[i] = 0.5;
+                    signal_strength[i] = 0.4;
+                }
+            }
+        }
+    }
+
+    Ok(VolumeProfileResult {
+        poc,
+        vah,
+        val,
+        buy_signals,
+        sell_signals,
+        signal_strength,
+    })
 }
 
 #[cfg(test)]

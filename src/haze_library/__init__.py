@@ -32,7 +32,7 @@ Performance:
     - High numerical precision using f64
 """
 
-__version__ = "1.0.6"
+__version__ = "1.1.0"
 __author__ = "kwannz"
 
 import inspect
@@ -129,6 +129,9 @@ except ImportError:
 # AI indicator helpers
 from .ai_indicators import adaptive_rsi, ensemble_signal, ml_supertrend
 
+# LT (Long-Term) indicator - 10 SFG indicators combination
+from .lt_indicators import lt_indicator
+
 # Streaming/incremental calculators
 try:
     from .streaming import (
@@ -195,6 +198,8 @@ __all__ = [
     "adaptive_rsi",
     "ensemble_signal",
     "ml_supertrend",
+    # LT indicator
+    "lt_indicator",
     # Exceptions
     "HazeError",
     "InvalidPeriodError",

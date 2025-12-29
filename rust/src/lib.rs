@@ -183,6 +183,9 @@ impl PyOhlcvFrame {
 }
 
 #[cfg(feature = "python")]
+type Vec3F64 = (Vec<f64>, Vec<f64>, Vec<f64>);
+
+#[cfg(feature = "python")]
 type Vec4F64 = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
 
 #[cfg(feature = "python")]
@@ -605,6 +608,8 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_breaker_block_signals, m)?)?;
     m.add_function(wrap_pyfunction!(py_general_parameters_signals, m)?)?;
     m.add_function(wrap_pyfunction!(py_linreg_supply_demand_signals, m)?)?;
+    m.add_function(wrap_pyfunction!(py_heikin_ashi_signals, m)?)?;
+    m.add_function(wrap_pyfunction!(py_volume_profile_signals, m)?)?;
 
     // 周期指标 (Hilbert Transform)
     m.add_function(wrap_pyfunction!(py_ht_dcperiod, m)?)?;
@@ -5707,6 +5712,61 @@ fn py_linreg_supply_demand_signals(
         tolerance.unwrap_or(0.02),
     )?;
     Ok((buy, sell, sl, tp))
+}
+
+/// Heikin Ashi 信号
+/// 返回: (buy_signals, sell_signals, trend_strength)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_heikin_ashi_signals(
+    open: Vec<f64>,
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    lookback: Option<usize>,
+) -> PyResult<Vec3F64> {
+    let result = indicators::heikin_ashi_signals(
+        &open,
+        &high,
+        &low,
+        &close,
+        lookback.unwrap_or(3),
+    )?;
+    Ok((
+        result.buy_signals,
+        result.sell_signals,
+        result.trend_strength,
+    ))
+}
+
+/// Volume Profile 信号
+/// 返回: (poc, vah, val, buy_signals, sell_signals, signal_strength)
+#[cfg(feature = "python")]
+#[pyfunction]
+fn py_volume_profile_signals(
+    high: Vec<f64>,
+    low: Vec<f64>,
+    close: Vec<f64>,
+    volume: Vec<f64>,
+    period: Option<usize>,
+    num_bins: Option<usize>,
+) -> PyResult<Vec6F64> {
+    let result = indicators::volume::volume_profile_with_signals(
+        &high,
+        &low,
+        &close,
+        &volume,
+        period.unwrap_or(50),
+        num_bins.unwrap_or(20),
+    )?;
+    Ok((
+        result.poc,
+        result.vah,
+        result.val,
+        result.buy_signals,
+        result.sell_signals,
+        result.signal_strength,
+    ))
 }
 
 // ==================== 周期指标包装 (Hilbert Transform) ====================
