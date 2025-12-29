@@ -18,6 +18,7 @@
 | ⚡ **Rust 高性能** | 比纯 Python 快 5-10 倍 |
 | 📊 **流式计算** | O(1) 实时增量指标计算 |
 | 🤖 **机器学习** | 内置 SVM、线性回归等 ML 模型 |
+| 🎯 **LT 组合指标** | 10 个 SFG 专业交易信号 + 市场状态自适应 |
 | 🔗 **多框架支持** | NumPy、Pandas、Polars、PyTorch |
 | 💹 **交易执行** | CCXT 交易所接口封装 |
 | 🎯 **高精度** | 误差容忍度 < 1e-9 |
@@ -30,7 +31,11 @@
 ### 从 PyPI 安装（推荐）
 
 ```bash
+# 安装最新版本 (v1.1.1+)
 pip install haze-library
+
+# 或指定版本
+pip install haze-library==1.1.1
 ```
 
 ### 可选依赖
@@ -186,6 +191,160 @@ model = ml.train_svm(features, labels)
 # 预测
 predictions = model.predict(new_features)
 ```
+
+### 🤖 LT 组合指标系统 (v1.1.0+)
+
+**LT (Long-Term) 组合指标系统**集成了 10 个 SFG (Smart Financial Group) 专业交易信号指标，具备市场状态自适应权重调整和加权集成投票逻辑，适用于中长期趋势交易。
+
+#### 快速开始
+
+```python
+import numpy as np
+from haze_library import lt_indicator
+
+# 准备价格数据（至少 500+ 个数据点以获得稳定信号）
+n = 1000
+high = np.array([100.0 + i * 0.1 + np.random.rand() * 2 for i in range(n)])
+low = np.array([100.0 + i * 0.1 - np.random.rand() * 2 for i in range(n)])
+close = np.array([100.0 + i * 0.1 for i in range(n)])
+volume = np.array([1000.0 + np.random.rand() * 500 for _ in range(n)])
+
+# 计算 LT 组合指标
+result = lt_indicator(high, low, close, volume)
+
+# 查看最终信号
+print(f"交易信号: {result['ensemble']['final_signal']}")  # BUY / SELL / NEUTRAL
+print(f"信号强度: {result['ensemble']['confidence']:.2%}")  # 0-100%
+print(f"市场状态: {result['market_regime']}")  # TRENDING / RANGING / VOLATILE
+```
+
+#### 10 个 SFG 指标详解
+
+| # | 指标名称 | 说明 | 适用场景 |
+|---|---------|------|---------|
+| 1 | **AI SuperTrend** | KNN + SuperTrend 机器学习增强 | 趋势跟踪 + 智能预测 |
+| 2 | **ATR2 Signals** | ATR + MLMI 多层次预测 | 波动率自适应入场 |
+| 3 | **Pivot Points** | 枢轴点 + 跟踪止损 | 支撑阻力位突破 |
+| 4 | **AI Momentum** | KNN + RSI 关系预测 | 动量反转捕捉 |
+| 5 | **Volume Profile** | 成交量分布 + POC/VAH/VAL | 高成交量区域识别 |
+| 6 | **General Parameters** | 动态 EMA 通道 | 趋势强度确认 |
+| 7 | **Market Structure** | BOS/CHoCH + Fair Value Gap | 市场结构转换 |
+| 8 | **PD Array** | Premium/Discount + 突破区块 | 价格失衡修复 |
+| 9 | **Linear Regression** | 多时间框架支撑阻力 | 均值回归交易 |
+| 10 | **Dynamic MACD + HA** | MACD + 平均 K 线 | 趋势延续验证 |
+
+#### 市场状态自适应
+
+系统自动检测 3 种市场状态并动态调整指标权重：
+
+```python
+# 查看当前市场状态
+regime = result['market_regime']
+print(f"市场状态: {regime}")
+
+# 不同市场状态的权重策略
+if regime == "TRENDING":
+    # 趋势指标权重高 (SuperTrend, MACD, Regression)
+    print("→ 适合趋势跟踪策略")
+elif regime == "RANGING":
+    # 均值回归指标权重高 (Pivot, Volume Profile)
+    print("→ 适合区间交易策略")
+elif regime == "VOLATILE":
+    # 波动率指标权重高 (ATR2, Market Structure)
+    print("→ 适合波动率突破策略")
+```
+
+#### 详细信号分析
+
+```python
+# 查看所有指标的独立信号
+for name, data in result['indicators'].items():
+    signal = data.get('signal', 'N/A')
+    confidence = data.get('confidence', 0.0)
+    print(f"{name:30} -> {signal:8} ({confidence:.1%})")
+
+# 示例输出:
+# ai_supertrend               -> BUY      (85.3%)
+# atr2_signals                -> BUY      (72.1%)
+# ai_momentum                 -> NEUTRAL  (45.0%)
+# volume_profile              -> SELL     (38.2%)
+# ...
+
+# 集成投票结果
+ensemble = result['ensemble']
+print(f"\n最终信号: {ensemble['final_signal']}")
+print(f"多头票数: {ensemble['bullish_votes']}")
+print(f"空头票数: {ensemble['bearish_votes']}")
+print(f"中性票数: {ensemble['neutral_votes']}")
+print(f"综合信心: {ensemble['confidence']:.2%}")
+```
+
+#### 实战应用示例
+
+```python
+import pandas as pd
+from haze_library import lt_indicator
+
+# 加载真实市场数据
+df = pd.read_csv('BTC_USDT_1h.csv')  # 至少 500+ 行数据
+
+# 计算 LT 信号
+result = lt_indicator(
+    df['high'].values,
+    df['low'].values,
+    df['close'].values,
+    df['volume'].values
+)
+
+# 获取最新信号
+signal = result['ensemble']['final_signal']
+confidence = result['ensemble']['confidence']
+regime = result['market_regime']
+
+# 交易逻辑
+if signal == "BUY" and confidence > 0.6:
+    if regime == "TRENDING":
+        print("✅ 强烈看涨信号 - 开多仓 (趋势跟踪)")
+    elif regime == "RANGING":
+        print("✅ 看涨信号 - 区间下沿做多")
+    else:
+        print("⚠️  看涨信号 - 高波动期谨慎操作")
+
+elif signal == "SELL" and confidence > 0.6:
+    if regime == "TRENDING":
+        print("❌ 强烈看跌信号 - 开空仓 (趋势跟踪)")
+    elif regime == "RANGING":
+        print("❌ 看跌信号 - 区间上沿做空")
+    else:
+        print("⚠️  看跌信号 - 高波动期谨慎操作")
+
+else:
+    print("⏸️  中性信号 - 观望等待更明确机会")
+
+# 风险管理建议
+if confidence < 0.4:
+    print("⚠️  低信心信号 - 建议减小仓位或不交易")
+elif confidence < 0.6:
+    print("ℹ️  中等信心 - 标准仓位")
+else:
+    print("💪 高信心信号 - 可适当增加仓位（不超过最大仓位限制）")
+```
+
+#### 最佳实践
+
+1. **数据量要求**: 至少 500 个数据点（推荐 1000+）以获得稳定信号
+2. **时间周期**: 适用于 1H / 4H / 1D 周期，中长期趋势交易
+3. **信号确认**:
+   - `confidence > 0.6` 为高质量信号
+   - `confidence < 0.4` 建议观望
+4. **市场适应**:
+   - TRENDING: 顺势交易，持仓时间较长
+   - RANGING: 区间交易，快进快出
+   - VOLATILE: 谨慎操作，严格止损
+5. **风险控制**:
+   - 永远设置止损（建议 2-3 倍 ATR）
+   - 单笔仓位不超过总资金 5-10%
+   - 多个信号确认后再入场
 
 ---
 
@@ -472,4 +631,4 @@ print(f"订单 ID: {order.id}")
 
 **Made with ❤️ by the Haze Team**
 
-**版本**: 1.0.5 | **更新日期**: 2025-12-28
+**版本**: 1.1.1 | **更新日期**: 2025-12-30
