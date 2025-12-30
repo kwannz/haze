@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["ai_momentum_index","ai_momentum_index_ml","ai_supertrend","ai_supertrend_ml","atr2_signals","atr2_signals_ml","dynamic_macd","general_parameters","general_parameters_signals","pivot_buy_sell"],"struct":["AIMomentumResult","AISuperTrendResult","ATR2SignalResult","GeneralParamsResult","PivotSignalResult"]};

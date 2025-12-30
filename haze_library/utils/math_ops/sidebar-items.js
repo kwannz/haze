@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["abs","acos","add","asin","atan","ceil","cos","cosh","div","exp","floor","ln","log10","max","min","minmax","minmaxindex","mult","sin","sinh","sqrt","sub","sum","tan","tanh"]};

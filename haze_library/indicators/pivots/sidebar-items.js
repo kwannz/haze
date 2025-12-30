@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["calc_pivot_series","calc_single_pivot","camarilla_pivots","demark_pivots","detect_pivot_touch","fibonacci_pivots","pivot_zone","standard_pivots","validate_finite_value","validate_pivot_levels","woodie_pivots"],"struct":["PivotLevels"]};

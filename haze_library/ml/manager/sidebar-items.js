@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["create_metadata","current_timestamp"],"struct":["ModelMetadata","SFGModelManager"]};

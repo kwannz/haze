@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["aberration","alligator","alma","bias","bop","cfo","coppock","cti","efi","entropy","er","inertia","kst","percent_rank","pgo","psl","pwma","qqe","roc_helper","rvi","shift_forward","sinwma","slope","smi","squeeze","ssl_channel","stc","stochastic_raw","swma","tdfi","vidya","vwma","wae","wma"]};

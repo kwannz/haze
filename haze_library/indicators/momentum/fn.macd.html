@@ -1,0 +1,96 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Calculates the Moving Average Convergence Divergence (MACD)."><title>macd in haze_library::indicators::momentum - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="haze_library" data-themes="" data-resource-suffix="" data-rustdoc-version="1.92.0 (ded5c06cf 2025-12-08)" data-channel="1.92.0" data-search-js="search-d69d8955.js" data-stringdex-js="stringdex-c3e638e9.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-ce535bd0.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc fn"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">macd</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../haze_library/index.html">haze_<wbr>library</a><span class="version">1.1.3</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">macd</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#formula" title="Formula">Formula</a></li><li><a href="#implementation-details" title="Implementation Details">Implementation Details</a></li><li><a href="#arguments" title="Arguments">Arguments</a></li><li><a href="#returns" title="Returns">Returns</a></li><li><a href="#errors" title="Errors">Errors</a></li><li><a href="#examples" title="Examples">Examples</a></li><li><a href="#performance" title="Performance">Performance</a></li><li><a href="#trading-interpretation" title="Trading Interpretation">Trading Interpretation</a></li><li><a href="#references" title="References">References</a></li><li><a href="#see-also" title="See Also">See Also</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="index.html">In haze_<wbr>library::<wbr>indicators::<wbr>momentum</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">haze_library</a>::<wbr><a href="../index.html">indicators</a>::<wbr><a href="index.html">momentum</a></div><h1>Function <span class="fn">macd</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/haze_library/indicators/momentum.rs.html#303-385">Source</a> </span></div><pre class="rust item-decl"><code>pub fn macd(
+    close: &amp;[<a class="primitive" href="https://doc.rust-lang.org/1.92.0/std/primitive.f64.html">f64</a>],
+    fast_period: <a class="primitive" href="https://doc.rust-lang.org/1.92.0/std/primitive.usize.html">usize</a>,
+    slow_period: <a class="primitive" href="https://doc.rust-lang.org/1.92.0/std/primitive.usize.html">usize</a>,
+    signal_period: <a class="primitive" href="https://doc.rust-lang.org/1.92.0/std/primitive.usize.html">usize</a>,
+) -&gt; <a class="type" href="../../errors/type.HazeResult.html" title="type haze_library::errors::HazeResult">HazeResult</a>&lt;(<a class="struct" href="https://doc.rust-lang.org/1.92.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.92.0/std/primitive.f64.html">f64</a>&gt;, <a class="struct" href="https://doc.rust-lang.org/1.92.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.92.0/std/primitive.f64.html">f64</a>&gt;, <a class="struct" href="https://doc.rust-lang.org/1.92.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.92.0/std/primitive.f64.html">f64</a>&gt;)&gt;</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Calculates the Moving Average Convergence Divergence (MACD).</p>
+<p>MACD is a trend-following momentum indicator that shows the relationship between
+two moving averages of a security’s price. It consists of three components:
+the MACD line, signal line, and histogram. MACD is widely used to identify
+trend direction, strength, and potential reversal points.</p>
+<h2 id="formula"><a class="doc-anchor" href="#formula">§</a>Formula</h2><div class="example-wrap"><pre class="language-text"><code>1. MACD Line = EMA(close, fast_period) - EMA(close, slow_period)
+2. Signal Line = EMA(MACD Line, signal_period)
+3. Histogram = MACD Line - Signal Line
+
+Trading Signals:
+- Bullish: MACD crosses above Signal (Histogram &gt; 0)
+- Bearish: MACD crosses below Signal (Histogram &lt; 0)
+- Divergence: Price and MACD move in opposite directions</code></pre></div><h2 id="implementation-details"><a class="doc-anchor" href="#implementation-details">§</a>Implementation Details</h2>
+<p>This implementation follows TA-Lib conventions:</p>
+<ul>
+<li>Fast EMA is reseeded at index <code>slow_period - 1</code> for alignment</li>
+<li>MACD line values before <code>lookback</code> are set to NaN</li>
+<li>Lookback period = <code>slow_period + signal_period - 2</code></li>
+</ul>
+<h2 id="arguments"><a class="doc-anchor" href="#arguments">§</a>Arguments</h2>
+<ul>
+<li><code>close</code> - Price data series (typically closing prices)</li>
+<li><code>fast_period</code> - Fast EMA period (commonly 12)</li>
+<li><code>slow_period</code> - Slow EMA period (commonly 26)</li>
+<li><code>signal_period</code> - Signal line EMA period (commonly 9)</li>
+</ul>
+<h2 id="returns"><a class="doc-anchor" href="#returns">§</a>Returns</h2>
+<p>Tuple of three vectors: <code>(macd_line, signal_line, histogram)</code></p>
+<ul>
+<li><code>macd_line</code>: Difference between fast and slow EMAs</li>
+<li><code>signal_line</code>: EMA of MACD line</li>
+<li><code>histogram</code>: Difference between MACD line and signal line</li>
+</ul>
+<p>All vectors have the same length as input. First <code>lookback</code> values are NaN.</p>
+<h2 id="errors"><a class="doc-anchor" href="#errors">§</a>Errors</h2>
+<p>Returns error if:</p>
+<ul>
+<li><a href="../../errors/enum.HazeError.html#variant.EmptyInput" title="variant haze_library::errors::HazeError::EmptyInput"><code>HazeError::EmptyInput</code></a> - <code>close</code> array is empty</li>
+<li><a href="../../errors/enum.HazeError.html#variant.InvalidPeriod" title="variant haze_library::errors::HazeError::InvalidPeriod"><code>HazeError::InvalidPeriod</code></a> - Any period parameter is 0</li>
+<li><a href="../../errors/enum.HazeError.html#variant.InvalidPeriod" title="variant haze_library::errors::HazeError::InvalidPeriod"><code>HazeError::InvalidPeriod</code></a> - <code>fast_period</code> constraints violated</li>
+<li><a href="../../errors/enum.HazeError.html#variant.InsufficientData" title="variant haze_library::errors::HazeError::InsufficientData"><code>HazeError::InsufficientData</code></a> - <code>slow_period</code> &gt; data length</li>
+<li><a href="../../errors/enum.HazeError.html#variant.InsufficientData" title="variant haze_library::errors::HazeError::InsufficientData"><code>HazeError::InsufficientData</code></a> - <code>lookback</code> &gt;= data length</li>
+</ul>
+<h2 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>haze_library::indicators::momentum::macd;
+
+<span class="kw">let </span>close = <span class="macro">vec!</span>[
+    <span class="number">100.0</span>, <span class="number">101.0</span>, <span class="number">102.0</span>, <span class="number">103.0</span>, <span class="number">104.0</span>, <span class="number">105.0</span>, <span class="number">104.5</span>, <span class="number">104.0</span>,
+    <span class="number">105.0</span>, <span class="number">106.0</span>, <span class="number">107.0</span>, <span class="number">108.0</span>, <span class="number">109.0</span>, <span class="number">110.0</span>, <span class="number">111.0</span>, <span class="number">112.0</span>,
+    <span class="number">113.0</span>, <span class="number">114.0</span>, <span class="number">115.0</span>, <span class="number">116.0</span>, <span class="number">117.0</span>, <span class="number">118.0</span>, <span class="number">119.0</span>, <span class="number">120.0</span>,
+    <span class="number">121.0</span>, <span class="number">122.0</span>, <span class="number">123.0</span>, <span class="number">124.0</span>, <span class="number">125.0</span>, <span class="number">126.0</span>, <span class="number">127.0</span>, <span class="number">128.0</span>,
+    <span class="number">129.0</span>, <span class="number">130.0</span>, <span class="number">131.0
+</span>];
+
+<span class="comment">// Standard MACD with 12/26/9 settings
+</span><span class="kw">let </span>(macd_line, signal, histogram) = macd(<span class="kw-2">&amp;</span>close, <span class="number">12</span>, <span class="number">26</span>, <span class="number">9</span>).unwrap();
+
+<span class="macro">assert_eq!</span>(macd_line.len(), close.len());
+<span class="macro">assert_eq!</span>(signal.len(), close.len());
+<span class="macro">assert_eq!</span>(histogram.len(), close.len());
+
+<span class="comment">// Check for bullish crossover (histogram turns positive)
+</span><span class="kw">let </span>lookback = <span class="number">26 </span>+ <span class="number">9 </span>- <span class="number">2</span>; <span class="comment">// 33
+</span><span class="kw">if </span>close.len() &gt; lookback {
+    <span class="kw">let </span>recent_hist = <span class="kw-2">&amp;</span>histogram[lookback..];
+    <span class="comment">// Analyze histogram for trend signals
+</span>}</code></pre></div><h2 id="performance"><a class="doc-anchor" href="#performance">§</a>Performance</h2>
+<ul>
+<li>Time complexity: O(n) where n = data.len()</li>
+<li>Space complexity: O(n) for intermediate EMA calculations</li>
+<li>Uses efficient single-pass EMA with seed indexing</li>
+</ul>
+<h2 id="trading-interpretation"><a class="doc-anchor" href="#trading-interpretation">§</a>Trading Interpretation</h2>
+<ul>
+<li><strong>Zero Line Crossover</strong>: MACD crosses zero indicates trend change</li>
+<li><strong>Signal Line Crossover</strong>: Primary buy/sell signals</li>
+<li><strong>Histogram Divergence</strong>: Momentum weakening or strengthening</li>
+<li><strong>Centerline</strong>: Above = bullish bias, Below = bearish bias</li>
+</ul>
+<h2 id="references"><a class="doc-anchor" href="#references">§</a>References</h2>
+<ul>
+<li>Gerald Appel (1979). The Moving Average Convergence-Divergence Method</li>
+<li>Standard parameters: 12/26/9 for daily charts</li>
+<li>TA-Lib compatible implementation</li>
+</ul>
+<h2 id="see-also"><a class="doc-anchor" href="#see-also">§</a>See Also</h2>
+<ul>
+<li><a href="fn.apo.html" title="fn haze_library::indicators::momentum::apo"><code>apo</code></a> - Absolute Price Oscillator (MACD without signal line)</li>
+<li><a href="fn.ppo.html" title="fn haze_library::indicators::momentum::ppo"><code>ppo</code></a> - Percentage Price Oscillator (MACD as percentage)</li>
+</ul>
+</div></details></section></div></main></body></html>

@@ -1,0 +1,9 @@
+(function() {
+    var implementors = Object.fromEntries([["haze_library",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.92.0/core/cmp/trait.Eq.html\" title=\"trait core::cmp::Eq\">Eq</a> for <a class=\"enum\" href=\"haze_library/indicators/harmonics/enum.PatternState.html\" title=\"enum haze_library::indicators::harmonics::PatternState\">PatternState</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.92.0/core/cmp/trait.Eq.html\" title=\"trait core::cmp::Eq\">Eq</a> for <a class=\"enum\" href=\"haze_library/indicators/harmonics/enum.PatternType.html\" title=\"enum haze_library::indicators::harmonics::PatternType\">PatternType</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.92.0/core/cmp/trait.Eq.html\" title=\"trait core::cmp::Eq\">Eq</a> for <a class=\"struct\" href=\"haze_library/utils/stats/struct.PercentileHeapItem.html\" title=\"struct haze_library::utils::stats::PercentileHeapItem\">PercentileHeapItem</a>"]]],["haze_library",[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.92.0/core/cmp/trait.Eq.html\" title=\"trait core::cmp::Eq\">Eq</a> for <a class=\"enum\" href=\"haze_library/indicators/harmonics/enum.PatternState.html\" title=\"enum haze_library::indicators::harmonics::PatternState\">PatternState</a>"],["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.92.0/core/cmp/trait.Eq.html\" title=\"trait core::cmp::Eq\">Eq</a> for <a class=\"enum\" href=\"haze_library/indicators/harmonics/enum.PatternType.html\" title=\"enum haze_library::indicators::harmonics::PatternType\">PatternType</a>"]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":57,"fragment_lengths":[921,616]}

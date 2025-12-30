@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["candlestick","cycle","fibonacci","harmonics","heikin_ashi","ichimoku","momentum","overlap","pandas_ta","pandas_ta_compat","pivots","price_transform","sfg","sfg_signals","sfg_utils","trend","volatility","volume"]};

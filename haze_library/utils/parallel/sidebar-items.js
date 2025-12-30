@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["compute_atr","compute_rsi","configure_thread_pool","parallel_atr","parallel_compute","parallel_ema","parallel_multi_period_ema","parallel_multi_period_sma","parallel_rsi","parallel_sma"]};

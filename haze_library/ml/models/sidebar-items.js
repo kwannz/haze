@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ModelType","SFGModel"],"fn":["solve_linear_system"],"struct":["AISuperTrendLinReg","ATR2RidgeModel","MomentumLinRegModel","SFGModelConfig","SerializableWeights"],"trait":["Predictor"]};

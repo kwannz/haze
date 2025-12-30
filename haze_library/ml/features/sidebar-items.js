@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["polynomial_features","prepare_atr2_features","prepare_momentum_features","prepare_supertrend_features","simple_ma","standardize"]};

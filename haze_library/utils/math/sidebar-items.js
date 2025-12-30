@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["EPSILON","KAHAN_THRESHOLD_CRITICAL","KAHAN_THRESHOLD_DEFAULT"],"fn":["approx_eq","approx_ne","is_negative","is_not_zero","is_positive","is_zero","kahan_mean","kahan_sum","kahan_sum_iter","kahan_sum_with_count","neumaier_sum","pairwise_sum","safe_div","safe_div_or","should_use_kahan"]};

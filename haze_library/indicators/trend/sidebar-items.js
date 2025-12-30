@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["adx","aroon","choppiness_index","compute_di","dmi","dpo","dx","minus_di","plus_di","psar","qstick","supertrend","trix","vhf","vortex"]};

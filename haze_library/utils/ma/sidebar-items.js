@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["dema","ema","ema_allow_nan","ema_impl","frama","hma","kama","rma","rma_allow_nan","sma","sma_allow_nan","sma_impl","t3","tema","vwap","wma","wma_allow_nan","wma_impl","zlma"]};

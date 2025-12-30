@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_EPSILON","RELAXED_EPSILON","STRICT_EPSILON"],"fn":["approx_eq","approx_ge","approx_gt","approx_le","approx_lt","approx_ne","approx_not_zero","approx_zero","relative_eq","safe_div","safe_div_or"]};

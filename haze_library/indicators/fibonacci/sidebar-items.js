@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["FIB_EXTENSION_RATIOS","FIB_RETRACEMENT_RATIOS"],"fn":["detect_fib_touch","dynamic_fib_retracement","fib_extension","fib_fan_lines","fib_retracement","fib_time_zones","generate_fibonacci_sequence","validate_finite_value","validate_ratios"],"struct":["FibonacciExtension","FibonacciRetracement"]};

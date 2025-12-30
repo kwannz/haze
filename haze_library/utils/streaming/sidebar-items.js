@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["BB_RECALC_INTERVAL","SMA_RECALC_INTERVAL"],"fn":["kahan_add"],"struct":["AISuperTrendMLResult","EnsembleResult","MLSuperTrendResult","OnlineAISuperTrendML","OnlineATR","OnlineAdaptiveRSI","OnlineBollingerBands","OnlineEMA","OnlineEnsembleSignal","OnlineMACD","OnlineMLSuperTrend","OnlineRSI","OnlineSMA","OnlineStochastic","OnlineSuperTrend"]};

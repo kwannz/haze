@@ -1,0 +1,63 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Parallel Computation Module"><title>haze_library::utils::parallel - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="haze_library" data-themes="" data-resource-suffix="" data-rustdoc-version="1.92.0 (ded5c06cf 2025-12-08)" data-channel="1.92.0" data-search-js="search-d69d8955.js" data-stringdex-js="stringdex-c3e638e9.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-ce535bd0.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module parallel</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../haze_library/index.html">haze_<wbr>library</a><span class="version">1.1.3</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module parallel</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#overview" title="Overview">Overview</a></li><li><a href="#design-philosophy" title="Design Philosophy">Design Philosophy</a></li><li><a href="#available-functions" title="Available Functions">Available Functions</a><ul><li><a href="#multi-symbol-parallelization" title="Multi-Symbol Parallelization">Multi-Symbol Parallelization</a></li><li><a href="#multi-period-parallelization" title="Multi-Period Parallelization">Multi-Period Parallelization</a></li><li><a href="#generic-parallelization" title="Generic Parallelization">Generic Parallelization</a></li><li><a href="#configuration" title="Configuration">Configuration</a></li></ul></li><li><a href="#examples" title="Examples">Examples</a></li><li><a href="#performance-characteristics" title="Performance Characteristics">Performance Characteristics</a></li><li><a href="#thread-pool-configuration" title="Thread Pool Configuration">Thread Pool Configuration</a></li><li><a href="#cross-references" title="Cross-References">Cross-References</a></li></ul><h3><a href="#functions">Module Items</a></h3><ul class="block"><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In haze_<wbr>library::<wbr>utils</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">haze_library</a>::<wbr><a href="../index.html">utils</a></div><h1>Module <span>parallel</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/haze_library/utils/parallel.rs.html#1-451">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Parallel Computation Module</p>
+<h2 id="overview"><a class="doc-anchor" href="#overview">§</a>Overview</h2>
+<p>This module provides parallel computation utilities using Rayon for batch
+processing of technical indicators across multiple symbols or timeframes.
+It enables efficient multi-core utilization for computationally intensive
+indicator calculations in trading systems.</p>
+<h2 id="design-philosophy"><a class="doc-anchor" href="#design-philosophy">§</a>Design Philosophy</h2>
+<ul>
+<li><strong>KISS Principle</strong>: Only the most common parallel patterns are provided</li>
+<li><strong>Zero-Copy</strong>: Uses references where possible to minimize memory overhead</li>
+<li><strong>Work-Stealing</strong>: Rayon’s work-stealing scheduler for load balancing</li>
+</ul>
+<h2 id="available-functions"><a class="doc-anchor" href="#available-functions">§</a>Available Functions</h2><h3 id="multi-symbol-parallelization"><a class="doc-anchor" href="#multi-symbol-parallelization">§</a>Multi-Symbol Parallelization</h3>
+<ul>
+<li><a href="fn.parallel_sma.html" title="fn haze_library::utils::parallel::parallel_sma"><code>parallel_sma</code></a> - Compute SMA for multiple trading pairs simultaneously</li>
+<li><a href="fn.parallel_ema.html" title="fn haze_library::utils::parallel::parallel_ema"><code>parallel_ema</code></a> - Compute EMA for multiple trading pairs simultaneously</li>
+<li><a href="fn.parallel_rsi.html" title="fn haze_library::utils::parallel::parallel_rsi"><code>parallel_rsi</code></a> - Compute RSI for multiple trading pairs simultaneously</li>
+<li><a href="fn.parallel_atr.html" title="fn haze_library::utils::parallel::parallel_atr"><code>parallel_atr</code></a> - Compute ATR for multiple trading pairs simultaneously</li>
+</ul>
+<h3 id="multi-period-parallelization"><a class="doc-anchor" href="#multi-period-parallelization">§</a>Multi-Period Parallelization</h3>
+<ul>
+<li><a href="fn.parallel_multi_period_sma.html" title="fn haze_library::utils::parallel::parallel_multi_period_sma"><code>parallel_multi_period_sma</code></a> - Compute multiple SMA periods (5, 10, 20, etc.)</li>
+<li><a href="fn.parallel_multi_period_ema.html" title="fn haze_library::utils::parallel::parallel_multi_period_ema"><code>parallel_multi_period_ema</code></a> - Compute multiple EMA periods (12, 26, etc.)</li>
+</ul>
+<h3 id="generic-parallelization"><a class="doc-anchor" href="#generic-parallelization">§</a>Generic Parallelization</h3>
+<ul>
+<li><a href="fn.parallel_compute.html" title="fn haze_library::utils::parallel::parallel_compute"><code>parallel_compute</code></a> - Generic parallel map for any indicator function</li>
+</ul>
+<h3 id="configuration"><a class="doc-anchor" href="#configuration">§</a>Configuration</h3>
+<ul>
+<li><a href="fn.configure_thread_pool.html" title="fn haze_library::utils::parallel::configure_thread_pool"><code>configure_thread_pool</code></a> - Configure Rayon thread pool size</li>
+</ul>
+<h2 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>haze_library::utils::parallel::{parallel_sma, parallel_multi_period_sma};
+
+<span class="kw">let </span>btc_prices = <span class="macro">vec!</span>[<span class="number">100.0</span>, <span class="number">101.0</span>, <span class="number">102.0</span>, <span class="number">103.0</span>, <span class="number">104.0</span>];
+<span class="kw">let </span>eth_prices = <span class="macro">vec!</span>[<span class="number">50.0</span>, <span class="number">51.0</span>, <span class="number">52.0</span>, <span class="number">53.0</span>, <span class="number">54.0</span>];
+
+<span class="comment">// Compute SMA for multiple symbols in parallel
+</span><span class="kw">let </span>data_sets: Vec&lt;(<span class="kw-2">&amp;</span>str, <span class="kw-2">&amp;</span>[f64], usize)&gt; = <span class="macro">vec!</span>[
+    (<span class="string">"BTC"</span>, <span class="kw-2">&amp;</span>btc_prices, <span class="number">3</span>),
+    (<span class="string">"ETH"</span>, <span class="kw-2">&amp;</span>eth_prices, <span class="number">3</span>),
+];
+<span class="kw">let </span>results = parallel_sma(<span class="kw-2">&amp;</span>data_sets).unwrap();
+
+<span class="comment">// Compute multiple periods for single symbol
+</span><span class="kw">let </span>multi_sma = parallel_multi_period_sma(<span class="kw-2">&amp;</span>btc_prices, <span class="kw-2">&amp;</span>[<span class="number">3</span>, <span class="number">5</span>]).unwrap();</code></pre></div><h2 id="performance-characteristics"><a class="doc-anchor" href="#performance-characteristics">§</a>Performance Characteristics</h2>
+<ul>
+<li>Parallelization overhead: ~1-5 microseconds per task spawn</li>
+<li>Recommended: Use for datasets &gt; 1000 elements or &gt; 4 symbols</li>
+<li>For small datasets, sequential computation may be faster</li>
+</ul>
+<h2 id="thread-pool-configuration"><a class="doc-anchor" href="#thread-pool-configuration">§</a>Thread Pool Configuration</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>haze_library::utils::parallel::configure_thread_pool;
+
+<span class="comment">// Use 4 threads (0 = Rayon default based on CPU cores)
+</span>configure_thread_pool(<span class="number">4</span>).expect(<span class="string">"Failed to configure thread pool"</span>);</code></pre></div><h2 id="cross-references"><a class="doc-anchor" href="#cross-references">§</a>Cross-References</h2>
+<ul>
+<li><a href="../ma/index.html" title="mod haze_library::utils::ma"><code>crate::utils::ma</code></a> - Underlying SMA/EMA implementations</li>
+<li><a href="../../indicators/momentum/index.html" title="mod haze_library::indicators::momentum"><code>crate::indicators::momentum</code></a> - RSI implementation</li>
+<li><a href="../../indicators/volatility/index.html" title="mod haze_library::indicators::volatility"><code>crate::indicators::volatility</code></a> - ATR implementation</li>
+</ul>
+</div></details><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.compute_atr.html" title="fn haze_library::utils::parallel::compute_atr">compute_<wbr>atr</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>ATR 计算（内部函数）</dd><dt><a class="fn" href="fn.compute_rsi.html" title="fn haze_library::utils::parallel::compute_rsi">compute_<wbr>rsi</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>RSI 计算（内部函数）</dd><dt><a class="fn" href="fn.configure_thread_pool.html" title="fn haze_library::utils::parallel::configure_thread_pool">configure_<wbr>thread_<wbr>pool</a></dt><dd>配置 Rayon 线程池</dd><dt><a class="fn" href="fn.parallel_atr.html" title="fn haze_library::utils::parallel::parallel_atr">parallel_<wbr>atr</a></dt><dd>并行计算多组 ATR</dd><dt><a class="fn" href="fn.parallel_compute.html" title="fn haze_library::utils::parallel::parallel_compute">parallel_<wbr>compute</a></dt><dd>批量指标计算器</dd><dt><a class="fn" href="fn.parallel_ema.html" title="fn haze_library::utils::parallel::parallel_ema">parallel_<wbr>ema</a></dt><dd>并行计算多组 EMA</dd><dt><a class="fn" href="fn.parallel_multi_period_ema.html" title="fn haze_library::utils::parallel::parallel_multi_period_ema">parallel_<wbr>multi_<wbr>period_<wbr>ema</a></dt><dd>并行计算多周期 EMA</dd><dt><a class="fn" href="fn.parallel_multi_period_sma.html" title="fn haze_library::utils::parallel::parallel_multi_period_sma">parallel_<wbr>multi_<wbr>period_<wbr>sma</a></dt><dd>并行计算多周期 SMA</dd><dt><a class="fn" href="fn.parallel_rsi.html" title="fn haze_library::utils::parallel::parallel_rsi">parallel_<wbr>rsi</a></dt><dd>并行计算多组 RSI</dd><dt><a class="fn" href="fn.parallel_sma.html" title="fn haze_library::utils::parallel::parallel_sma">parallel_<wbr>sma</a></dt><dd>并行计算多组 SMA</dd></dl></section></div></main></body></html>

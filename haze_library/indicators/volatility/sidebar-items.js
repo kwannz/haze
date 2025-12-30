@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["atr","bollinger_bands","chandelier_exit","donchian_channel","historical_volatility","keltner_channel","mass_index","natr","true_range","ulcer_index"]};

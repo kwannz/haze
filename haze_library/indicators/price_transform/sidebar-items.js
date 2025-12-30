@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["avgprice","hl2","hlc3","medprice","ohlc4","typprice","wclprice"]};

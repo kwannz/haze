@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["ht_dcperiod","ht_dcphase","ht_phasor","ht_sine","ht_trendmode"]};

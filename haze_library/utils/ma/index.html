@@ -1,0 +1,58 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Moving Average Utilities Module"><title>haze_library::utils::ma - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-ca0dd0c4.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="haze_library" data-themes="" data-resource-suffix="" data-rustdoc-version="1.92.0 (ded5c06cf 2025-12-08)" data-channel="1.92.0" data-search-js="search-d69d8955.js" data-stringdex-js="stringdex-c3e638e9.js" data-settings-js="settings-c38705f0.js" ><script src="../../../static.files/storage-e2aeef58.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-ce535bd0.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-263c88ec.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Module ma</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../haze_library/index.html">haze_<wbr>library</a><span class="version">1.1.3</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module ma</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#overview" title="Overview">Overview</a></li><li><a href="#available-functions" title="Available Functions">Available Functions</a></li><li><a href="#usage-patterns" title="Usage Patterns">Usage Patterns</a></li><li><a href="#examples" title="Examples">Examples</a></li><li><a href="#performance-characteristics" title="Performance Characteristics">Performance Characteristics</a></li><li><a href="#nan-handling" title="NaN Handling">NaN Handling</a></li><li><a href="#cross-references" title="Cross-References">Cross-References</a></li></ul><h3><a href="#functions">Module Items</a></h3><ul class="block"><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In haze_<wbr>library::<wbr>utils</a></h2></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">haze_library</a>::<wbr><a href="../index.html">utils</a></div><h1>Module <span>ma</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/haze_library/utils/ma.rs.html#1-1139">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Moving Average Utilities Module</p>
+<h2 id="overview"><a class="doc-anchor" href="#overview">§</a>Overview</h2>
+<p>This module provides fundamental moving average calculations that serve as
+building blocks for other technical indicators. All MA functions are optimized
+for performance with incremental updates and warmup NaNs.</p>
+<h2 id="available-functions"><a class="doc-anchor" href="#available-functions">§</a>Available Functions</h2>
+<ul>
+<li><a href="fn.sma.html" title="fn haze_library::utils::ma::sma"><code>sma</code></a> - Simple Moving Average (arithmetic mean)</li>
+<li><a href="fn.ema.html" title="fn haze_library::utils::ma::ema"><code>ema</code></a> - Exponential Moving Average (weighted recent values)</li>
+<li><a href="fn.rma.html" title="fn haze_library::utils::ma::rma"><code>rma</code></a> - Wilder’s Moving Average / Running Moving Average</li>
+<li><a href="fn.wma.html" title="fn haze_library::utils::ma::wma"><code>wma</code></a> - Weighted Moving Average (linear weights)</li>
+<li><a href="fn.dema.html" title="fn haze_library::utils::ma::dema"><code>dema</code></a> - Double Exponential Moving Average (reduced lag)</li>
+<li><a href="fn.tema.html" title="fn haze_library::utils::ma::tema"><code>tema</code></a> - Triple Exponential Moving Average (further lag reduction)</li>
+<li><a href="fn.kama.html" title="fn haze_library::utils::ma::kama"><code>kama</code></a> - Kaufman Adaptive Moving Average (volatility-adjusted)</li>
+<li><code>zlema</code> - Zero-Lag Exponential Moving Average (lag compensation)</li>
+<li><a href="fn.hma.html" title="fn haze_library::utils::ma::hma"><code>hma</code></a> - Hull Moving Average (smoothness with reduced lag)</li>
+<li><code>vwma</code> - Volume Weighted Moving Average</li>
+<li><a href="fn.vwap.html" title="fn haze_library::utils::ma::vwap"><code>vwap</code></a> - Volume Weighted Average Price</li>
+</ul>
+<h2 id="usage-patterns"><a class="doc-anchor" href="#usage-patterns">§</a>Usage Patterns</h2>
+<p>These functions are typically used:</p>
+<ul>
+<li>Directly for trend identification (crossover signals)</li>
+<li>As components in composite indicators (MACD uses EMA, ATR uses RMA)</li>
+<li>For smoothing noisy price data</li>
+</ul>
+<h2 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>haze_library::utils::ma::{sma, ema, rma};
+
+<span class="kw">let </span>prices = <span class="macro">vec!</span>[<span class="number">100.0</span>, <span class="number">101.0</span>, <span class="number">102.0</span>, <span class="number">103.0</span>, <span class="number">104.0</span>, <span class="number">105.0</span>];
+
+<span class="comment">// Simple Moving Average (3-period)
+</span><span class="kw">let </span>sma_values = sma(<span class="kw-2">&amp;</span>prices, <span class="number">3</span>);
+
+<span class="comment">// Exponential Moving Average (more weight on recent prices)
+</span><span class="kw">let </span>ema_values = ema(<span class="kw-2">&amp;</span>prices, <span class="number">3</span>);
+
+<span class="comment">// Wilder's RMA (used in ATR, RSI calculations)
+</span><span class="kw">let </span>rma_values = rma(<span class="kw-2">&amp;</span>prices, <span class="number">3</span>);</code></pre></div><h2 id="performance-characteristics"><a class="doc-anchor" href="#performance-characteristics">§</a>Performance Characteristics</h2>
+<ul>
+<li>SMA: O(n) with incremental sum updates</li>
+<li>EMA/RMA: O(n) single pass with exponential decay</li>
+<li>WMA: O(n * period) due to weighted summation</li>
+<li>DEMA/TEMA: O(n) with chained EMA calculations</li>
+</ul>
+<h2 id="nan-handling"><a class="doc-anchor" href="#nan-handling">§</a>NaN Handling</h2>
+<ul>
+<li>Inputs must be finite; NaN/Inf are rejected by validation</li>
+<li>Warmup periods (first period-1 values) are NaN by design</li>
+<li>Output maintains same length as input array</li>
+</ul>
+<h2 id="cross-references"><a class="doc-anchor" href="#cross-references">§</a>Cross-References</h2>
+<ul>
+<li><a href="../../indicators/momentum/index.html" title="mod haze_library::indicators::momentum"><code>crate::indicators::momentum</code></a> - MACD uses EMA</li>
+<li><a href="../../indicators/volatility/index.html" title="mod haze_library::indicators::volatility"><code>crate::indicators::volatility</code></a> - ATR uses RMA</li>
+<li><a href="../../indicators/trend/index.html" title="mod haze_library::indicators::trend"><code>crate::indicators::trend</code></a> - SuperTrend uses ATR (via RMA)</li>
+</ul>
+</div></details><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.dema.html" title="fn haze_library::utils::ma::dema">dema</a></dt><dd>DEMA - Double Exponential Moving Average（双重指数移动平均）</dd><dt><a class="fn" href="fn.ema.html" title="fn haze_library::utils::ma::ema">ema</a></dt><dt><a class="fn" href="fn.ema_allow_nan.html" title="fn haze_library::utils::ma::ema_allow_nan">ema_<wbr>allow_<wbr>nan</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.ema_impl.html" title="fn haze_library::utils::ma::ema_impl">ema_<wbr>impl</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>EMA - Exponential Moving Average（指数移动平均）</dd><dt><a class="fn" href="fn.frama.html" title="fn haze_library::utils::ma::frama">frama</a></dt><dd>FRAMA (Fractal Adaptive Moving Average) 分形自适应移动平均</dd><dt><a class="fn" href="fn.hma.html" title="fn haze_library::utils::ma::hma">hma</a></dt><dd>HMA - Hull Moving Average（赫尔移动平均，低延迟）</dd><dt><a class="fn" href="fn.kama.html" title="fn haze_library::utils::ma::kama">kama</a></dt><dd>KAMA (Kaufman’s Adaptive Moving Average) 考夫曼自适应移动平均</dd><dt><a class="fn" href="fn.rma.html" title="fn haze_library::utils::ma::rma">rma</a></dt><dd>RMA - Wilder’s Moving Average（威尔德移动平均）</dd><dt><a class="fn" href="fn.rma_allow_nan.html" title="fn haze_library::utils::ma::rma_allow_nan">rma_<wbr>allow_<wbr>nan</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.sma.html" title="fn haze_library::utils::ma::sma">sma</a></dt><dt><a class="fn" href="fn.sma_allow_nan.html" title="fn haze_library::utils::ma::sma_allow_nan">sma_<wbr>allow_<wbr>nan</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.sma_impl.html" title="fn haze_library::utils::ma::sma_impl">sma_<wbr>impl</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>SMA - Simple Moving Average（简单移动平均）</dd><dt><a class="fn" href="fn.t3.html" title="fn haze_library::utils::ma::t3">t3</a></dt><dd>T3 (Tillson T3) 移动平均</dd><dt><a class="fn" href="fn.tema.html" title="fn haze_library::utils::ma::tema">tema</a></dt><dd>TEMA - Triple Exponential Moving Average（三重指数移动平均）</dd><dt><a class="fn" href="fn.vwap.html" title="fn haze_library::utils::ma::vwap">vwap</a></dt><dd>VWAP - Volume Weighted Average Price（成交量加权平均价）</dd><dt><a class="fn" href="fn.wma.html" title="fn haze_library::utils::ma::wma">wma</a></dt><dt><a class="fn" href="fn.wma_allow_nan.html" title="fn haze_library::utils::ma::wma_allow_nan">wma_<wbr>allow_<wbr>nan</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dt><a class="fn" href="fn.wma_impl.html" title="fn haze_library::utils::ma::wma_impl">wma_<wbr>impl</a><span title="Restricted Visibility">&nbsp;🔒</span> </dt><dd>WMA - Weighted Moving Average（加权移动平均）</dd><dt><a class="fn" href="fn.zlma.html" title="fn haze_library::utils::ma::zlma">zlma</a></dt><dd>ZLMA (Zero Lag Moving Average) 零延迟移动平均</dd></dl></section></div></main></body></html>
