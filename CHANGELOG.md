@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.3] - 2025-12-30
+
+### Changed / 变更
+- **License Change / 许可证变更**: 从 CC BY-NC 4.0 变更为 Proprietary License
+  - 完全保留所有权利 / All rights reserved
+  - 商业使用需要明确授权 / Commercial use requires explicit authorization
+  - 许可咨询 / Licensing inquiries: team@haze-library.com
+- **Version Synchronization / 版本同步**: 统一所有项目文件的版本号
+  - pyproject.toml: 1.1.2 → 1.1.3
+  - rust/Cargo.toml: 1.1.1 → 1.1.3
+  - rust/pyproject.toml: 1.1.1 → 1.1.3
+  - README.md footer updated
+
 ## [1.1.2] - 2025-12-30
 
 ### Fixed / 修复

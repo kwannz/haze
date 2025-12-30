@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/kwannz/haze/actions/workflows/ci.yml/badge.svg)](https://github.com/kwannz/haze/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/haze-library)](https://pypi.org/project/haze-library/)
-[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.14%2B-blue)](https://www.python.org/)
 [![Rust](https://img.shields.io/badge/rust-1.75%2B-orange)](https://www.rust-lang.org/)
 
@@ -600,15 +600,16 @@ print(f"订单 ID: {order.id}")
 
 ---
 
-## 📜 许可证
+## 📜 许可证 / License
 
-本项目采用 **CC BY-NC 4.0** 许可证。
+本项目为**专有软件**，保留所有权利。
 
-- ✅ 个人学习和研究
-- ✅ 学术论文和教育用途
-- ❌ 商业用途（需单独授权）
+This project is **proprietary software**. All rights reserved.
 
-商业授权请联系：team@haze-library.com
+- ❌ 禁止未经授权的使用 / Unauthorized use prohibited
+- ✅ 商业许可可用 / Commercial licenses available
+
+许可咨询 / Licensing inquiries: team@haze-library.com
 
 ---
 
@@ -631,4 +632,4 @@ print(f"订单 ID: {order.id}")
 
 **Made with ❤️ by the Haze Team**
 
-**版本**: 1.1.1 | **更新日期**: 2025-12-30
+**版本**: 1.1.3 | **更新日期**: 2025-12-30
