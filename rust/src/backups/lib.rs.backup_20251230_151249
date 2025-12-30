@@ -416,15 +416,11 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_ema, m)?)?;
     m.add_function(wrap_pyfunction!(py_ema_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_rma, m)?)?;
-    m.add_function(wrap_pyfunction!(py_rma_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_wma, m)?)?;
     m.add_function(wrap_pyfunction!(py_wma_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_hma, m)?)?;
-    m.add_function(wrap_pyfunction!(py_hma_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_dema, m)?)?;
-    m.add_function(wrap_pyfunction!(py_dema_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_tema, m)?)?;
-    m.add_function(wrap_pyfunction!(py_tema_legacy, m)?)?;  // Legacy API for backward compatibility
 
     // Fibonacci 指标
     m.add_function(wrap_pyfunction!(py_fib_retracement, m)?)?;
@@ -476,7 +472,6 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // 扩展 MA 指标
     m.add_function(wrap_pyfunction!(py_zlma, m)?)?;
-    m.add_function(wrap_pyfunction!(py_zlma_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_t3, m)?)?;
     m.add_function(wrap_pyfunction!(py_kama, m)?)?;
     m.add_function(wrap_pyfunction!(py_frama, m)?)?;
@@ -499,13 +494,10 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_linear_regression, m)?)?;
     m.add_function(wrap_pyfunction!(py_correlation, m)?)?;
     m.add_function(wrap_pyfunction!(py_zscore, m)?)?;
-    m.add_function(wrap_pyfunction!(py_zscore_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_covariance, m)?)?;
     m.add_function(wrap_pyfunction!(py_beta, m)?)?;
     m.add_function(wrap_pyfunction!(py_standard_error, m)?)?;
-    m.add_function(wrap_pyfunction!(py_standard_error_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_stderr, m)?)?;
-    m.add_function(wrap_pyfunction!(py_stderr_legacy, m)?)?;  // Legacy API for backward compatibility
     // 价格变换指标
     m.add_function(wrap_pyfunction!(py_avgprice, m)?)?;
     m.add_function(wrap_pyfunction!(py_medprice, m)?)?;
@@ -513,43 +505,25 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(py_wclprice, m)?)?;
     // 数学运算函数
     m.add_function(wrap_pyfunction!(py_max, m)?)?;
-    m.add_function(wrap_pyfunction!(py_max_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_min, m)?)?;
-    m.add_function(wrap_pyfunction!(py_min_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_sum, m)?)?;
-    m.add_function(wrap_pyfunction!(py_sum_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_sqrt, m)?)?;
-    m.add_function(wrap_pyfunction!(py_sqrt_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_ln, m)?)?;
-    m.add_function(wrap_pyfunction!(py_ln_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_log10, m)?)?;
-    m.add_function(wrap_pyfunction!(py_log10_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_exp, m)?)?;
-    m.add_function(wrap_pyfunction!(py_exp_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_abs, m)?)?;
     m.add_function(wrap_pyfunction!(py_abs_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_ceil, m)?)?;
-    m.add_function(wrap_pyfunction!(py_ceil_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_floor, m)?)?;
-    m.add_function(wrap_pyfunction!(py_floor_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_sin, m)?)?;
-    m.add_function(wrap_pyfunction!(py_sin_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_cos, m)?)?;
-    m.add_function(wrap_pyfunction!(py_cos_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_tan, m)?)?;
-    m.add_function(wrap_pyfunction!(py_tan_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_asin, m)?)?;
-    m.add_function(wrap_pyfunction!(py_asin_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_acos, m)?)?;
-    m.add_function(wrap_pyfunction!(py_acos_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_atan, m)?)?;
-    m.add_function(wrap_pyfunction!(py_atan_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_sinh, m)?)?;
-    m.add_function(wrap_pyfunction!(py_sinh_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_cosh, m)?)?;
-    m.add_function(wrap_pyfunction!(py_cosh_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_tanh, m)?)?;
-    m.add_function(wrap_pyfunction!(py_tanh_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_add, m)?)?;
     m.add_function(wrap_pyfunction!(py_sub, m)?)?;
     m.add_function(wrap_pyfunction!(py_mult, m)?)?;
@@ -610,10 +584,8 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // Overlap Studies 指标
     m.add_function(wrap_pyfunction!(py_midpoint, m)?)?;
-    m.add_function(wrap_pyfunction!(py_midpoint_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_midprice, m)?)?;
     m.add_function(wrap_pyfunction!(py_trima, m)?)?;
-    m.add_function(wrap_pyfunction!(py_trima_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_sar, m)?)?;
     m.add_function(wrap_pyfunction!(py_sarext, m)?)?;
     m.add_function(wrap_pyfunction!(py_mama, m)?)?;
@@ -650,28 +622,19 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     // 周期指标 (Hilbert Transform)
     m.add_function(wrap_pyfunction!(py_ht_dcperiod, m)?)?;
-    m.add_function(wrap_pyfunction!(py_ht_dcperiod_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_ht_dcphase, m)?)?;
-    m.add_function(wrap_pyfunction!(py_ht_dcphase_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_ht_phasor, m)?)?;
     m.add_function(wrap_pyfunction!(py_ht_sine, m)?)?;
     m.add_function(wrap_pyfunction!(py_ht_trendmode, m)?)?;
-    m.add_function(wrap_pyfunction!(py_ht_trendmode_legacy, m)?)?;  // Legacy API for backward compatibility
 
     // 统计函数 (TA-Lib Compatible)
     m.add_function(wrap_pyfunction!(py_correl, m)?)?;
     m.add_function(wrap_pyfunction!(py_linearreg, m)?)?;
-    m.add_function(wrap_pyfunction!(py_linearreg_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_linearreg_slope, m)?)?;
-    m.add_function(wrap_pyfunction!(py_linearreg_slope_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_linearreg_angle, m)?)?;
-    m.add_function(wrap_pyfunction!(py_linearreg_angle_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_linearreg_intercept, m)?)?;
-    m.add_function(wrap_pyfunction!(py_linearreg_intercept_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_var, m)?)?;
-    m.add_function(wrap_pyfunction!(py_var_legacy, m)?)?;  // Legacy API for backward compatibility
     m.add_function(wrap_pyfunction!(py_tsf, m)?)?;
-    m.add_function(wrap_pyfunction!(py_tsf_legacy, m)?)?;  // Legacy API for backward compatibility
 
     // Batch 7: TA-Lib Advanced Indicators (170 → 180)
     // Note: py_ad already registered at line ~80, only new indicators below
@@ -743,10 +706,10 @@ fn haze_library(m: &Bound<'_, PyModule>) -> PyResult<()> {
 // ==================== Volatility 指标包装 ====================
 
 #[cfg(feature = "python")]
-#[pyfunction(name = "py_zscore_legacy")]
+#[pyfunction(name = "py_abs_legacy")]
 #[pyo3(signature = (high, low, close, drift=1))]
 #[pyo3(text_signature = "(high, low, close, drift=1)")]
-/// Calculate True Range (TR) - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version - Legacy version
+/// Calculate True Range (TR) - Legacy version
 ///
 /// Maximum of high-low, |high-prev close|, |low-prev close|.
 /// Foundation for ATR calculation.
@@ -2324,33 +2287,10 @@ fn py_ema<'py>(
 /// ------
 /// ValueError
 ///     If period <= 0 or insufficient data
-fn py_rma_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_rma(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::rma(&values, period), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_rma<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::rma(values_slice, period).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction(name = "py_wma_legacy")]
@@ -2443,33 +2383,10 @@ fn py_wma<'py>(
 /// ------
 /// ValueError
 ///     If period <= 0 or insufficient data
-fn py_hma_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_hma(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::hma(&values, period), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_hma<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::hma(values_slice, period).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
@@ -2493,33 +2410,10 @@ fn py_hma<'py>(
 /// ------
 /// ValueError
 ///     If period <= 0 or insufficient data
-fn py_dema_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_dema(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::dema(&values, period), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_dema<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::dema(values_slice, period).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
@@ -2543,33 +2437,10 @@ fn py_dema<'py>(
 /// ------
 /// ValueError
 ///     If period <= 0 or insufficient data
-fn py_tema_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_tema(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::tema(&values, period), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_tema<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::tema(values_slice, period).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 // ==================== Fibonacci 指标包装 ====================
 
@@ -3372,33 +3243,10 @@ fn py_eom(
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_zlma_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_zlma(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::zlma(&values, period), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_zlma<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::zlma(values_slice, period).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 // Note: py_t3 and py_kama are defined later in the file with better Optional parameter support
 
@@ -3750,34 +3598,11 @@ fn py_correlation(x: Vec<f64>, y: Vec<f64>, period: usize) -> PyResult<Vec<f64>>
 /// Returns
 /// -------
 /// list of float - Z-score values
-fn py_zscore_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_zscore(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = validate_single!(&values, "values");
     validate_period!(period, len);
     Ok(utils::zscore(&values, period))
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_zscore<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = Some(utils::zscore(values_slice, period));
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
@@ -3856,67 +3681,21 @@ fn py_beta(
 /// Returns
 /// -------
 /// list of float - Standard error values
-fn py_standard_error_legacy(y_values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_standard_error(y_values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = validate_single!(&y_values, "y_values");
     validate_period!(period, len);
     Ok(utils::standard_error(&y_values, period))
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_standard_error<'py>(
-    py: Python<'py>,
-    y_values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let y_values_slice = y_values.as_slice().expect("Failed to get array slice");
-
-    let len = y_values_slice.len();
-
-    // 调用核心算法
-    let result = Some(utils::standard_error(y_values_slice, period));
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
 #[pyo3(text_signature = "(y_values, period)")]
 /// Calculate Standard Error (alias for standard_error)
-fn py_stderr_legacy(y_values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_stderr(y_values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = validate_single!(&y_values, "y_values");
     validate_period!(period, len);
     Ok(utils::standard_error(&y_values, period))
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_stderr<'py>(
-    py: Python<'py>,
-    y_values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let y_values_slice = y_values.as_slice().expect("Failed to get array slice");
-
-    let len = y_values_slice.len();
-
-    // 调用核心算法
-    let result = Some(utils::standard_error(y_values_slice, period));
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 // ==================== 价格变换指标包装 ====================
 
@@ -3981,209 +3760,52 @@ fn py_wclprice(high: Vec<f64>, low: Vec<f64>, close: Vec<f64>) -> PyResult<Vec<f
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_max_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_max(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::max(&values, period), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_max<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::max(values_slice, period).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_min_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_min(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::min(&values, period), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_min<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::min(values_slice, period).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_sum_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_sum(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::sum(&values, period), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_sum<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::sum(values_slice, period).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_sqrt_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_sqrt(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::sqrt(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_sqrt<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::sqrt(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_ln_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_ln(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::ln(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_ln<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::ln(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_log10_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_log10(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::log10(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_log10<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::log10(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_exp_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_exp(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::exp(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_exp<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::exp(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
@@ -4216,322 +3838,80 @@ fn py_abs<'py>(
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_ceil_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_ceil(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::ceil(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_ceil<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::ceil(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_floor_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_floor(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::floor(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_floor<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::floor(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_sin_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_sin(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::sin(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_sin<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::sin(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_cos_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_cos(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::cos(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_cos<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::cos(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_tan_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_tan(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::tan(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_tan<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::tan(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_asin_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_asin(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::asin(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_asin<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::asin(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_acos_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_acos(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::acos(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_acos<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::acos(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_atan_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_atan(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::atan(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_atan<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::atan(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_sinh_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_sinh(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::sinh(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_sinh<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::sinh(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_cosh_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_cosh(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::cosh(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_cosh<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::cosh(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_tanh_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_tanh(values: Vec<f64>) -> PyResult<Vec<f64>> {
     let len = values.len();
     ok_or_nan_vec(utils::tanh(&values), len)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_tanh<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = utils::tanh(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
@@ -6011,32 +5391,9 @@ fn py_breakaway(
 /// Returns
 /// -------
 /// list of float - Midpoint values
-fn py_midpoint_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_midpoint(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(indicators::midpoint(&values, period)?)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_midpoint<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = indicators::midpoint(values_slice, period).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
@@ -6080,32 +5437,9 @@ fn py_midprice(high: Vec<f64>, low: Vec<f64>, period: usize) -> PyResult<Vec<f64
 /// Returns
 /// -------
 /// list of float - TRIMA values
-fn py_trima_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_trima(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     Ok(indicators::trima(&values, period)?)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_trima<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = indicators::trima(values_slice, period).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
@@ -6720,59 +6054,15 @@ fn py_volume_profile_signals(
 // ==================== 周期指标包装 (Hilbert Transform) ====================
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_ht_dcperiod_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_ht_dcperiod(values: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::ht_dcperiod(&values)?)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_ht_dcperiod<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = indicators::ht_dcperiod(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_ht_dcphase_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_ht_dcphase(values: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::ht_dcphase(&values)?)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_ht_dcphase<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = indicators::ht_dcphase(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
@@ -6788,31 +6078,9 @@ fn py_ht_sine(values: Vec<f64>) -> PyResult<(Vec<f64>, Vec<f64>)> {
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_ht_trendmode_legacy(values: Vec<f64>) -> PyResult<Vec<f64>> {
+fn py_ht_trendmode(values: Vec<f64>) -> PyResult<Vec<f64>> {
     Ok(indicators::ht_trendmode(&values)?)
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_ht_trendmode<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = indicators::ht_trendmode(values_slice).ok();
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(test)]
 mod coverage_tests;
@@ -6828,189 +6096,51 @@ fn py_correl(values1: Vec<f64>, values2: Vec<f64>, period: usize) -> PyResult<Ve
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_linearreg_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_linearreg(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = validate_single!(&values, "values");
     validate_period!(period, len);
     Ok(utils::linearreg(&values, period))
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_linearreg<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = Some(utils::linearreg(values_slice, period));
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_linearreg_slope_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_linearreg_slope(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = validate_single!(&values, "values");
     validate_period!(period, len);
     Ok(utils::linearreg_slope(&values, period))
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_linearreg_slope<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = Some(utils::linearreg_slope(values_slice, period));
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_linearreg_angle_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_linearreg_angle(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = validate_single!(&values, "values");
     validate_period!(period, len);
     Ok(utils::linearreg_angle(&values, period))
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_linearreg_angle<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = Some(utils::linearreg_angle(values_slice, period));
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_linearreg_intercept_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_linearreg_intercept(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = validate_single!(&values, "values");
     validate_period!(period, len);
     Ok(utils::linearreg_intercept(&values, period))
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_linearreg_intercept<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = Some(utils::linearreg_intercept(values_slice, period));
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_var_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_var(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = validate_single!(&values, "values");
     validate_period!(period, len);
     Ok(utils::var(&values, period))
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_var<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = Some(utils::var(values_slice, period));
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 #[cfg(feature = "python")]
 #[pyfunction]
-fn py_tsf_legacy(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
+fn py_tsf(values: Vec<f64>, period: usize) -> PyResult<Vec<f64>> {
     let len = validate_single!(&values, "values");
     validate_period!(period, len);
     Ok(utils::tsf(&values, period))
 }
-// === 迁移后 (零拷贝版本) ===
-#[cfg(feature = "python")]
-#[pyfunction]
-fn py_tsf<'py>(
-    py: Python<'py>,
-    values: numpy::PyReadonlyArray1<'py, f64>,
-    period: usize,
-) -> pyo3::Py<numpy::PyArray1<f64>> {
-    use crate::ffi::zero_copy;
-
-    let values_slice = values.as_slice().expect("Failed to get array slice");
-
-    let len = values_slice.len();
-
-    // 调用核心算法
-    let result = Some(utils::tsf(values_slice, period));
-
-    zero_copy::to_pyarray_or_nan(py, result, len)
-        .expect("Failed to create NumPy array")
-        .unbind()
-}
-
-
 
 // ==================== Batch 7: TA-Lib Advanced Indicators ====================
 // Volume Indicators (AD already exists at line 766)
