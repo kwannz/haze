@@ -32,7 +32,7 @@ Performance:
     - High numerical precision using f64
 """
 
-__version__ = "1.1.1"
+__version__ = "1.1.2"
 __author__ = "kwannz"
 
 import inspect
@@ -167,19 +167,26 @@ from .exceptions import (
 )
 
 # Convenience re-exports for common indicators
-__all__ = [
-    # Version
+
+# ==================== Public API Exports ====================
+
+# 核心导出（手动维护，保持分类和文档）
+_CORE_EXPORTS = [
+    # Version metadata
     "__version__",
-    # Rust frame
+
+    # Rust data structures
     "OhlcvFrame",
-    # Accessors
+
+    # Pandas accessors
     "TechnicalAnalysisAccessor",
     "SeriesTechnicalAnalysisAccessor",
-    # NumPy module
-    "np_ta",
-    # Streaming module
-    "stream_ta",
-    # Streaming classes
+
+    # Module aliases
+    "np_ta",        # NumPy compatibility layer
+    "stream_ta",    # Streaming indicators module
+
+    # Streaming/incremental calculators
     "IncrementalSMA",
     "IncrementalEMA",
     "IncrementalRSI",
@@ -194,13 +201,16 @@ __all__ = [
     "CCXTStreamProcessor",
     "get_available_streaming_indicators",
     "create_indicator",
-    # AI indicators
+
+    # AI-enhanced indicators (Python wrappers)
     "adaptive_rsi",
     "ensemble_signal",
     "ml_supertrend",
-    # LT indicator
+
+    # LT indicator (10 SFG combination)
     "lt_indicator",
-    # Exceptions
+
+    # Exception types
     "HazeError",
     "InvalidPeriodError",
     "InsufficientDataError",
@@ -208,3 +218,23 @@ __all__ = [
     "InvalidParameterError",
     "ComputationError",
 ]
+
+# 动态收集所有指标函数（py_* 和 clean API）
+# 这些函数由 Rust 扩展提供，通过 _install_clean_api_aliases() 创建别名
+_INDICATOR_EXPORTS = []
+
+# 收集所有 py_* 函数（Rust 原生导出）
+for _name in sorted(globals().keys()):
+    if _name.startswith("py_") and callable(globals().get(_name)):
+        _INDICATOR_EXPORTS.append(_name)
+
+# 收集所有 clean API 别名（无 py_ 前缀）
+for _clean_name in sorted(_PY_PREFIX_ALIASES.values()):
+    if _clean_name in globals() and callable(globals()[_clean_name]):
+        _INDICATOR_EXPORTS.append(_clean_name)
+
+# 合并所有导出
+__all__ = _CORE_EXPORTS + _INDICATOR_EXPORTS
+
+# 清理临时变量，避免污染命名空间
+del _name, _clean_name

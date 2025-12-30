@@ -1038,3 +1038,9 @@ def _register_pandas_accessors() -> None:
 
 
 _register_pandas_accessors()
+
+# Public API
+__all__ = [
+    "TechnicalAnalysisAccessor",
+    "SeriesTechnicalAnalysisAccessor",
+]

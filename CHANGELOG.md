@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.2] - 2025-12-30
 
+### Fixed / 修复
+- **修复 `__all__` 导出不完整问题**: 主包现在导出所有 524 个指标函数（从 25 项增加到 554 项）
+  - 修复 IDE 和类型检查器无法发现指标函数的问题
+  - 修复"另一个系统显示 py_atr 不支持"的问题
+  - 同步 `lt_indicators.py` 版本号至 1.1.2
+- **修复 `accessor.py` 缺少 `__all__` 导出**: 添加 DataFrame/Series 访问器的显式导出
+- **修复 `streaming.py` 缺少 `__all__` 导出**: 添加流式计算器类的显式导出
+
+### Added / 新增
+- **启用 `from haze_library import *` 星号导入功能**: 现在可以通过星号导入访问所有指标函数
+- **动态 `__all__` 生成**: 主包 `__all__` 从静态列表改为动态生成，自动同步新增函数
+
+### Changed / 变更
+- **改进公共 API 可发现性**: 所有 524 个指标函数（py_* 和 clean API）现在对工具可见
+- **统一版本号管理**: 所有模块同步到 1.1.2
+
 ### Documentation / 文档
 - **新增 `docs/LT_INDICATORS.md`** - LT 指标系统完整技术文档 (50KB+)
   - 架构设计：市场状态检测算法、加权集成投票机制
@@ -27,8 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 实战示例：5 个递进式完整代码示例（基础用法 → 回测框架）
   - 市场分析：TRENDING/RANGING/VOLATILE 三态详解
   - 常见问题：FAQ + 故障排除 + 集成指南
-
-**注意**: 本版本为纯文档发布，无代码变更。
 
 ## [1.1.1] - 2025-12-30
 

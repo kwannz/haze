@@ -31,6 +31,28 @@ from .haze_library import (
     OnlineAISuperTrendML,
 )
 
+__all__ = [
+    # Main processor
+    "CCXTStreamProcessor",
+
+    # Incremental indicators
+    "IncrementalSMA",
+    "IncrementalEMA",
+    "IncrementalRSI",
+    "IncrementalATR",
+    "IncrementalMACD",
+    "IncrementalBollingerBands",
+    "IncrementalStochastic",
+    "IncrementalSuperTrend",
+    "IncrementalAdaptiveRSI",
+    "IncrementalEnsembleSignal",
+    "IncrementalMLSuperTrend",
+
+    # Factory functions
+    "create_indicator",
+    "get_available_streaming_indicators",
+]
+
 _NAN = float("nan")
 
 

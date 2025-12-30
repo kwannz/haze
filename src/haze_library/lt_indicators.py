@@ -22,7 +22,7 @@ from typing import Sequence
 logger = logging.getLogger(__name__)
 
 # 版本号
-__version__ = "1.0.6"
+__version__ = "1.1.2"
 
 
 def _to_float_list(
