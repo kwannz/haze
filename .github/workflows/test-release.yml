@@ -1,0 +1,300 @@
+# Test Release Workflow - Publishes to TestPyPI for validation
+name: Test Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to test (e.g., 1.1.3)'
+        required: true
+        type: string
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ============================================================
+  # Rust Testing & Linting
+  # ============================================================
+  rust-test:
+    name: Rust Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./rust
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets -- -D clippy::all
+
+      - name: Run tests
+        run: cargo test --verbose
+
+      - name: Build release
+        run: cargo build --release
+
+  # ============================================================
+  # Python Wheel Building (Linux)
+  # ============================================================
+  build-linux:
+    name: Build Linux Wheels
+    runs-on: ubuntu-latest
+    needs: rust-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheel (manylinux)
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release -o dist -i python3.14
+          manylinux: 2014
+          working-directory: .
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-linux-py3.14
+          path: dist/*.whl
+
+  # ============================================================
+  # Python Wheel Building (Linux ARM64)
+  # ============================================================
+  build-linux-aarch64:
+    name: Build Linux ARM64 Wheels
+    runs-on: ubuntu-latest
+    needs: rust-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build wheel (manylinux aarch64)
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release -o dist -i python3.14
+          manylinux: 2014
+          target: aarch64-unknown-linux-gnu
+          working-directory: .
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-linux-aarch64-py3.14
+          path: dist/*.whl
+
+  # ============================================================
+  # Python Wheel Building (macOS ARM64)
+  # ============================================================
+  build-macos:
+    name: Build macOS ARM64 Wheels
+    runs-on: macos-14
+    needs: rust-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: --release -o dist
+          rust-toolchain: stable
+          working-directory: .
+
+      - name: Upload wheel
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-macos-arm64-py3.14
+          path: dist/*.whl
+
+  # ============================================================
+  # Build sdist
+  # ============================================================
+  build-sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    needs: rust-test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: -o dist
+          working-directory: .
+
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  # ============================================================
+  # Test installation from wheels
+  # ============================================================
+  test-wheels:
+    name: Test Wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: [build-linux, build-macos]
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-14]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: Download wheel (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/download-artifact@v4
+        with:
+          name: wheel-linux-py3.14
+          path: dist
+
+      - name: Download wheel (macOS)
+        if: matrix.os == 'macos-14'
+        uses: actions/download-artifact@v4
+        with:
+          name: wheel-macos-arm64-py3.14
+          path: dist
+
+      - name: Install wheel
+        run: |
+          pip install dist/*.whl
+          pip install numpy pandas pytest
+
+      - name: Smoke test - Import and version
+        run: |
+          python -c "import haze_library; print(f'Version: {haze_library.__version__}')"
+          python -c "import haze_library; assert haze_library.__version__ == '${{ github.event.inputs.version }}', f'Version mismatch: {haze_library.__version__} != ${{ github.event.inputs.version }}'"
+
+      - name: Smoke test - NumPy interface
+        run: |
+          python -c "
+          import numpy as np
+          from haze_library import np_ta
+          close = np.random.randn(100) + 100.0
+          sma = np_ta.sma(close, 20)
+          rsi = np_ta.rsi(close, 14)
+          assert len(sma) == 100, 'SMA length mismatch'
+          assert len(rsi) == 100, 'RSI length mismatch'
+          print('✓ NumPy interface OK')
+          "
+
+      - name: Smoke test - Pandas accessor
+        run: |
+          python -c "
+          import pandas as pd
+          import haze_library
+          df = pd.DataFrame({'close': [100, 101, 102, 103, 104] * 20})
+          sma = df['close'].haze.sma(20)
+          rsi = df['close'].haze.rsi(14)
+          assert len(sma) == 100, 'Pandas SMA length mismatch'
+          assert len(rsi) == 100, 'Pandas RSI length mismatch'
+          print('✓ Pandas accessor OK')
+          "
+
+      - name: Smoke test - Streaming indicators
+        run: |
+          python -c "
+          from haze_library.streaming import IncrementalSMA, IncrementalRSI
+          sma = IncrementalSMA(period=20)
+          rsi = IncrementalRSI(period=14)
+          for price in [100.0, 101.0, 102.0, 103.0, 104.0] * 10:
+              sma_val = sma.update(price)
+              rsi_val = rsi.update(price)
+          print('✓ Streaming indicators OK')
+          print(f'  SMA: {sma_val:.2f}')
+          print(f'  RSI: {rsi_val:.2f}')
+          "
+
+  # ============================================================
+  # Publish to TestPyPI
+  # ============================================================
+  publish-testpypi:
+    name: Publish to TestPyPI
+    runs-on: ubuntu-latest
+    needs: [build-linux, build-linux-aarch64, build-macos, build-sdist, test-wheels]
+
+    environment: testpypi
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: wheel-*
+          merge-multiple: true
+
+      - name: Download sdist
+        uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+
+      - name: List distributions
+        run: |
+          echo "Files to upload to TestPyPI:"
+          ls -lh dist/
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: dist/
+          skip-existing: true
+
+      - name: Output TestPyPI URL
+        run: |
+          echo "::notice::Package published to TestPyPI: https://test.pypi.org/project/haze-library/${{ github.event.inputs.version }}/"
+          echo "::notice::Test installation with: pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple haze-library==${{ github.event.inputs.version }}"
