@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2025-12-30
+
+### Documentation / 文档
+- **新增 `docs/LT_INDICATORS.md`** - LT 指标系统完整技术文档 (50KB+)
+  - 架构设计：市场状态检测算法、加权集成投票机制
+  - 指标深度：10 个 SFG 指标详解（算法原理、数学公式、参数配置、代码示例）
+    - AI SuperTrend: KNN + SuperTrend ML 增强
+    - ATR2 Signals: ATR + RSI + 岭回归
+    - AI Momentum Index: KNN + RSI 关系预测
+    - General Parameters: RSI + MACD + ATR 投票
+    - Pivot Buy/Sell: 枢轴点 + 跟踪止损
+    - Market Structure & FVG: BOS/CHoCH + Fair Value Gap
+    - PD Array & Breaker: Premium/Discount + 突破区块
+    - Linear Regression: 多时间框架支撑阻力
+    - Volume Profile: POC/VAH/VAL 成交量分布
+    - Dynamic MACD + Heikin Ashi: MACD + 平均 K 线
+  - 配置指南：参数调优策略、权重自定义、性能优化
+  - 实战示例：5 个递进式完整代码示例（基础用法 → 回测框架）
+  - 市场分析：TRENDING/RANGING/VOLATILE 三态详解
+  - 常见问题：FAQ + 故障排除 + 集成指南
+
+**注意**: 本版本为纯文档发布，无代码变更。
+
 ## [1.1.1] - 2025-12-30
 
 ### Fixed / 修复
