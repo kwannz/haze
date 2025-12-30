@@ -32,7 +32,7 @@ Performance:
     - High numerical precision using f64
 """
 
-__version__ = "1.1.2"
+__version__ = "1.1.3"
 __author__ = "kwannz"
 
 import inspect
