@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1769399839385,
+  "lastUpdate": 1769485690041,
   "repoUrl": "https://github.com/kwannz/haze",
   "entries": {
     "Rust Numerical Precision Benchmarks": [
@@ -5161,6 +5161,184 @@ window.BENCHMARK_DATA = {
             "name": "memory_efficiency/ema_1m_points",
             "value": 2031388,
             "range": "± 3874",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jacksonchiunz",
+            "username": "renoschubert",
+            "email": "your-email@example.com"
+          },
+          "committer": {
+            "name": "Jacksonchiunz",
+            "username": "renoschubert",
+            "email": "your-email@example.com"
+          },
+          "id": "56287755f22fabd9243d5549dfa3f3257b90076b",
+          "message": "feat(ffi): migrate 30 single-input indicators to zero-copy (Phase 1)\n\n## Phase 1 Complete: Zero-Copy FFI Migration\nSuccessfully migrated 30 technical indicators from Vec<f64> to PyReadonlyArray1\nfor zero-copy data transfer between Python and Rust.\n\n### Performance Impact\n- Eliminated 4 data copies per function call (NumPy → List → Vec → List → NumPy)\n- Expected 2-3x speedup for large datasets (n > 10K)\n- Compilation time: 14.60s (within <20s target)\n\n### Migrated Functions (30)\n**Trend**: alma, dpo, vhf, trix, volume_oscillator\n**Momentum**: apo, ppo, cmo, cti, er, bias, psl, mom, roc, percent_rank\n**Volatility**: historical_volatility, ulcer_index\n**Advanced MA**: frama, t3, kama, sinwma, slope, swma\n**Composite**: stc, tdfi, coppock, entropy\n\n### Technical Achievements\n1. **Enhanced Code Generator** (`migrate_to_zero_copy.py`)\n   - Implemented brace-counting algorithm for robust function body extraction\n   - Auto-extracts Option parameter defaults from legacy functions\n   - Success rate: 50% auto + 50% manual fixup\n\n2. **Zero-Copy Infrastructure** (`rust/src/ffi/zero_copy.rs`)\n   - `to_pyarray_or_nan()`: Handles Option<Vec<f64>> → PyArray1\n   - Graceful NaN handling for computation errors\n   - Foundation for multi-output functions (Phase 2-4)\n\n3. **Safe Migration Strategy**\n   - Original functions renamed to `*_legacy` (backward compatible)\n   - Comprehensive backups in `rust/src/backups/`\n   - Integration script with dry-run mode\n\n### Validation\n- ✅ 0 compilation errors (3 harmless warnings)\n- ✅ 5/5 sample functions tested (correct NumPy output)\n- ✅ Type-safe: no runtime type coercion\n\n### Architecture Pattern\n```rust\n// Before (4 copies):\nfn py_alma(values: Vec<f64>, ...) -> Vec<f64>\n\n// After (zero-copy):\nfn py_alma<'py>(\n    py: Python<'py>,\n    values: PyReadonlyArray1<'py, f64>,  // Borrow Python data\n    ...\n) -> Py<PyArray1<f64>>  // Return NumPy view directly\n```\n\n### Migration Progress\n- Phase 1 (1→1): 30/32 ✅ (93.8%)\n  - Deferred: volume_filter, prepare_momentum_features (wrong pattern)\n- Phase 2 (n→1): 0/129 (next)\n- Phase 3 (1→n, n→m): 0/16\n- Total: 30/262 indicators (11.5%)\n\n### Breaking Changes\nNone - legacy functions remain available during transition period.\n\n### Files Changed\n- `rust/src/lib.rs`: +30 zero-copy functions\n- `scripts/migrate_to_zero_copy.py`: Code generator with default extraction\n- `scripts/auto_integrate_zero_copy.py`: Batch integration tool\n- `rust/src/ffi/zero_copy.rs`: Zero-copy helper functions\n- `tests/validation/test_zero_copy_migration.py`: Validation suite\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>",
+          "timestamp": "2025-12-30T08:06:32Z",
+          "url": "https://github.com/kwannz/haze/commit/56287755f22fabd9243d5549dfa3f3257b90076b"
+        },
+        "date": 1769485689491,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "sma_large_numbers/1000",
+            "value": 40779,
+            "range": "± 519",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "sma_large_numbers/10000",
+            "value": 447371,
+            "range": "± 366",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "sma_large_numbers/100000",
+            "value": 4517792,
+            "range": "± 159660",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ema_long_sequence/10000",
+            "value": 20256,
+            "range": "± 46",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ema_long_sequence/100000",
+            "value": 203138,
+            "range": "± 436",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "ema_long_sequence/1000000",
+            "value": 2033959,
+            "range": "± 3739",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "extreme_volatility/sma_volatile",
+            "value": 156832,
+            "range": "± 301",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "extreme_volatility/ema_volatile",
+            "value": 20212,
+            "range": "± 15",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "small_numbers/sma_tiny",
+            "value": 447363,
+            "range": "± 1677",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "small_numbers/ema_tiny",
+            "value": 20307,
+            "range": "± 59",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "mixed_range/sma_mixed",
+            "value": 156873,
+            "range": "± 225",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "mixed_range/ema_mixed",
+            "value": 20208,
+            "range": "± 21",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "kahan_summation/naive_sum",
+            "value": 93623,
+            "range": "± 91",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "kahan_summation/kahan_sum",
+            "value": 373623,
+            "range": "± 201",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "period_variations/sma/10",
+            "value": 252554,
+            "range": "± 103838",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "period_variations/ema/10",
+            "value": 203080,
+            "range": "± 370",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "period_variations/sma/50",
+            "value": 1578237,
+            "range": "± 6891",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "period_variations/ema/50",
+            "value": 203107,
+            "range": "± 341",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "period_variations/sma/100",
+            "value": 4519223,
+            "range": "± 4929",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "period_variations/ema/100",
+            "value": 203010,
+            "range": "± 429",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "period_variations/sma/200",
+            "value": 13100324,
+            "range": "± 5924",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "period_variations/ema/200",
+            "value": 202958,
+            "range": "± 441",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "period_variations/sma/500",
+            "value": 40889742,
+            "range": "± 17673",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "period_variations/ema/500",
+            "value": 202650,
+            "range": "± 181",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "memory_efficiency/sma_1m_points",
+            "value": 45283481,
+            "range": "± 31407",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "memory_efficiency/ema_1m_points",
+            "value": 2034352,
+            "range": "± 996",
             "unit": "ns/iter"
           }
         ]
