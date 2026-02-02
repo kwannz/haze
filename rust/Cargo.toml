@@ -16,7 +16,7 @@ crate-type = ["cdylib", "rlib"]
 # 注意：不要在依赖上直接启用 `extension-module`，否则 `cargo test` / `cargo test --all-features`
 # 会在本地环境（尤其是 macOS）遇到链接问题。maturin 会通过 `PYO3_BUILD_EXTENSION_MODULE`
 # 等方式为扩展模块构建提供正确行为。
-pyo3 = { version = "0.27.2", optional = true }
+pyo3 = { version = "0.28.0", optional = true }
 numpy = { version = "0.27.1", optional = true }
 rayon = "1.11.0"
 serde = { version = "1.0.228", features = ["derive"] }
