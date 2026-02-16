@@ -41,7 +41,7 @@ version = "0.16.1"
 features = ["rayon"]
 
 [build-dependencies]
-pyo3-build-config = { version = "0.27.2", features = ["resolve-config"] }
+pyo3-build-config = { version = "0.28.1", features = ["resolve-config"] }
 
 [features]
 default = []
